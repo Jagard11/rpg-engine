@@ -24,6 +24,12 @@ if 'char_name' not in st.session_state:
 if 'player_name' not in st.session_state:
     st.session_state.player_name = "Hero"
     
+if 'instruction' not in st.session_state:
+    st.session_state.instruction = "Choose how to respond to the player"
+
+if 'instruction' not in st.session_state:
+    st.session_state.instruction = "Choose how to respond to the player"
+    
 # Initialize default content if not in session state
 if 'loaded_npc_card' not in st.session_state:
     st.session_state.loaded_npc_card = f"""Name: {st.session_state.char_name}
@@ -66,7 +72,7 @@ def send_to_server(message):
     URL = "http://127.0.0.1:5000/v1/chat/completions"
     
     request_data = {
-        "messages": [{"role": "user", "content": message}],
+        "messages": [{"role": "user", "content": replace_variables(message)}],
         "mode": "instruct",
         "instruction_template": "Alpaca",
         "temperature": 0.7,
@@ -95,7 +101,12 @@ def replace_variables(text):
 # Streamlit UI
 st.title("RPG Server Communication Debugger")
 
-# Top section - Names and basic info
+# Top section - Instruction and names
+st.text_area("Instruction", 
+             value=st.session_state.instruction, 
+             height=100,
+             key="instruction")
+
 name_col1, name_col2, name_col3 = st.columns(3)
 
 with name_col1:
@@ -352,12 +363,16 @@ with server_col:
             st.rerun()
     with msg_col2:
         if st.button("Send to Server", use_container_width=True):
-            response = send_to_server(replace_variables(st.session_state.server_message))
+            # Combine instruction and message with proper spacing
+            message_display = st.session_state.get('message_display', '')  # Get current message from display
+            full_message = f"{st.session_state.instruction}\n\n{message_display}"
+            
+            response = send_to_server(full_message)
             st.session_state.server_response = response
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             st.session_state.server_history.append({
                 "timestamp": timestamp,
-                "message": replace_variables(st.session_state.server_message),
+                "message": full_message,
                 "response": response
             })
             st.rerun()
