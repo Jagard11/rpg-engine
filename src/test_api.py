@@ -3,87 +3,86 @@ import json
 from datetime import datetime
 
 def test_oobabooga_connection():
-    # Gradio API endpoint for oobabooga
-    URL = "http://127.0.0.1:7860/api/v1/chat"
+    # OpenAI-compatible endpoint as specified in the wiki
+    URL = "http://127.0.0.1:5000/v1/chat/completions"
     
-    # Test prompt following Gradio format
-    prompt_data = {
-        "user_input": "You are a friendly tavern keeper. Greet a new customer who just walked in.",
-        "max_new_tokens": 250,
-        "auto_max_new_tokens": False,
-        "max_tokens_second": 0,
-        "history": {"internal": [], "visible": []},
-        "mode": "chat",  # or "instruct" depending on your model
-        "character": "Assistant",
-        "instruction_template": "Vicuna-v1.1",  # adjust based on your model
-        "your_name": "You",
-        
-        # Generation parameters
+    # Test message following the OpenAI chat format
+    messages = [
+        {
+            "role": "user",
+            "content": "You are a friendly tavern keeper. Greet a new customer who just walked in."
+        }
+    ]
+    
+    # Request body following OpenAI format
+    request_data = {
+        "messages": messages,
+        "mode": "chat",         # can be chat or instruct
+        "stream": False,        # we'll start with non-streaming for simplicity
+        "max_tokens": 250,
         "temperature": 0.7,
-        "top_p": 0.9,
-        "top_k": 40,
-        "typical_p": 1,
-        "repetition_penalty": 1.15,
-        "encoder_repetition_penalty": 1,
-        "top_k": 40,
-        "min_length": 0,
-        "no_repeat_ngram_size": 0,
-        "num_beams": 1,
-        "penalty_alpha": 0,
-        "length_penalty": 1,
-        "early_stopping": True,
-        "seed": -1,
-        "add_bos_token": True,
-        "truncation_length": 2048,
-        "ban_eos_token": False,
-        "skip_special_tokens": True,
-        "stopping_strings": []
+        "top_p": 0.9
     }
     
     try:
-        # Make the API call
         print(f"\nAttempting to connect to {URL}")
-        print("\nSending request with data:", json.dumps(prompt_data, indent=2))
+        print("\nSending request with data:", json.dumps(request_data, indent=2))
         
-        response = requests.post(URL, json=prompt_data)
+        # Make the API call
+        response = requests.post(
+            URL, 
+            headers={"Content-Type": "application/json"},
+            json=request_data,
+            verify=False  # as mentioned in wiki for local connections
+        )
         
-        # Print raw response for debugging
+        # Print response details for debugging
         print("\nStatus Code:", response.status_code)
         print("\nResponse Headers:", dict(response.headers))
-        print("\nRaw Response Content:", response.text[:500])  # First 500 chars in case it's very long
         
         # Create a timestamp for the filename
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         
-        # Try to parse JSON response if possible
         try:
             response_json = response.json()
+            print("\nResponse Content:", json.dumps(response_json, indent=2))
+            
             output = {
                 "timestamp": timestamp,
-                "request": prompt_data,
+                "request": request_data,
                 "response": response_json,
                 "status_code": response.status_code
             }
+            
+            # If successful, print the generated text
+            if response.status_code == 200:
+                generated_text = response_json['choices'][0]['message']['content']
+                print("\nGenerated Response:")
+                print(generated_text)
+                
         except json.JSONDecodeError:
-            # If JSON parsing fails, store raw response
+            print("\nRaw Response Content (not JSON):", response.text)
             output = {
                 "timestamp": timestamp,
-                "request": prompt_data,
+                "request": request_data,
                 "raw_response": response.text,
                 "status_code": response.status_code,
                 "headers": dict(response.headers)
             }
         
-        # Write to a file in the data directory
-        with open(f"data/test_response_{timestamp}.json", "w") as f:
-            json.dump(output, f, indent=4)
+        # Write complete response to file
+        with open(f"data/test_response_{timestamp}.json", "w", encoding='utf-8') as f:
+            json.dump(output, f, indent=4, ensure_ascii=False)
             
-        print(f"\nTest completed. Response saved to data/test_response_{timestamp}.json")
+        print(f"\nTest completed. Full results saved to data/test_response_{timestamp}.json")
         
-    except requests.exceptions.ConnectionError:
-        print("Error: Could not connect to the oobabooga server. Make sure it's running and the API is enabled.")
+    except requests.exceptions.ConnectionError as e:
+        print(f"Connection Error: {str(e)}")
+        print("\nError: Could not connect to the oobabooga API server.")
+        print("Make sure oobabooga is running with the --api flag enabled.")
+        print("Example start command: python server.py --api")
     except Exception as e:
-        print(f"An error occurred: {str(e)}")
+        print(f"\nAn error occurred: {str(e)}")
         print(f"Error type: {type(e)}")
         import traceback
         traceback.print_exc()
