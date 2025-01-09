@@ -5,7 +5,7 @@ from datetime import datetime
 # Configure Streamlit page to use wide mode
 st.set_page_config(layout="wide")
 
-# Initialize session state variables if they don't exist
+# Initialize ALL session state variables first
 if 'messages' not in st.session_state:
     st.session_state.messages = []
     
@@ -26,6 +26,45 @@ if 'player_name' not in st.session_state:
     
 if 'instruction' not in st.session_state:
     st.session_state.instruction = "Choose how to respond to the player"
+    
+if 'message_sections' not in st.session_state:
+    st.session_state.message_sections = {}
+
+# Initialize all toggle states
+if 'toggle_instruction' not in st.session_state:
+    st.session_state.toggle_instruction = True
+    
+if 'toggle_npc_card' not in st.session_state:
+    st.session_state.toggle_npc_card = False
+    
+if 'toggle_player_card' not in st.session_state:
+    st.session_state.toggle_player_card = False
+    
+if 'toggle_scenario' not in st.session_state:
+    st.session_state.toggle_scenario = False
+    
+if 'toggle_char_states' not in st.session_state:
+    st.session_state.toggle_char_states = False
+    
+if 'toggle_char_attacks' not in st.session_state:
+    st.session_state.toggle_char_attacks = False
+    
+if 'toggle_char_spells' not in st.session_state:
+    st.session_state.toggle_char_spells = False
+    
+if 'toggle_player_states' not in st.session_state:
+    st.session_state.toggle_player_states = False
+    
+if 'toggle_player_attacks' not in st.session_state:
+    st.session_state.toggle_player_attacks = False
+    
+if 'toggle_player_spells' not in st.session_state:
+    st.session_state.toggle_player_spells = False
+    
+if 'toggle_custom_field' not in st.session_state:
+    st.session_state.toggle_custom_field = False
+
+# Initialize any other required session state variables
 
 if 'forced_response' not in st.session_state:
     st.session_state.forced_response = ""
@@ -115,10 +154,17 @@ def replace_variables(text):
 st.title("RPG Server Communication Debugger")
 
 # Top section - Instruction and names
-st.text_area("Instruction", 
+instruction_text = st.text_area("Instruction", 
              value=st.session_state.instruction, 
              height=100,
              key="instruction")
+
+if st.toggle('Include Instruction', key='toggle_instruction', value=st.session_state.toggle_instruction):
+    if 'instruction_content' not in st.session_state.message_sections:
+        st.session_state.message_sections['instruction_content'] = instruction_text
+else:
+    if 'instruction_content' in st.session_state.message_sections:
+        del st.session_state.message_sections['instruction_content']
 
 name_col1, name_col2, name_col3 = st.columns(3)
 
@@ -380,9 +426,19 @@ with server_col:
             st.rerun()
     with msg_col2:
         if st.button("Send to Server", use_container_width=True):
-            # Combine instruction and active message sections
-            message_content = "\n".join(st.session_state.message_sections.values())
-            full_message = f"{st.session_state.instruction}\n\n{message_content}"
+            # Get instruction if toggled on
+            instruction = st.session_state.message_sections.get('instruction_content', '')
+            
+            # Combine message sections (excluding instruction)
+            message_sections = {k: v for k, v in st.session_state.message_sections.items() 
+                              if k != 'instruction_content'}
+            message_content = "\n".join(message_sections.values())
+            
+            # Build full message based on whether instruction is included
+            if instruction:
+                full_message = f"{instruction}\n\n{message_content}"
+            else:
+                full_message = message_content
             
             # Get forced response if any
             forced_response = st.session_state.get('forced_response', '').strip()
