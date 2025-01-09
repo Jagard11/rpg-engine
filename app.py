@@ -37,6 +37,21 @@ if 'toggle_instruction' not in st.session_state:
 if 'toggle_npc_card' not in st.session_state:
     st.session_state.toggle_npc_card = False
     
+if 'toggle_char_stats' not in st.session_state:
+    st.session_state.toggle_char_stats = False
+    
+if 'toggle_player_stats' not in st.session_state:
+    st.session_state.toggle_player_stats = False
+    
+if 'toggle_chat_log' not in st.session_state:
+    st.session_state.toggle_chat_log = False
+    
+if 'toggle_combat_log' not in st.session_state:
+    st.session_state.toggle_combat_log = False
+    
+if 'toggle_react_to' not in st.session_state:
+    st.session_state.toggle_react_to = False
+    
 if 'toggle_player_card' not in st.session_state:
     st.session_state.toggle_player_card = False
     
@@ -80,6 +95,21 @@ Personality: Scholarly and curious
 Background: Trained at the Academy of High Magic
 Appearance: Robed figure with glowing staff
 Notable Traits: Speaks in a formal manner, values knowledge"""
+
+if 'char_stats' not in st.session_state:
+    st.session_state.char_stats = "HP: 10/10\nMP: 8/8"
+    
+if 'player_stats' not in st.session_state:
+    st.session_state.player_stats = "HP: 15/15\nMP: 5/5"
+    
+if 'chat_log' not in st.session_state:
+    st.session_state.chat_log = ""
+    
+if 'combat_log' not in st.session_state:
+    st.session_state.combat_log = ""
+    
+if 'react_to' not in st.session_state:
+    st.session_state.react_to = ""
 
 if 'loaded_player_card' not in st.session_state:
     st.session_state.loaded_player_card = f"""Name: {st.session_state.player_name}
@@ -342,6 +372,86 @@ Notable Traits: Natural leader, protective of allies""",
                 if 'scenario_content' in st.session_state.message_sections:
                     del st.session_state.message_sections['scenario_content']
                 
+        # Character Stats
+        with st.expander(f"{st.session_state.char_name}'s Stats", expanded=True):
+            char_stats = st.text_area(
+                "Character Stats",
+                value=st.session_state.char_stats,
+                height=100,
+                key="char_stats"
+            )
+            
+            if st.toggle('Include in Message', key='toggle_char_stats', value=st.session_state.toggle_char_stats):
+                if 'char_stats_content' not in st.session_state.message_sections:
+                    st.session_state.message_sections['char_stats_content'] = f"\n{st.session_state.char_name}'s Stats:\n{char_stats}"
+            else:
+                if 'char_stats_content' in st.session_state.message_sections:
+                    del st.session_state.message_sections['char_stats_content']
+
+        # Player Stats
+        with st.expander(f"{st.session_state.player_name}'s Stats", expanded=True):
+            player_stats = st.text_area(
+                "Player Stats",
+                value=st.session_state.player_stats,
+                height=100,
+                key="player_stats"
+            )
+            
+            if st.toggle('Include in Message', key='toggle_player_stats', value=st.session_state.toggle_player_stats):
+                if 'player_stats_content' not in st.session_state.message_sections:
+                    st.session_state.message_sections['player_stats_content'] = f"\n{st.session_state.player_name}'s Stats:\n{player_stats}"
+            else:
+                if 'player_stats_content' in st.session_state.message_sections:
+                    del st.session_state.message_sections['player_stats_content']
+
+        # Chat Log
+        with st.expander("Chat Log", expanded=True):
+            chat_log = st.text_area(
+                "Recent Chat History",
+                value=st.session_state.chat_log,
+                height=150,
+                key="chat_log"
+            )
+            
+            if st.toggle('Include in Message', key='toggle_chat_log', value=st.session_state.toggle_chat_log):
+                if 'chat_log_content' not in st.session_state.message_sections:
+                    st.session_state.message_sections['chat_log_content'] = f"\n<CHAT_LOG>\n{chat_log}\n</CHAT_LOG>"
+            else:
+                if 'chat_log_content' in st.session_state.message_sections:
+                    del st.session_state.message_sections['chat_log_content']
+
+        # Combat Log
+        with st.expander("Combat Log", expanded=True):
+            combat_log = st.text_area(
+                "Recent Combat Actions",
+                value=st.session_state.combat_log,
+                height=150,
+                key="combat_log"
+            )
+            
+            if st.toggle('Include in Message', key='toggle_combat_log', value=st.session_state.toggle_combat_log):
+                if 'combat_log_content' not in st.session_state.message_sections:
+                    st.session_state.message_sections['combat_log_content'] = f"\n<COMBAT_LOG>\n{combat_log}\n</COMBAT_LOG>"
+            else:
+                if 'combat_log_content' in st.session_state.message_sections:
+                    del st.session_state.message_sections['combat_log_content']
+
+        # React To
+        with st.expander("React To", expanded=True):
+            react_to = st.text_area(
+                "Content to React To",
+                value=st.session_state.react_to,
+                height=150,
+                key="react_to"
+            )
+            
+            if st.toggle('Include in Message', key='toggle_react_to', value=st.session_state.toggle_react_to):
+                if 'react_to_content' not in st.session_state.message_sections:
+                    st.session_state.message_sections['react_to_content'] = f"\n<REACT_TO>\n{react_to}\n</REACT_TO>"
+            else:
+                if 'react_to_content' in st.session_state.message_sections:
+                    del st.session_state.message_sections['react_to_content']
+
         # Character States
         with st.expander(f"{st.session_state.char_name}'s States", expanded=True):
             char_states = st.text_area(
@@ -383,7 +493,7 @@ Low on mana""",
                 if 'char_attacks_content' in st.session_state.message_sections:
                     del st.session_state.message_sections['char_attacks_content']
         
-                    # Character Spells
+        # Character Spells
         with st.expander(f"{st.session_state.char_name}'s Spells", expanded=True):
             char_spells = st.text_area(
                 "Available Spells",
@@ -402,6 +512,84 @@ Low on mana""",
             else:
                 if 'char_spells_content' in st.session_state.message_sections:
                     del st.session_state.message_sections['char_spells_content']
+                    
+        # Player States
+        with st.expander(f"{st.session_state.player_name}'s States", expanded=True):
+            player_states = st.text_area(
+                "Player States",
+                value="""Stunned (1 round remaining)
+Bleeding (2 damage per round)
+Weakened (-2 to physical attacks)""",
+                height=150
+            )
+            
+            # Initialize toggle state if not exists
+            if 'toggle_player_states' not in st.session_state:
+                st.session_state.toggle_player_states = False
+                
+            if st.toggle('Include in Message', key='toggle_player_states', value=st.session_state.toggle_player_states):
+                if 'player_states_content' not in st.session_state.message_sections:
+                    st.session_state.message_sections['player_states_content'] = f"\n{st.session_state.player_name}'s Current States:\n{player_states}"
+            else:
+                if 'player_states_content' in st.session_state.message_sections:
+                    del st.session_state.message_sections['player_states_content']
+    
+    with field_col3:
+        # Player Attacks
+        with st.expander(f"{st.session_state.player_name}'s Attacks", expanded=True):
+            player_attacks = st.text_area(
+                "Player's Combat Actions",
+                value=st.session_state.loaded_player_attacks,
+                height=150,
+                key="player_attacks"
+            )
+            
+            # Initialize toggle state if not exists
+            if 'toggle_player_attacks' not in st.session_state:
+                st.session_state.toggle_player_attacks = False
+                
+            if st.toggle('Include in Message', key='toggle_player_attacks', value=st.session_state.toggle_player_attacks):
+                if 'player_attacks_content' not in st.session_state.message_sections:
+                    st.session_state.message_sections['player_attacks_content'] = f"\n{st.session_state.player_name}'s Combat Actions:\n{player_attacks}"
+            else:
+                if 'player_attacks_content' in st.session_state.message_sections:
+                    del st.session_state.message_sections['player_attacks_content']
+        
+        # Player Spells
+        with st.expander(f"{st.session_state.player_name}'s Spells", expanded=True):
+            player_spells = st.text_area(
+                "Player's Spells",
+                value=st.session_state.loaded_player_spells,
+                height=150,
+                key="player_spells"
+            )
+            
+            # Initialize toggle state if not exists
+            if 'toggle_player_spells' not in st.session_state:
+                st.session_state.toggle_player_spells = False
+                
+            if st.toggle('Include in Message', key='toggle_player_spells', value=st.session_state.toggle_player_spells):
+                if 'player_spells_content' not in st.session_state.message_sections:
+                    st.session_state.message_sections['player_spells_content'] = f"\n{st.session_state.player_name}'s Spells:\n{player_spells}"
+            else:
+                if 'player_spells_content' in st.session_state.message_sections:
+                    del st.session_state.message_sections['player_spells_content']
+        
+        # Custom Field
+        with st.expander("Custom Field", expanded=True):
+            custom_label = st.text_input("Field Label", "Custom Data")
+            custom_data = st.text_area("Custom Data", height=150)
+            
+            # Initialize toggle state if not exists
+            if 'toggle_custom_field' not in st.session_state:
+                st.session_state.toggle_custom_field = False
+                
+            if st.toggle('Include in Message', key='toggle_custom_field', value=st.session_state.toggle_custom_field):
+                if 'custom_field_content' not in st.session_state.message_sections:
+                    st.session_state.message_sections['custom_field_content'] = f"\n{custom_label}:\n{custom_data}"
+            else:
+                if 'custom_field_content' in st.session_state.message_sections:
+                    del st.session_state.message_sections['custom_field_content']
 
 with server_col:
     st.header("Server Communication")
