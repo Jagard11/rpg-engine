@@ -27,8 +27,11 @@ if 'player_name' not in st.session_state:
 if 'instruction' not in st.session_state:
     st.session_state.instruction = "Choose how to respond to the player"
 
-if 'instruction' not in st.session_state:
-    st.session_state.instruction = "Choose how to respond to the player"
+if 'forced_response' not in st.session_state:
+    st.session_state.forced_response = ""
+    
+if 'message_sections' not in st.session_state:
+    st.session_state.message_sections = {}
     
 # Initialize default content if not in session state
 if 'loaded_npc_card' not in st.session_state:
@@ -67,12 +70,22 @@ if 'loaded_player_spells' not in st.session_state:
 Lightning Strike: Single target lightning damage
 Purify: Remove poison effect"""
 
-def send_to_server(message):
+def send_to_server(message, forced_response=None):
     """Send message to the API and return the response"""
     URL = "http://127.0.0.1:5000/v1/chat/completions"
     
+    # If there's a forced response, prepend it to the message with a special marker
+    if forced_response and forced_response.strip():
+        # Create system message to force the response using proper API instruction format
+        system_message = {"role": "system", "content": "You are an assistant designed to generate text. You need to follow the rules and constraints given to you to generate an appropriate response."}
+        format_message = {"role": "user", "content": f"Please complete the following response, starting exactly with: {forced_response}"}
+        main_message = {"role": "user", "content": replace_variables(message)}
+        messages = [system_message, format_message, main_message]
+    else:
+        messages = [{"role": "user", "content": replace_variables(message)}]
+    
     request_data = {
-        "messages": [{"role": "user", "content": replace_variables(message)}],
+        "messages": messages,
         "mode": "instruct",
         "instruction_template": "Alpaca",
         "temperature": 0.7,
@@ -188,11 +201,18 @@ Notable Traits: Speaks in a formal manner, values knowledge""",
                 key="npc_card"
             )
             
-            # NPC Character Buttons
-            if st.button("Add to Message", key="add_npc_card"):
-                st.session_state.server_message += f"\nCharacter Description:\n{character_card}"
-                st.rerun()
+            # Initialize toggle state if not exists
+            if 'toggle_npc_card' not in st.session_state:
+                st.session_state.toggle_npc_card = False
                 
+            # Add toggle for character card
+            if st.toggle('Include in Message', key='toggle_npc_card', value=st.session_state.toggle_npc_card):
+                if 'npc_card_content' not in st.session_state.message_sections:
+                    st.session_state.message_sections['npc_card_content'] = f"\nCharacter Description:\n{character_card}"
+            else:
+                if 'npc_card_content' in st.session_state.message_sections:
+                    del st.session_state.message_sections['npc_card_content']
+            
             if st.button("Save to File", key="save_npc"):
                 if save_character_data(
                     st.session_state.char_name,
@@ -226,11 +246,18 @@ Notable Traits: Natural leader, protective of allies""",
                 key="player_card"
             )
             
-            # Player Character Buttons
-            if st.button("Add to Message", key="add_player_card"):
-                st.session_state.server_message += f"\nPlayer Character Description:\n{player_char_card}"
-                st.rerun()
+            # Initialize toggle state if not exists
+            if 'toggle_player_card' not in st.session_state:
+                st.session_state.toggle_player_card = False
                 
+            # Add toggle for player character card
+            if st.toggle('Include in Message', key='toggle_player_card', value=st.session_state.toggle_player_card):
+                if 'player_card_content' not in st.session_state.message_sections:
+                    st.session_state.message_sections['player_card_content'] = f"\nPlayer Character Description:\n{player_char_card}"
+            else:
+                if 'player_card_content' in st.session_state.message_sections:
+                    del st.session_state.message_sections['player_card_content']
+            
             if st.button("Save to File", key="save_player"):
                 if save_character_data(
                     st.session_state.player_name,
@@ -257,9 +284,17 @@ Notable Traits: Natural leader, protective of allies""",
                 value=f"{st.session_state.char_name} stands ready in the tavern, watching the patrons carefully.",
                 height=150
             )
-            if st.button("Add Scenario", use_container_width=True):
-                st.session_state.server_message += f"\nCurrent Scenario:\n{scenario}"
-                st.rerun()
+            
+            # Initialize toggle state if not exists
+            if 'toggle_scenario' not in st.session_state:
+                st.session_state.toggle_scenario = False
+                
+            if st.toggle('Include in Message', key='toggle_scenario', value=st.session_state.toggle_scenario):
+                if 'scenario_content' not in st.session_state.message_sections:
+                    st.session_state.message_sections['scenario_content'] = f"\nCurrent Scenario:\n{scenario}"
+            else:
+                if 'scenario_content' in st.session_state.message_sections:
+                    del st.session_state.message_sections['scenario_content']
                 
         # Character States
         with st.expander(f"{st.session_state.char_name}'s States", expanded=True):
@@ -270,9 +305,17 @@ Protected by magical barrier
 Low on mana""",
                 height=150
             )
-            if st.button(f"Add {st.session_state.char_name}'s States", use_container_width=True):
-                st.session_state.server_message += f"\n{st.session_state.char_name}'s Current States:\n{char_states}"
-                st.rerun()
+            
+            # Initialize toggle state if not exists
+            if 'toggle_char_states' not in st.session_state:
+                st.session_state.toggle_char_states = False
+                
+            if st.toggle('Include in Message', key='toggle_char_states', value=st.session_state.toggle_char_states):
+                if 'char_states_content' not in st.session_state.message_sections:
+                    st.session_state.message_sections['char_states_content'] = f"\n{st.session_state.char_name}'s Current States:\n{char_states}"
+            else:
+                if 'char_states_content' in st.session_state.message_sections:
+                    del st.session_state.message_sections['char_states_content']
     
     with field_col2:
         # Character Attacks
@@ -283,11 +326,18 @@ Low on mana""",
                 height=150,
                 key="npc_attacks"
             )
-            if st.button(f"Add {st.session_state.char_name}'s Attacks", use_container_width=True):
-                st.session_state.server_message += f"\n{st.session_state.char_name}'s Available Combat Actions:\n{char_attacks}"
-                st.rerun()
+            # Initialize toggle state if not exists
+            if 'toggle_char_attacks' not in st.session_state:
+                st.session_state.toggle_char_attacks = False
+                
+            if st.toggle('Include in Message', key='toggle_char_attacks', value=st.session_state.toggle_char_attacks):
+                if 'char_attacks_content' not in st.session_state.message_sections:
+                    st.session_state.message_sections['char_attacks_content'] = f"\n{st.session_state.char_name}'s Available Combat Actions:\n{char_attacks}"
+            else:
+                if 'char_attacks_content' in st.session_state.message_sections:
+                    del st.session_state.message_sections['char_attacks_content']
         
-        # Character Spells
+                    # Character Spells
         with st.expander(f"{st.session_state.char_name}'s Spells", expanded=True):
             char_spells = st.text_area(
                 "Available Spells",
@@ -295,63 +345,27 @@ Low on mana""",
                 height=150,
                 key="npc_spells"
             )
-            if st.button(f"Add {st.session_state.char_name}'s Spells", use_container_width=True):
-                st.session_state.server_message += f"\n{st.session_state.char_name}'s Available Spells:\n{char_spells}"
-                st.rerun()
+            
+            # Initialize toggle state if not exists
+            if 'toggle_char_spells' not in st.session_state:
+                st.session_state.toggle_char_spells = False
                 
-        # Player States
-        with st.expander(f"{st.session_state.player_name}'s States", expanded=True):
-            player_states = st.text_area(
-                "Player States",
-                value="""Stunned (1 round remaining)
-Bleeding (2 damage per round)
-Weakened (-2 to physical attacks)""",
-                height=150
-            )
-            if st.button(f"Add {st.session_state.player_name}'s States", use_container_width=True):
-                st.session_state.server_message += f"\n{st.session_state.player_name}'s Current States:\n{player_states}"
-                st.rerun()
-    
-    with field_col3:
-        # Player Attacks
-        with st.expander(f"{st.session_state.player_name}'s Attacks", expanded=True):
-            player_attacks = st.text_area(
-                "Player's Combat Actions",
-                value=st.session_state.loaded_player_attacks,
-                height=150,
-                key="player_attacks"
-            )
-            if st.button(f"Add {st.session_state.player_name}'s Attacks", use_container_width=True):
-                st.session_state.server_message += f"\n{st.session_state.player_name}'s Combat Actions:\n{player_attacks}"
-                st.rerun()
-        
-        # Player Spells
-        with st.expander(f"{st.session_state.player_name}'s Spells", expanded=True):
-            player_spells = st.text_area(
-                "Player's Spells",
-                value=st.session_state.loaded_player_spells,
-                height=150,
-                key="player_spells"
-            )
-            if st.button(f"Add {st.session_state.player_name}'s Spells", use_container_width=True):
-                st.session_state.server_message += f"\n{st.session_state.player_name}'s Spells:\n{player_spells}"
-                st.rerun()
-        
-        # Custom Field (kept for flexibility)
-        with st.expander("Custom Field", expanded=True):
-            custom_label = st.text_input("Field Label", "Custom Data")
-            custom_data = st.text_area("Custom Data", height=150)
-            if st.button("Add Custom Data", use_container_width=True):
-                st.session_state.server_message += f"\n{custom_label}:\n{custom_data}"
-                st.rerun()
+            if st.toggle('Include in Message', key='toggle_char_spells', value=st.session_state.toggle_char_spells):
+                if 'char_spells_content' not in st.session_state.message_sections:
+                    st.session_state.message_sections['char_spells_content'] = f"\n{st.session_state.char_name}'s Available Spells:\n{char_spells}"
+            else:
+                if 'char_spells_content' in st.session_state.message_sections:
+                    del st.session_state.message_sections['char_spells_content']
 
 with server_col:
     st.header("Server Communication")
     
     # Server Message Builder
     st.subheader("Message to Server")
+    # Combine all active sections for display
+    combined_message = "\n".join(st.session_state.message_sections.values())
     st.text_area("Current Message", 
-                 value=replace_variables(st.session_state.server_message),
+                 value=replace_variables(combined_message),
                  height=200,
                  key="message_display")
     
@@ -359,23 +373,38 @@ with server_col:
     msg_col1, msg_col2 = st.columns(2)
     with msg_col1:
         if st.button("Clear Message", use_container_width=True):
-            st.session_state.server_message = ""
+            st.session_state.message_sections = {}
+            for key in list(st.session_state.keys()):
+                if key.startswith('toggle_'):
+                    st.session_state[key] = False
             st.rerun()
     with msg_col2:
         if st.button("Send to Server", use_container_width=True):
-            # Combine instruction and message with proper spacing
-            message_display = st.session_state.get('message_display', '')  # Get current message from display
-            full_message = f"{st.session_state.instruction}\n\n{message_display}"
+            # Combine instruction and active message sections
+            message_content = "\n".join(st.session_state.message_sections.values())
+            full_message = f"{st.session_state.instruction}\n\n{message_content}"
             
-            response = send_to_server(full_message)
+            # Get forced response if any
+            forced_response = st.session_state.get('forced_response', '').strip()
+            
+            response = send_to_server(full_message, forced_response)
             st.session_state.server_response = response
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             st.session_state.server_history.append({
                 "timestamp": timestamp,
                 "message": full_message,
-                "response": response
+                "response": response,
+                "forced_response": forced_response if forced_response else None
             })
             st.rerun()
+    
+    # Forced Response field
+    st.subheader("Forced Response")
+    st.text_area("Force the server response to begin with:", 
+                 value=st.session_state.get('forced_response', ''),
+                 height=100,
+                 key='forced_response',
+                 help="If not empty, the server will be forced to start its response with this exact text.")
     
     # Server Response
     st.subheader("Server Response")
@@ -423,6 +452,9 @@ with history_col:
         with st.expander(f"Exchange {len(st.session_state.server_history) - i} - {entry['timestamp']}", expanded=False):
             st.text("Message sent:")
             st.code(entry['message'])
+            if entry.get('forced_response'):
+                st.text("Forced response:")
+                st.code(entry['forced_response'])
             st.text("Response received:")
             st.code(entry['response'])
 
