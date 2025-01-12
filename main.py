@@ -1,9 +1,9 @@
-# ./main.py
 import streamlit as st
-from ServerMessage import render_server_tab  # Changed from server_communication
-from CharacterInfo import init_character_state, render_character_tab  # Changed to match your file name
+from ServerMessage import render_server_tab, init_server_state
+from CharacterInfo import init_character_state, render_character_tab
 
-# Initialize character state
+# Initialize all states
+init_server_state()
 init_character_state()
 
 # Main app with tabs
