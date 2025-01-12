@@ -1,18 +1,48 @@
 import streamlit as st
 import requests
 from datetime import datetime
+import os
+from enum import Enum
+from pathlib import Path
+
+# Enum for instruction types
+class InstructionType(Enum):
+    CONVERSATION = "Conversation"
+    OPTION_SELECT = "OptionSelectPhase"
+    ABILITY_SELECT = "AbilitySelectPhase"
+    CONSEQUENCES = "ConsequencesPhase"
 
 # Initialize session state variables
 if 'server_response' not in st.session_state:
     st.session_state.server_response = ""
 if 'server_address' not in st.session_state:
     st.session_state.server_address = "http://127.0.0.1:5000/v1/chat/completions"
+if 'selected_instruction' not in st.session_state:
+    st.session_state.selected_instruction = ""
 
-def send_to_server(message):
+def load_instruction_file(instruction_type: InstructionType) -> str:
+    """Load the content of the selected instruction file"""
+    file_path = Path(f"ServerMessages/Instructions/{instruction_type.value}.txt")
+    try:
+        with open(file_path, 'r') as file:
+            return file.read()
+    except Exception as e:
+        return f"Error loading instruction file: {str(e)}"
+
+def load_message_data() -> str:
+    """Load the content of the message data file"""
+    try:
+        with open("ServerMessages/MessageData/MessageData.txt", 'r') as file:
+            return file.read()
+    except Exception as e:
+        return f"Error loading message data: {str(e)}"
+
+def send_to_server(instruction_content: str, message_content: str):
     """Send message to the API and return the response"""
     URL = st.session_state.server_address
     
-    messages = [{"role": "user", "content": message}]
+    full_message = f"{instruction_content}\n\n{message_content}"
+    messages = [{"role": "user", "content": full_message}]
     request_data = {
         "messages": messages,
         "mode": "instruct",
@@ -36,6 +66,14 @@ def send_to_server(message):
     except Exception as e:
         return f"Error: {str(e)}"
 
+def refresh_message_data():
+    """Refresh both instruction and message data fields"""
+    if st.session_state.selected_instruction:
+        st.session_state.instruction_content = load_instruction_file(
+            InstructionType(st.session_state.selected_instruction)
+        )
+    st.session_state.message_data = load_message_data()
+
 # Streamlit UI
 st.title("Simple Server Communication")
 
@@ -46,24 +84,47 @@ server_address = st.text_input(
     value=st.session_state.server_address,
     help="Enter the full URL of the server endpoint"
 )
-# Update session state when address changes
 if server_address != st.session_state.server_address:
     st.session_state.server_address = server_address
 
-# Instruction field
-instruction = st.text_area("Instruction", 
-                          value="Enter your instruction here",
-                          height=100)
+# Instruction selection
+st.subheader("Instruction Selection")
+instruction_type = st.selectbox(
+    "Select instruction type",
+    [inst.value for inst in InstructionType],
+    key="instruction_selector"
+)
 
-# Message to server
-st.subheader("Message to Server")
-message = st.text_area("Enter your message",
-                      height=200)
+# Update selected instruction when changed
+if instruction_type != st.session_state.selected_instruction:
+    st.session_state.selected_instruction = instruction_type
+    refresh_message_data()
+
+# Refresh button
+if st.button("Refresh Message Data"):
+    refresh_message_data()
+
+# Display instruction content
+instruction_content = st.text_area(
+    "Instruction Content",
+    value=getattr(st.session_state, 'instruction_content', ''),
+    height=100,
+    key="instruction_display"
+)
+
+# Display message data
+st.subheader("Message Data")
+message_content = st.text_area(
+    "Message Content",
+    value=st.session_state.message_data,
+    height=200,
+    key="message_data_display"
+)
 
 # Send button
 if st.button("Send to Server"):
-    full_message = f"{instruction}\n\n{message}" if instruction.strip() else message
-    response = send_to_server(full_message)
+    # Use the current values from the text areas instead of session state
+    response = send_to_server(instruction_content, message_content)
     st.session_state.server_response = response
 
 # Server Response
