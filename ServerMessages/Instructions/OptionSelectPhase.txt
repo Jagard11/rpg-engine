@@ -1,0 +1,12 @@
+Limit your response to only one of the following available actions:
+[
+Attack
+Special attack
+Magic
+Inventory
+Run
+Surrender
+Do nothing
+]
+
+DO NOT add any additional text, dialogue, or description. Only output one of the above options exactly as written.
