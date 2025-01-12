@@ -1,3 +1,5 @@
+# ./ServerMessage.py
+
 import streamlit as st
 import requests
 from datetime import datetime
@@ -74,61 +76,62 @@ def refresh_message_data():
         )
     st.session_state.message_data = load_message_data()
 
-# Streamlit UI
-st.title("Simple Server Communication")
+def render_server_tab():
+    # Streamlit UI
+    st.title("Simple Server Communication")
 
-# Server address input
-st.subheader("Server Configuration")
-server_address = st.text_input(
-    "Server address",
-    value=st.session_state.server_address,
-    help="Enter the full URL of the server endpoint"
-)
-if server_address != st.session_state.server_address:
-    st.session_state.server_address = server_address
+    # Server address input
+    st.subheader("Server Configuration")
+    server_address = st.text_input(
+        "Server address",
+        value=st.session_state.server_address,
+        help="Enter the full URL of the server endpoint"
+    )
+    if server_address != st.session_state.server_address:
+        st.session_state.server_address = server_address
 
-# Instruction selection
-st.subheader("Instruction Selection")
-instruction_type = st.selectbox(
-    "Select instruction type",
-    [inst.value for inst in InstructionType],
-    key="instruction_selector"
-)
+    # Instruction selection
+    st.subheader("Instruction Selection")
+    instruction_type = st.selectbox(
+        "Select instruction type",
+        [inst.value for inst in InstructionType],
+        key="instruction_selector"
+    )
 
-# Update selected instruction when changed
-if instruction_type != st.session_state.selected_instruction:
-    st.session_state.selected_instruction = instruction_type
-    refresh_message_data()
+    # Update selected instruction when changed
+    if instruction_type != st.session_state.selected_instruction:
+        st.session_state.selected_instruction = instruction_type
+        refresh_message_data()
 
-# Refresh button
-if st.button("Refresh Message Data"):
-    refresh_message_data()
+    # Refresh button
+    if st.button("Refresh Message Data"):
+        refresh_message_data()
 
-# Display instruction content
-instruction_content = st.text_area(
-    "Instruction Content",
-    value=getattr(st.session_state, 'instruction_content', ''),
-    height=100,
-    key="instruction_display"
-)
+    # Display instruction content
+    instruction_content = st.text_area(
+        "Instruction Content",
+        value=getattr(st.session_state, 'instruction_content', ''),
+        height=100,
+        key="instruction_display"
+    )
 
-# Display message data
-st.subheader("Message Data")
-message_content = st.text_area(
-    "Message Content",
-    value=st.session_state.message_data,
-    height=200,
-    key="message_data_display"
-)
+    # Display message data
+    st.subheader("Message Data")
+    message_content = st.text_area(
+        "Message Content",
+        value=st.session_state.message_data,
+        height=200,
+        key="message_data_display"
+    )
 
-# Send button
-if st.button("Send to Server"):
-    # Use the current values from the text areas instead of session state
-    response = send_to_server(instruction_content, message_content)
-    st.session_state.server_response = response
+    # Send button
+    if st.button("Send to Server"):
+        # Use the current values from the text areas instead of session state
+        response = send_to_server(instruction_content, message_content)
+        st.session_state.server_response = response
 
-# Server Response
-st.subheader("Server Response")
-st.text_area("Latest Response",
-             value=st.session_state.server_response,
-             height=200)
+    # Server Response
+    st.subheader("Server Response")
+    st.text_area("Latest Response",
+                value=st.session_state.server_response,
+                height=200)
