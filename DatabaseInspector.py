@@ -5,7 +5,7 @@ import sqlite3
 import pandas as pd
 from pathlib import Path
 import json
-from typing import List, Tuple
+from typing import List, Tuple, Dict, Optional
 
 def get_tables() -> List[str]:
     """Get list of all tables in the database"""
@@ -15,6 +15,75 @@ def get_tables() -> List[str]:
     tables = [row[0] for row in cursor.fetchall()]
     conn.close()
     return tables
+
+def get_foreign_key_info(table_name: str) -> List[Dict]:
+    """Get foreign key information for a table"""
+    conn = sqlite3.connect('rpg_data.db')
+    cursor = conn.cursor()
+    cursor.execute(f"PRAGMA foreign_key_list({table_name});")
+    fk_info = cursor.fetchall()
+    conn.close()
+    
+    foreign_keys = []
+    for fk in fk_info:
+        foreign_keys.append({
+            'id': fk[0],              # id
+            'seq': fk[1],             # seq
+            'table': fk[2],           # referenced table
+            'from': fk[3],            # column in current table
+            'to': fk[4],              # column in referenced table
+            'on_update': fk[5],       # on update
+            'on_delete': fk[6],       # on delete
+            'match': fk[7]            # match
+        })
+    return foreign_keys
+
+def get_referenced_values(table_name: str, id_column: str, display_column: str) -> List[Tuple]:
+    """Get values from a referenced table for dropdown"""
+    conn = sqlite3.connect('rpg_data.db')
+    cursor = conn.cursor()
+    try:
+        cursor.execute(f"SELECT {id_column}, {display_column} FROM {table_name}")
+        return cursor.fetchall()
+    except Exception as e:
+        st.error(f"Error fetching referenced values: {str(e)}")
+        return []
+    finally:
+        conn.close()
+
+def get_primary_key_column(table_name: str) -> Optional[str]:
+    """Get the primary key column name for a table"""
+    conn = sqlite3.connect('rpg_data.db')
+    cursor = conn.cursor()
+    cursor.execute(f"PRAGMA table_info({table_name});")
+    columns = cursor.fetchall()
+    conn.close()
+    
+    for col in columns:
+        if col[5] == 1:  # Primary key flag
+            return col[1]
+    return None
+
+def get_display_column(table_name: str) -> str:
+    """Get the best column to display for a table"""
+    conn = sqlite3.connect('rpg_data.db')
+    cursor = conn.cursor()
+    cursor.execute(f"PRAGMA table_info({table_name});")
+    columns = cursor.fetchall()
+    conn.close()
+    
+    # Prefer 'name' column if it exists
+    for col in columns:
+        if col[1].lower() == 'name':
+            return col[1]
+    
+    # Otherwise, return first non-primary-key column
+    for col in columns:
+        if col[5] != 1:  # Not a primary key
+            return col[1]
+    
+    # Fallback to primary key if nothing else available
+    return columns[0][1]
 
 def get_table_schema(table_name: str) -> List[Tuple]:
     """Get schema information for a specific table"""
@@ -133,6 +202,54 @@ def delete_record(table_name: str, record_id: int):
     finally:
         conn.close()
 
+def render_add_record_form(table_name: str, schema_df: pd.DataFrame):
+    """Render the form for adding a new record with foreign key support"""
+    st.subheader("Add New Record")
+    
+    # Get foreign key information
+    foreign_keys = get_foreign_key_info(table_name)
+    fk_dict = {fk['from']: fk for fk in foreign_keys}
+    
+    new_record = {}
+    for _, row in schema_df.iterrows():
+        col_name = row['Column Name']
+        if col_name != 'id':  # Skip ID field for new records
+            if col_name in fk_dict:
+                # Handle foreign key field
+                fk = fk_dict[col_name]
+                referenced_table = fk['table']
+                referenced_pk = get_primary_key_column(referenced_table)
+                display_column = get_display_column(referenced_table)
+                
+                # Get values for dropdown
+                options = get_referenced_values(referenced_table, referenced_pk, display_column)
+                
+                # Create selectbox with formatted options
+                selected = st.selectbox(
+                    f"{col_name} ({referenced_table})",
+                    options=options,
+                    format_func=lambda x: f"{x[1]} (ID: {x[0]})"
+                )
+                if selected:
+                    new_record[col_name] = selected[0]
+            
+            elif 'json' in row['Data Type'].lower():
+                # Special handling for JSON fields
+                json_input = st.text_area(f"{col_name} (JSON)", "{}")
+                try:
+                    new_record[col_name] = json.loads(json_input)
+                except:
+                    st.error(f"Invalid JSON for {col_name}")
+            else:
+                new_record[col_name] = st.text_input(col_name)
+    
+    if st.button("Add Record"):
+        success, message = insert_record(table_name, new_record)
+        if success:
+            st.success(message)
+        else:
+            st.error(message)
+
 def render_db_inspector_tab():
     """Render the database inspector interface"""
     st.header("Database Inspector")
@@ -200,28 +317,7 @@ def render_data_inspector():
                     st.error(f"Error saving changes: {str(e)}")
         
         with crud_tab2:
-            st.subheader("Add New Record")
-            # Create input fields based on schema
-            new_record = {}
-            for _, row in schema_df.iterrows():
-                col_name = row['Column Name']
-                if col_name != 'id':  # Skip ID field for new records
-                    if 'json' in row['Data Type'].lower():
-                        # Special handling for JSON fields
-                        json_input = st.text_area(f"{col_name} (JSON)", "{}")
-                        try:
-                            new_record[col_name] = json.loads(json_input)
-                        except:
-                            st.error(f"Invalid JSON for {col_name}")
-                    else:
-                        new_record[col_name] = st.text_input(col_name)
-            
-            if st.button("Add Record"):
-                success, message = insert_record(selected_table, new_record)
-                if success:
-                    st.success(message)
-                else:
-                    st.error(message)
+            render_add_record_form(selected_table, schema_df)
         
         with crud_tab3:
             st.subheader("Delete Record")
@@ -397,7 +493,6 @@ def render_table_management():
                     conn.close()
             else:
                 st.warning("Please provide a table name and at least one column")
-            
     
     else:  # Modify Existing Table
         selected_table = st.selectbox("Select Table to Modify", tables)
@@ -417,7 +512,7 @@ def render_table_management():
             st.subheader("Modify Schema")
             modification_type = st.selectbox(
                 "Select Modification Type",
-                ["Add Column", "Remove Column", "Modify Column"]
+                ["Add Column", "Remove Column", "Modify Column", "Add Foreign Key"]
             )
             
             operations = []
@@ -457,6 +552,43 @@ def render_table_management():
                         'action': 'remove',
                         'column': col_to_remove
                     })
+            
+            elif modification_type == "Add Foreign Key":
+                # Select column to add foreign key to
+                col_to_modify = st.selectbox(
+                    "Select Column",
+                    [row['Column Name'] for _, row in schema_df.iterrows() if row['Data Type'] == 'INTEGER']
+                )
+                
+                # Select reference table
+                reference_table = st.selectbox(
+                    "Reference Table",
+                    [table for table in tables if table != selected_table]
+                )
+                
+                if reference_table:
+                    # Get columns from reference table
+                    ref_schema = get_table_schema(reference_table)
+                    ref_schema_df = pd.DataFrame(
+                        ref_schema,
+                        columns=['cid', 'name', 'type', 'notnull', 'dflt_value', 'pk']
+                    )
+                    reference_column = st.selectbox(
+                        "Reference Column",
+                        [row[1] for row in ref_schema if row[5] == 1]  # Only show primary key columns
+                    )
+                    
+                    if st.button("Add Foreign Key"):
+                        success, message = add_foreign_key(
+                            selected_table,
+                            col_to_modify,
+                            reference_table,
+                            reference_column
+                        )
+                        if success:
+                            st.success(message)
+                        else:
+                            st.error(message)
             
             elif modification_type == "Modify Column":
                 col_to_modify = st.selectbox(
