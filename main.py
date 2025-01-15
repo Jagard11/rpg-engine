@@ -1,3 +1,5 @@
+# ./main.py
+
 import streamlit as st
 from ServerMessage import render_server_tab
 from CharacterInfo import init_character_state, render_character_tab
