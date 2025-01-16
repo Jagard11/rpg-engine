@@ -1,150 +1,177 @@
 # ./CharacterInfo.py
 
-from dataclasses import dataclass
-from typing import Dict, Optional
 import streamlit as st
+import sqlite3
+from dataclasses import dataclass
+from typing import List, Optional, Dict
+from datetime import datetime
+import json
 
 @dataclass
 class Character:
+    id: int
     name: str
+    class_id: int
     level: int
-    health: int
-    mana: int
+    experience: int
+    current_health: int
+    max_health: int
+    current_mana: int
+    max_mana: int
     strength: int
     dexterity: int
     intelligence: int
     constitution: int
-    abilities: Dict[str, str]
     description: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+def get_db_connection():
+    """Create a database connection"""
+    return sqlite3.connect('rpg_data.db')
 
 def init_character_state():
     """Initialize character-related session state variables"""
-    if 'character' not in st.session_state:
-        st.session_state.character = Character(
-            name="",
-            level=1,
-            health=100,
-            mana=100,
-            strength=10,
-            dexterity=10,
-            intelligence=10,
-            constitution=10,
-            abilities={},
-            description=""
-        )
+    if 'current_character' not in st.session_state:
+        st.session_state.current_character = None
+    if 'character_list' not in st.session_state:
+        st.session_state.character_list = []
+        load_character_list()
+
+def load_character_list():
+    """Load list of available characters from database"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT id, name FROM characters ORDER BY name")
+        st.session_state.character_list = cursor.fetchall()
+    except Exception as e:
+        st.error(f"Error loading character list: {str(e)}")
+    finally:
+        conn.close()
+
+def load_character(character_id: int) -> Optional[Character]:
+    """Load a character from database"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT * FROM characters WHERE id = ?
+        """, (character_id,))
+        result = cursor.fetchone()
+        if result:
+            # Convert tuple to dict using column names
+            columns = [description[0] for description in cursor.description]
+            char_dict = dict(zip(columns, result))
+            return Character(**char_dict)
+        return None
+    except Exception as e:
+        st.error(f"Error loading character: {str(e)}")
+        return None
+    finally:
+        conn.close()
+
+def load_character_abilities(character_id: int) -> List[Dict]:
+    """Load abilities for a character"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT a.* FROM abilities a
+            JOIN character_abilities ca ON a.id = ca.ability_id
+            WHERE ca.character_id = ?
+        """, (character_id,))
+        columns = [description[0] for description in cursor.description]
+        return [dict(zip(columns, row)) for row in cursor.fetchall()]
+    except Exception as e:
+        st.error(f"Error loading character abilities: {str(e)}")
+        return []
+    finally:
+        conn.close()
+
+def load_character_class(class_id: int) -> Optional[Dict]:
+    """Load class information"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT * FROM character_classes WHERE id = ?", (class_id,))
+        result = cursor.fetchone()
+        if result:
+            columns = [description[0] for description in cursor.description]
+            return dict(zip(columns, result))
+        return None
+    except Exception as e:
+        st.error(f"Error loading character class: {str(e)}")
+        return None
+    finally:
+        conn.close()
 
 def render_character_tab():
-    """Render the character information tab"""
+    """Display character information"""
     st.header("Character Information")
     
-    # Basic Info
-    col1, col2 = st.columns(2)
-    with col1:
-        name = st.text_input("Character Name", value=st.session_state.character.name)
-        level = st.number_input("Level", min_value=1, value=st.session_state.character.level)
+    # Character selection
+    if st.session_state.character_list:
+        selected_char = st.selectbox(
+            "Select Character",
+            options=st.session_state.character_list,
+            format_func=lambda x: x[1],  # Display character name
+            key="char_select"
+        )
         
-    with col2:
-        health = st.number_input("Health", min_value=0, value=st.session_state.character.health)
-        mana = st.number_input("Mana", min_value=0, value=st.session_state.character.mana)
-    
-    # Stats
-    st.subheader("Stats")
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        strength = st.number_input("Strength", min_value=0, value=st.session_state.character.strength)
-    with col2:
-        dexterity = st.number_input("Dexterity", min_value=0, value=st.session_state.character.dexterity)
-    with col3:
-        intelligence = st.number_input("Intelligence", min_value=0, value=st.session_state.character.intelligence)
-    with col4:
-        constitution = st.number_input("Constitution", min_value=0, value=st.session_state.character.constitution)
-    
-    # Abilities
-    st.subheader("Abilities")
-    ability_name = st.text_input("New Ability Name")
-    ability_description = st.text_area("Ability Description")
-    
-    if st.button("Add Ability"):
-        if ability_name and ability_description:
-            st.session_state.character.abilities[ability_name] = ability_description
-            
-    # Display existing abilities
-    for name, desc in st.session_state.character.abilities.items():
-        with st.expander(f"Ability: {name}"):
-            st.write(desc)
-            if st.button(f"Remove {name}"):
-                del st.session_state.character.abilities[name]
-    
-    # Character Description
-    st.subheader("Character Description")
-    description = st.text_area("Description", value=st.session_state.character.description or "")
-    
-    # Update character state
-    st.session_state.character = Character(
-        name=name,
-        level=level,
-        health=health,
-        mana=mana,
-        strength=strength,
-        dexterity=dexterity,
-        intelligence=intelligence,
-        constitution=constitution,
-        abilities=st.session_state.character.abilities.copy(),
-        description=description
-    )
-    
-    # Save/Load functionality
-    if st.button("Save Character"):
-        save_character()
-        
-    if st.button("Load Character"):
-        load_character()
-
-def save_character():
-    """Save character data to a file"""
-    import json
-    from pathlib import Path
-    
-    save_dir = Path("SaveData")
-    save_dir.mkdir(exist_ok=True)
-    
-    character_data = {
-        "name": st.session_state.character.name,
-        "level": st.session_state.character.level,
-        "health": st.session_state.character.health,
-        "mana": st.session_state.character.mana,
-        "strength": st.session_state.character.strength,
-        "dexterity": st.session_state.character.dexterity,
-        "intelligence": st.session_state.character.intelligence,
-        "constitution": st.session_state.character.constitution,
-        "abilities": st.session_state.character.abilities,
-        "description": st.session_state.character.description
-    }
-    
-    save_path = save_dir / f"{st.session_state.character.name}.json"
-    with open(save_path, 'w') as f:
-        json.dump(character_data, f, indent=2)
-    st.success(f"Character saved to {save_path}")
-
-def load_character():
-    """Load character data from a file"""
-    import json
-    from pathlib import Path
-    
-    save_dir = Path("SaveData")
-    if not save_dir.exists():
-        st.error("No saved characters found!")
-        return
-        
-    save_files = list(save_dir.glob("*.json"))
-    if not save_files:
-        st.error("No saved characters found!")
-        return
-        
-    selected_file = st.selectbox("Select character to load", save_files)
-    if selected_file:
-        with open(selected_file, 'r') as f:
-            data = json.load(f)
-            st.session_state.character = Character(**data)
-            st.success("Character loaded successfully!")
+        if selected_char:
+            character = load_character(selected_char[0])
+            if character:
+                st.session_state.current_character = character
+                
+                # Load additional character information
+                character_class = load_character_class(character.class_id)
+                abilities = load_character_abilities(character.id)
+                
+                # Display character info in columns
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.subheader("Basic Info")
+                    st.write(f"Name: {character.name}")
+                    if character_class:
+                        st.write(f"Class: {character_class['name']}")
+                    st.write(f"Level: {character.level}")
+                    st.write(f"Experience: {character.experience}")
+                    st.write(f"Health: {character.current_health}/{character.max_health}")
+                    st.write(f"Mana: {character.current_mana}/{character.max_mana}")
+                
+                with col2:
+                    st.subheader("Stats")
+                    st.write(f"Strength: {character.strength}")
+                    st.write(f"Dexterity: {character.dexterity}")
+                    st.write(f"Intelligence: {character.intelligence}")
+                    st.write(f"Constitution: {character.constitution}")
+                
+                # Display abilities
+                st.subheader("Abilities")
+                if abilities:
+                    for ability in abilities:
+                        with st.expander(ability['name']):
+                            st.write(ability['description'])
+                            if ability['mana_cost']:
+                                st.write(f"Mana Cost: {ability['mana_cost']}")
+                            if ability['cooldown']:
+                                st.write(f"Cooldown: {ability['cooldown']} turns")
+                            if ability['damage']:
+                                st.write(f"Damage: {ability['damage']}")
+                            if ability['healing']:
+                                st.write(f"Healing: {ability['healing']}")
+                else:
+                    st.write("No abilities unlocked")
+                
+                # Display description
+                if character.description:
+                    st.subheader("Description")
+                    st.write(character.description)
+                
+                # Display metadata
+                with st.expander("Character Metadata"):
+                    st.write(f"Created: {character.created_at}")
+                    st.write(f"Last Updated: {character.updated_at}")
+    else:
+        st.info("No characters found. Please create a character first.")
