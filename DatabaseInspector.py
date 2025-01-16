@@ -567,23 +567,12 @@ def render_table_management():
                 )
                 
                 if reference_table:
-                    # Get columns from reference table
-                    ref_schema = get_table_schema(reference_table)
-                    ref_schema_df = pd.DataFrame(
-                        ref_schema,
-                        columns=['cid', 'name', 'type', 'notnull', 'dflt_value', 'pk']
-                    )
-                    reference_column = st.selectbox(
-                        "Reference Column",
-                        [row[1] for row in ref_schema if row[5] == 1]  # Only show primary key columns
-                    )
-                    
                     if st.button("Add Foreign Key"):
                         success, message = add_foreign_key(
                             selected_table,
                             col_to_modify,
                             reference_table,
-                            reference_column
+                            "id"  # Hardcode to reference the id column
                         )
                         if success:
                             st.success(message)
