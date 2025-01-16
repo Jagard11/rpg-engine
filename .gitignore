@@ -45,7 +45,5 @@ logs/
 ehthumbs.db
 Thumbs.db
 
-# Database File
-rpg_data.db
-db_setup.py
+# Database File 
 rpg_data.db.backup
