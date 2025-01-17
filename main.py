@@ -20,6 +20,12 @@ def init_database():
             st.error("Database not found. Please run DatabaseSetup/setupDatabase.py to create the initial database.")
             raise FileNotFoundError("Database not found")
             
+        # Import and run timestamp trigger creation
+        import sys
+        sys.path.append('DatabaseSetup')
+        from DatabaseTimestampTriggers import create_timestamp_triggers
+        create_timestamp_triggers()
+            
     except Exception as e:
         st.error(f"Error initializing database: {str(e)}")
         raise
