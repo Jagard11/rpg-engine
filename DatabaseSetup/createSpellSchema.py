@@ -1,9 +1,10 @@
-# ./database/createSpellSchema.py
+# ./DatabaseSetup/createSpellSchema.py
 
 import sqlite3
 from pathlib import Path
 import logging
 from datetime import datetime
+import os
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -12,12 +13,15 @@ logger = logging.getLogger(__name__)
 def create_spell_schema():
     """Create the spell system database schema"""
     try:
-        # Ensure database directory exists
-        db_dir = Path('database')
-        db_dir.mkdir(exist_ok=True)
+        # Get path to database in parent directory
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        parent_dir = os.path.dirname(current_dir)
+        db_path = os.path.join(parent_dir, 'rpg_data.db')
+        
+        logger.info(f"Creating spell schema in database: {db_path}")
         
         # Connect to database
-        conn = sqlite3.connect('database/rpg_data.db')
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         
         # Enable foreign keys

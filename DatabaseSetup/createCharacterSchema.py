@@ -1,9 +1,10 @@
-# ./database/createCharacterSchema.py
+# ./DatabaseSetup/createCharacterSchema.py
 
 import sqlite3
 from pathlib import Path
 import logging
 from datetime import datetime
+import os
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -12,20 +13,21 @@ logger = logging.getLogger(__name__)
 def create_character_schema():
     """Create the character system database schema"""
     try:
-        # Ensure database directory exists
-        db_dir = Path('database')
-        db_dir.mkdir(exist_ok=True)
+        # Get path to database in parent directory
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        parent_dir = os.path.dirname(current_dir)
+        db_path = os.path.join(parent_dir, 'rpg_data.db')
+        
+        logger.info(f"Creating character schema in database: {db_path}")
         
         # Connect to database
-        conn = sqlite3.connect('database/rpg_data.db')
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         
         # Enable foreign keys
         cursor.execute("PRAGMA foreign_keys = ON")
         
-        logger.info("Creating character system schema...")
-        
-        # Create races table
+        # Rest of the existing schema creation code remains the same...
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS races (
             id INTEGER PRIMARY KEY,
@@ -167,8 +169,6 @@ def create_character_schema():
         )
         """)
 
-        logger.info("Tables created successfully. Inserting initial data...")
-        
         # Insert base race categories
         races = [
             ('Human', 'Humanoid', 'Versatile and adaptable race', 1, 1.0, 0),
@@ -229,7 +229,7 @@ def create_character_schema():
         
         # Commit changes and close connection
         conn.commit()
-        logger.info("Schema creation and initial data insertion completed successfully.")
+        logger.info("Character schema creation and initial data insertion completed successfully.")
         
     except sqlite3.Error as e:
         logger.error(f"SQLite error occurred: {str(e)}")
@@ -241,10 +241,3 @@ def create_character_schema():
         if conn:
             conn.close()
             logger.info("Database connection closed.")
-
-if __name__ == "__main__":
-    try:
-        create_character_schema()
-    except Exception as e:
-        logger.error(f"Failed to create character schema: {str(e)}")
-        exit(1)
