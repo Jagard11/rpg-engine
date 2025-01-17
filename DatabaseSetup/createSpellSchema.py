@@ -234,9 +234,12 @@ def create_spell_schema():
             conn.close()
             logger.info("Database connection closed.")
 
-if __name__ == "__main__":
+def main():
     try:
         create_spell_schema()
     except Exception as e:
         logger.error(f"Failed to create spell schema: {str(e)}")
-        exit(1)
+        raise
+
+if __name__ == "__main__":
+    main()

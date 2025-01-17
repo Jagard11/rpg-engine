@@ -57,5 +57,8 @@ def cleanup_database():
     finally:
         conn.close()
 
-if __name__ == "__main__":
+def main():
     cleanup_database()
+
+if __name__ == "__main__":
+    main()
