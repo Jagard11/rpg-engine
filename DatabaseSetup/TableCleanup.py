@@ -1,4 +1,4 @@
-# ./DatabaseSetup/CleanupTables.py
+# ./DatabaseSetup/TableCleanup.py
 
 import sqlite3
 import os
