@@ -7,31 +7,19 @@ from pathlib import Path
 from ServerMessage import render_server_tab
 from CharacterInfo import init_character_state, render_character_tab
 from DatabaseInspector import render_db_inspector_tab
-from DatabaseSetup.createCharacterSchema import create_character_schema
-from DatabaseSetup.createSpellSchema import create_spell_schema
-from DatabaseSetup.createClassSystemSchema import ClassSystemInitializer
 
 # Must be the first Streamlit command
 st.set_page_config(page_title="RPG Communication Interface", layout="wide")
 
 def init_database():
-    """Initialize database and create tables if they don't exist"""
+    """Initialize database if it doesn't exist"""
     try:
         # Check if database exists
         db_path = Path('rpg_data.db')
         if not db_path.exists():
-            print("Database not found. Creating new database...")
+            st.error("Database not found. Please run DatabaseSetup/setupDatabase.py to create the initial database.")
+            raise FileNotFoundError("Database not found")
             
-            # Initialize all schemas
-            create_character_schema()
-            create_spell_schema()
-            
-            # Initialize class system
-            class_initializer = ClassSystemInitializer()
-            class_initializer.setup_class_system()
-            
-            print("Database initialization complete.")
-        
     except Exception as e:
         st.error(f"Error initializing database: {str(e)}")
         raise
