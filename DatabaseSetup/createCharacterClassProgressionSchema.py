@@ -1,4 +1,4 @@
-# ./DatabaseSetup/createSpellSchema.py
+# ./DatabaseSetup/createCharacterClassProgressionSchema.py
 
 import sqlite3
 import os
@@ -8,15 +8,15 @@ import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-def create_spell_schema():
-    """Create the spells table schema"""
+def create_character_class_progression_schema():
+    """Create the character class progression table schema"""
     try:
         # Get path to database in parent directory
         current_dir = os.path.dirname(os.path.abspath(__file__))
         parent_dir = os.path.dirname(current_dir)
         db_path = os.path.join(parent_dir, 'rpg_data.db')
         
-        logger.info(f"Creating spell schema in database: {db_path}")
+        logger.info(f"Creating character class progression schema in database: {db_path}")
         
         # Connect to database
         conn = sqlite3.connect(db_path)
@@ -25,39 +25,26 @@ def create_spell_schema():
         # Enable foreign keys
         cursor.execute("PRAGMA foreign_keys = ON")
         
-        # Create spells table
+        # Create character class progression table
         cursor.execute("""
-        CREATE TABLE IF NOT EXISTS spells (
+        CREATE TABLE IF NOT EXISTS character_class_progression (
             id INTEGER PRIMARY KEY,
-            name TEXT NOT NULL UNIQUE,
-            description TEXT,
-            school_id INTEGER NOT NULL,
-            tier_id INTEGER NOT NULL,
-            base_mana_cost INTEGER NOT NULL,
-            cast_time TEXT NOT NULL,
-            range TEXT NOT NULL,
-            area_of_effect TEXT,
-            duration TEXT NOT NULL,
-            damage_type_id INTEGER,
-            base_damage TEXT,
-            healing_amount TEXT,
-            is_concentration BOOLEAN DEFAULT FALSE,
-            is_ritual BOOLEAN DEFAULT FALSE,
-            components TEXT NOT NULL,
-            material_components TEXT,
-            can_be_interrupted BOOLEAN DEFAULT TRUE,
-            interruption_dc INTEGER,
+            character_id INTEGER NOT NULL,
+            class_id INTEGER NOT NULL,
+            current_level INTEGER NOT NULL DEFAULT 1,
+            current_exp INTEGER NOT NULL DEFAULT 0,
+            is_active BOOLEAN DEFAULT FALSE,
+            unlocked_at TIMESTAMP,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (school_id) REFERENCES magic_schools(id),
-            FOREIGN KEY (tier_id) REFERENCES spell_tiers(id),
-            FOREIGN KEY (damage_type_id) REFERENCES damage_types(id)
+            FOREIGN KEY (character_id) REFERENCES characters(id),
+            FOREIGN KEY (class_id) REFERENCES character_classes(id)
         )
         """)
         
         # Commit changes
         conn.commit()
-        logger.info("Spell schema creation completed successfully.")
+        logger.info("Character class progression schema creation completed successfully.")
         
     except sqlite3.Error as e:
         logger.error(f"SQLite error occurred: {str(e)}")
@@ -72,7 +59,7 @@ def create_spell_schema():
 
 def main():
     """Entry point for schema creation"""
-    create_spell_schema()
+    create_character_class_progression_schema()
 
 if __name__ == "__main__":
     main()

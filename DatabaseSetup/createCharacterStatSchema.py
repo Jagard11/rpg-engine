@@ -1,4 +1,4 @@
-# ./DatabaseSetup/createCharacterSchema.py
+# ./DatabaseSetup/createCharacterStatSchema.py
 
 import sqlite3
 import os
@@ -8,15 +8,15 @@ import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-def create_character_schema():
-    """Create the character table schema"""
+def create_character_stat_schema():
+    """Create the character stats table schema"""
     try:
         # Get path to database in parent directory
         current_dir = os.path.dirname(os.path.abspath(__file__))
         parent_dir = os.path.dirname(current_dir)
         db_path = os.path.join(parent_dir, 'rpg_data.db')
         
-        logger.info(f"Creating character schema in database: {db_path}")
+        logger.info(f"Creating character stat schema in database: {db_path}")
         
         # Connect to database
         conn = sqlite3.connect(db_path)
@@ -25,30 +25,26 @@ def create_character_schema():
         # Enable foreign keys
         cursor.execute("PRAGMA foreign_keys = ON")
         
-        # Create single characters table
+        # Create character stats table
         cursor.execute("""
-        CREATE TABLE IF NOT EXISTS characters (
+        CREATE TABLE IF NOT EXISTS character_stats (
             id INTEGER PRIMARY KEY,
-            name TEXT NOT NULL,
-            race_id INTEGER,
-            character_level INTEGER DEFAULT 1,
-            experience INTEGER DEFAULT 0,
-            karma INTEGER DEFAULT 0,
-            current_health INTEGER NOT NULL,
-            max_health INTEGER NOT NULL,
-            current_mana INTEGER NOT NULL,
-            max_mana INTEGER NOT NULL,
-            description TEXT,
-            is_active BOOLEAN DEFAULT TRUE,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (race_id) REFERENCES races(id)
+            character_id INTEGER NOT NULL,
+            stat_id INTEGER NOT NULL,
+            base_value INTEGER NOT NULL,
+            bonus_racial INTEGER DEFAULT 0,
+            bonus_class INTEGER DEFAULT 0,
+            bonus_equipment INTEGER DEFAULT 0,
+            bonus_temporary INTEGER DEFAULT 0,
+            last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (character_id) REFERENCES characters(id),
+            FOREIGN KEY (stat_id) REFERENCES base_stats(id)
         )
         """)
         
         # Commit changes
         conn.commit()
-        logger.info("Character schema creation completed successfully.")
+        logger.info("Character stat schema creation completed successfully.")
         
     except sqlite3.Error as e:
         logger.error(f"SQLite error occurred: {str(e)}")
@@ -63,7 +59,7 @@ def create_character_schema():
 
 def main():
     """Entry point for schema creation"""
-    create_character_schema()
+    create_character_stat_schema()
 
 if __name__ == "__main__":
     main()
