@@ -45,12 +45,29 @@ def create_spell_schema():
         CREATE TABLE IF NOT EXISTS spell_tiers (
             id INTEGER PRIMARY KEY,
             name TEXT NOT NULL,
-            level INTEGER NOT NULL,
-            mana_cost_multiplier REAL DEFAULT 1.0,
-            slot_count INTEGER NOT NULL,
-            min_class_level INTEGER NOT NULL,
+            tier_level INTEGER NOT NULL,
+            min_magic_class_levels INTEGER NOT NULL,
+            max_slots INTEGER NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """)
+        
+        # Create character spell slots table
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS character_spell_slots (
+            id INTEGER PRIMARY KEY,
+            character_id INTEGER NOT NULL,
+            tier_id INTEGER NOT NULL,
+            school_id INTEGER NOT NULL,
+            base_slots INTEGER NOT NULL,
+            bonus_racial_slots INTEGER DEFAULT 0,
+            bonus_equipment_slots INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (character_id) REFERENCES characters(id),
+            FOREIGN KEY (tier_id) REFERENCES spell_tiers(id),
+            FOREIGN KEY (school_id) REFERENCES magic_schools(id)
         )
         """)
         
@@ -139,6 +156,15 @@ def create_spell_schema():
             FOREIGN KEY (spell_id) REFERENCES spells(id)
         )
         """)
+
+        # Check if spell_school_id column exists in character_classes
+        cursor.execute("PRAGMA table_info(character_classes)")
+        columns = [column[1] for column in cursor.fetchall()]
+        if 'spell_school_id' not in columns:
+            cursor.execute("""
+            ALTER TABLE character_classes ADD COLUMN
+            spell_school_id INTEGER REFERENCES magic_schools(id)
+            """)
         
         logger.info("Tables created successfully. Inserting initial data...")
         
@@ -155,24 +181,24 @@ def create_spell_schema():
             magic_schools
         )
         
-        # Insert spell tiers
+        # Insert spell tiers with correct level requirements and max slots
         spell_tiers = [
-            ('Cantrip', 0, 17, 1),
-            ('Tier 1', 1, 15, 1),
-            ('Tier 2', 2, 14, 7),
-            ('Tier 3', 3, 13, 14),
-            ('Tier 4', 4, 12, 21),
-            ('Tier 5', 5, 11, 28),
-            ('Tier 6', 6, 10, 35),
-            ('Tier 7', 7, 9, 42),
-            ('Tier 8', 8, 8, 49),
-            ('Tier 9', 9, 7, 56),
-            ('Tier 10', 10, 6, 63),
-            ('Super Tier', 11, 5, 70)
+            ('Cantrip', 0, 0, 17),  # Available at level 0
+            ('Tier 1', 1, 7, 15),   # Available at level 7
+            ('Tier 2', 2, 14, 14),  # Available at level 14
+            ('Tier 3', 3, 21, 13),  # Available at level 21
+            ('Tier 4', 4, 28, 12),  # Available at level 28
+            ('Tier 5', 5, 35, 11),  # Available at level 35
+            ('Tier 6', 6, 42, 10),  # Available at level 42
+            ('Tier 7', 7, 49, 9),   # Available at level 49
+            ('Tier 8', 8, 56, 8),   # Available at level 56
+            ('Tier 9', 9, 63, 7),   # Available at level 63
+            ('Tier 10', 10, 70, 6), # Available at level 70
+            ('Super Tier', 11, 77, 5) # Available at level 77
         ]
         
         cursor.executemany(
-            "INSERT OR IGNORE INTO spell_tiers (name, level, slot_count, min_class_level) VALUES (?, ?, ?, ?)",
+            "INSERT OR IGNORE INTO spell_tiers (name, tier_level, min_magic_class_levels, max_slots) VALUES (?, ?, ?, ?)",
             spell_tiers
         )
         
