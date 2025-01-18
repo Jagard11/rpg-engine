@@ -43,9 +43,15 @@ def load_character_list():
     cursor = conn.cursor()
     try:
         cursor.execute("""
-            SELECT c.id, c.name, r.name as race, c.character_level 
+            SELECT 
+                c.id, 
+                c.name, 
+                r.name as race, 
+                crp.current_level as race_level,
+                c.character_level 
             FROM characters c
-            LEFT JOIN races r ON c.race_id = r.id
+            LEFT JOIN character_race_progression crp ON c.id = crp.character_id AND crp.is_active = TRUE
+            LEFT JOIN races r ON crp.race_id = r.id
             ORDER BY c.name
         """)
         st.session_state.character_list = cursor.fetchall()

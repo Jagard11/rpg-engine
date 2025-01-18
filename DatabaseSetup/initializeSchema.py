@@ -73,7 +73,8 @@ def initialize_schemas():
         "createClassAbilitySchema.py",
         "createTalentConditionSchema.py",
         "createTalentEffectSchema.py",
-        "createCharacterTalentSchema.py"
+        "createCharacterTalentSchema.py",
+        "createCharacterRaceProgressionSchema.py"
     ]
     
     logger.info(f"Starting schema initialization with {len(schema_files)} files...")
