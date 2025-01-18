@@ -31,31 +31,31 @@ def create_character_schema():
             id INTEGER PRIMARY KEY,
             first_name TEXT NOT NULL,
             middle_name TEXT,
-            last_name TEXT NOT NULL,
+            last_name TEXT,
             bio TEXT,
-            race_column TEXT,           
             total_level INTEGER NOT NULL DEFAULT 0,
             birth_place TEXT,
             age INTEGER,
             karma INTEGER DEFAULT 0,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             talent TEXT,
-            is_active BOOLEAN DEFAULT TRUE
+            race_category TEXT CHECK(race_category IN ('Humanoid', 'Demi-Human', 'Heteromorphic')) NOT NULL DEFAULT 'Humanoid',
+            is_active BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """)
 
         # Insert default character
         default_character = [
             (1, 'James', None, 'Gerard', 
-             'A young student beginning his journey into space exploration', "humanoid",
-             15, 'Earth', 19, 0, 'Adaptive Learning', True)
+             'A young student beginning his journey into space exploration',
+             15, 'Earth', 19, 0, 'Adaptive Learning', 'Humanoid', True)
         ]
 
         cursor.executemany("""
         INSERT OR IGNORE INTO characters (
-            id, first_name, middle_name, last_name, bio, race_column,
-            total_level, birth_place, age, karma, talent, is_active
+            id, first_name, middle_name, last_name, bio, 
+            total_level, birth_place, age, karma, talent, race_category, is_active
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, default_character)
         

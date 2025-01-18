@@ -61,6 +61,66 @@ def load_character_list():
     finally:
         conn.close()
 
+def load_character(character_id: int) -> Optional[Character]:
+    """Load a character's basic information"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT 
+                id,
+                first_name,
+                middle_name,
+                last_name,
+                bio,
+                total_level,
+                birth_place,
+                age,
+                karma,
+                talent,
+                race_category,
+                is_active,
+                created_at,
+                updated_at
+            FROM characters 
+            WHERE id = ?
+        """, (character_id,))
+        result = cursor.fetchone()
+        if result:
+            # Convert tuple to Character object by unpacking
+            return Character(*result)
+        return None
+    except Exception as e:
+        st.error(f"Error loading character: {str(e)}")
+        return None
+    finally:
+        conn.close()
+
+def load_character_classes(character_id: int) -> List[Dict]:
+    """Load character's class information"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT 
+                c.id,
+                c.name,
+                c.is_racial,
+                cp.current_level as level,
+                cp.current_experience as exp
+            FROM character_class_progression cp
+            JOIN classes c ON cp.class_id = c.id
+            WHERE cp.character_id = ?
+            ORDER BY c.is_racial DESC, c.name
+        """, (character_id,))
+        columns = ['id', 'name', 'is_racial', 'level', 'exp']
+        return [dict(zip(columns, row)) for row in cursor.fetchall()]
+    except Exception as e:
+        st.error(f"Error loading character classes: {str(e)}")
+        return []
+    finally:
+        conn.close()  
+
 def can_change_race_category(character_id: int) -> bool:
     """Check if character can change race category"""
     conn = get_db_connection()
@@ -147,7 +207,7 @@ def get_available_classes_for_level_up(character_id: int) -> List[Dict]:
                 c.karma_requirement_max
             FROM classes c
             WHERE 
-                (c.is_racial = FALSE OR c.race_category = ?) AND
+                (c.is_racial = FALSE OR c.category = ?) AND
                 ? BETWEEN c.karma_requirement_min AND c.karma_requirement_max AND
                 NOT EXISTS (
                     SELECT 1 
