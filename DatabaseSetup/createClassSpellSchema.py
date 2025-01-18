@@ -32,8 +32,29 @@ def create_class_spell_schema():
             class_id INTEGER NOT NULL,
             spell_id INTEGER NOT NULL,
             min_level INTEGER NOT NULL DEFAULT 1,
+            is_auto_granted BOOLEAN DEFAULT FALSE,
+            auto_grant_order INTEGER,
+            is_optional BOOLEAN DEFAULT TRUE,
+            prerequisites_json JSON,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (class_id) REFERENCES character_classes(id),
+            FOREIGN KEY (spell_id) REFERENCES spells(id)
+        )
+        """)
+        
+        # Create character spell acquisition table
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS character_spell_acquisition (
+            id INTEGER PRIMARY KEY,
+            character_id INTEGER NOT NULL,
+            class_id INTEGER NOT NULL,
+            spell_id INTEGER NOT NULL,
+            acquired_at_level INTEGER NOT NULL,
+            acquisition_order INTEGER NOT NULL,
+            is_active BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (character_id) REFERENCES characters(id),
             FOREIGN KEY (class_id) REFERENCES character_classes(id),
             FOREIGN KEY (spell_id) REFERENCES spells(id)
         )
