@@ -1,4 +1,4 @@
-# ./DatabaseSetup/createRaceSchema.py
+# ./DatabaseSetup/createRaceCategorySchema.py
 
 import sqlite3
 import os
@@ -8,15 +8,15 @@ import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-def create_race_schema():
-    """Create the races table schema"""
+def create_race_category_schema():
+    """Create the race categories table schema"""
     try:
         # Get path to database in parent directory
         current_dir = os.path.dirname(os.path.abspath(__file__))
         parent_dir = os.path.dirname(current_dir)
         db_path = os.path.join(parent_dir, 'rpg_data.db')
         
-        logger.info(f"Creating race schema in database: {db_path}")
+        logger.info(f"Creating race category schema in database: {db_path}")
         
         # Connect to database
         conn = sqlite3.connect(db_path)
@@ -25,23 +25,29 @@ def create_race_schema():
         # Enable foreign keys
         cursor.execute("PRAGMA foreign_keys = ON")
         
-        # Create races table
+        # Create race categories table
         cursor.execute("""
-        CREATE TABLE IF NOT EXISTS races (
+        CREATE TABLE IF NOT EXISTS race_categories (
             id INTEGER PRIMARY KEY,
             name TEXT NOT NULL UNIQUE,
-            category_id INTEGER NOT NULL,
             description TEXT,
-            max_level INTEGER NOT NULL DEFAULT 1,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (category_id) REFERENCES race_categories(id)
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """)
         
+        # Create initial categories
+        cursor.executemany("""
+        INSERT OR IGNORE INTO race_categories (name, description) VALUES (?, ?)
+        """, [
+            ('Humanoid', 'Basic humanoid races'),
+            ('Demi-Human', 'Hybrid races with mixed characteristics'),
+            ('Heteromorphic', 'Non-human races with unique traits')
+        ])
+        
         # Commit changes
         conn.commit()
-        logger.info("Race schema creation completed successfully.")
+        logger.info("Race category schema creation completed successfully.")
         
     except sqlite3.Error as e:
         logger.error(f"SQLite error occurred: {str(e)}")
@@ -56,7 +62,7 @@ def create_race_schema():
 
 def main():
     """Entry point for schema creation"""
-    create_race_schema()
+    create_race_category_schema()
 
 if __name__ == "__main__":
     main()

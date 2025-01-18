@@ -36,6 +36,7 @@ def initialize_schemas():
         "createQuestSchema.py",               # No dependencies
         "createTalentSchema.py",              # No dependencies
         "createAbilitySchema.py",             # No dependencies
+        "createRaceCategorySchema.py",        # No dependencies
 
         # Level 2: Basic dependent tables
         "createProgressionSchema.py",         # Depends on characters
