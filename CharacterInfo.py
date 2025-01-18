@@ -37,6 +37,14 @@ def init_character_state():
         load_character_list()
     if 'show_new_race_form' not in st.session_state:
         st.session_state.show_new_race_form = False
+    if 'selected_class_type' not in st.session_state:
+        st.session_state.selected_class_type = "All"
+    if 'selected_category' not in st.session_state:
+        st.session_state.selected_category = "All"
+    if 'show_racial' not in st.session_state:
+        st.session_state.show_racial = False
+    if 'show_existing' not in st.session_state:
+        st.session_state.show_existing = True
 
 def load_character_list():
     """Load list of available characters from database"""
@@ -203,9 +211,15 @@ def get_available_classes_for_level_up(character_id: int) -> List[Dict]:
                 c.name,
                 c.description,
                 c.class_type,
+                c.is_racial,
+                c.category,
+                c.subcategory,
                 c.karma_requirement_min,
-                c.karma_requirement_max
+                c.karma_requirement_max,
+                COALESCE(cp.current_level, 0) as current_level
             FROM classes c
+            LEFT JOIN character_class_progression cp ON 
+                cp.class_id = c.id AND cp.character_id = ?
             WHERE 
                 (c.is_racial = FALSE OR c.category = ?) AND
                 ? BETWEEN c.karma_requirement_min AND c.karma_requirement_max AND
@@ -215,16 +229,17 @@ def get_available_classes_for_level_up(character_id: int) -> List[Dict]:
                     WHERE p.class_id = c.id AND
                     NOT EXISTS (
                         SELECT 1 
-                        FROM character_class_progression cp
-                        WHERE cp.character_id = ? AND
-                        cp.class_id = p.required_class_id AND
-                        cp.current_level >= p.required_level
+                        FROM character_class_progression cp2
+                        WHERE cp2.character_id = ? AND
+                        cp2.class_id = p.required_class_id AND
+                        cp2.current_level >= p.required_level
                     )
                 )
-            ORDER BY c.class_type, c.name
-        """, (race_category, karma, character_id))
+            ORDER BY c.is_racial DESC, c.class_type, c.category, c.name
+        """, (character_id, race_category, karma, character_id))
 
-        columns = ['id', 'name', 'description', 'type', 'karma_min', 'karma_max']
+        columns = ['id', 'name', 'description', 'type', 'is_racial', 'category', 
+                  'subcategory', 'karma_min', 'karma_max', 'current_level']
         return [dict(zip(columns, row)) for row in cursor.fetchall()]
     finally:
         conn.close()
@@ -248,7 +263,8 @@ def level_up_class(character_id: int, class_id: int) -> Tuple[bool, str]:
             # Update existing progression
             cursor.execute("""
                 UPDATE character_class_progression
-                SET current_level = current_level + 1
+                SET current_level = current_level + 1,
+                    updated_at = DATETIME('now')
                 WHERE character_id = ? AND class_id = ?
             """, (character_id, class_id))
         else:
@@ -262,18 +278,21 @@ def level_up_class(character_id: int, class_id: int) -> Tuple[bool, str]:
         # Update character's total level
         cursor.execute("""
             UPDATE characters
-            SET total_level = total_level + 1
+            SET total_level = total_level + 1,
+                updated_at = DATETIME('now')
             WHERE id = ?
         """, (character_id,))
 
-        cursor.execute("COMMIT")
+        conn.commit()  # Actually commit the transaction
         return True, "Level up successful!"
     except Exception as e:
-        cursor.execute("ROLLBACK")
+        if conn:
+            conn.rollback()  # Use conn.rollback() instead of executing ROLLBACK
         return False, f"Error during level up: {str(e)}"
     finally:
-        conn.close()
-
+        if conn:
+            conn.close()
+            
 def render_new_race_form():
     """Render form for creating a new race"""
     st.subheader("Create New Race")
@@ -298,51 +317,123 @@ def render_level_up_interface(character_id: int):
     """Render the level up interface"""
     st.subheader("Level Up")
     
+    # Load available classes fresh
     available_classes = get_available_classes_for_level_up(character_id)
     
     if not available_classes:
         st.warning("No classes available for level up!")
         return
 
-    # Group classes by type
-    base_classes = [c for c in available_classes if c['type'] == 'Base']
-    high_classes = [c for c in available_classes if c['type'] == 'High']
-    rare_classes = [c for c in available_classes if c['type'] == 'Rare']
-
+    # Get unique categories and subcategories
+    categories = sorted(set(c['category'] for c in available_classes if c['category']))
+    class_types = sorted(set(c['type'] for c in available_classes if c['type']))
+    
+    # Filters with session state
     col1, col2, col3 = st.columns(3)
-
+    
+    def update_class_type():
+        st.session_state.selected_class_type = st.session_state.class_type_filter
+        
+    def update_category():
+        st.session_state.selected_category = st.session_state.category_filter
+        
+    def update_show_racial():
+        st.session_state.show_racial = st.session_state.racial_filter
+        
+    def update_show_existing():
+        st.session_state.show_existing = st.session_state.existing_filter
+    
+    # Store current filter states before updating
+    prev_type = st.session_state.selected_class_type
+    prev_category = st.session_state.selected_category
+    prev_racial = st.session_state.show_racial
+    prev_existing = st.session_state.show_existing
+    
     with col1:
-        st.write("Base Classes")
-        for c in base_classes:
-            if st.button(f"Level {c['name']}", key=f"base_{c['id']}"):
-                success, message = level_up_class(character_id, c['id'])
-                if success:
-                    st.success(message)
-                    load_character_list()  # Refresh character list
-                else:
-                    st.error(message)
-
+        type_options = ["All"] + class_types
+        selected_type = st.selectbox(
+            "Class Type",
+            options=type_options,
+            index=type_options.index(st.session_state.selected_class_type),
+            key="class_type_filter",
+            on_change=update_class_type
+        )
+    
     with col2:
-        st.write("High Classes")
-        for c in high_classes:
-            if st.button(f"Level {c['name']}", key=f"high_{c['id']}"):
-                success, message = level_up_class(character_id, c['id'])
-                if success:
-                    st.success(message)
-                    load_character_list()
-                else:
-                    st.error(message)
-
+        category_options = ["All"] + categories
+        selected_category = st.selectbox(
+            "Category",
+            options=category_options,
+            index=category_options.index(st.session_state.selected_category),
+            key="category_filter",
+            on_change=update_category
+        )
+    
     with col3:
-        st.write("Rare Classes")
-        for c in rare_classes:
-            if st.button(f"Level {c['name']}", key=f"rare_{c['id']}"):
-                success, message = level_up_class(character_id, c['id'])
-                if success:
-                    st.success(message)
-                    load_character_list()
-                else:
-                    st.error(message)
+        show_racial = st.checkbox(
+            "Show Racial Classes",
+            key="racial_filter",
+            on_change=update_show_racial,
+            value=st.session_state.show_racial
+        )
+        show_existing = st.checkbox(
+            "Show Existing Classes",
+            key="existing_filter",
+            on_change=update_show_existing,
+            value=st.session_state.show_existing
+        )
+
+    # Filter classes based on session state values
+    filtered_classes = [
+        c for c in available_classes
+        if (st.session_state.selected_class_type == "All" or c['type'] == st.session_state.selected_class_type) and
+           (st.session_state.selected_category == "All" or c['category'] == st.session_state.selected_category) and
+           (st.session_state.show_racial or not c['is_racial']) and
+           (st.session_state.show_existing or c['current_level'] == 0)
+    ]
+
+    # Display filtered classes
+    if filtered_classes:
+        # Create class selection radio buttons
+        class_options = [
+            f"{c['name']} (Level {c['current_level'] + 1})" 
+            if c['current_level'] > 0 
+            else f"{c['name']} (New Class)"
+            for c in filtered_classes
+        ]
+        
+        selected_index = st.radio(
+            "Select Class to Level Up",
+            range(len(class_options)),
+            format_func=lambda x: class_options[x]
+        )
+        
+        selected_class = filtered_classes[selected_index]
+        
+        # Show class details in a container for better organization
+        with st.container():
+            st.markdown("### Class Details")
+            st.write(f"**Type:** {selected_class['type']}")
+            st.write(f"**Category:** {selected_class['category'] or 'None'}")
+            if selected_class['subcategory']:
+                st.write(f"**Subcategory:** {selected_class['subcategory']}")
+            st.write("**Description:**", selected_class['description'])
+            st.write(f"**Current Level:** {selected_class['current_level']}")
+            
+            # Level up button in its own container
+            with st.container():
+                if st.button("Confirm Level Up", use_container_width=True):
+                    success, message = level_up_class(character_id, selected_class['id'])
+                    if success:
+                        st.success(message)
+                        # Refresh all necessary data
+                        load_character_list()
+                        available_classes = get_available_classes_for_level_up(character_id)
+                        st.rerun()  # Rerun to refresh the interface
+                    else:
+                        st.error(message)
+    else:
+        st.warning("No classes match the selected filters.")
 
 def render_character_view():
     """Display existing character information"""
