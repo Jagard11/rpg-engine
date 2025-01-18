@@ -9,7 +9,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 def create_character_schema():
-    """Create the character table schema"""
+    """Create the characters table schema"""
     try:
         # Get path to database in parent directory
         current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -25,24 +25,39 @@ def create_character_schema():
         # Enable foreign keys
         cursor.execute("PRAGMA foreign_keys = ON")
         
-        # Create single characters table
+        # Create characters table
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS characters (
             id INTEGER PRIMARY KEY,
-            name TEXT NOT NULL,
-            character_level INTEGER DEFAULT 1,
-            experience INTEGER DEFAULT 0,
+            first_name TEXT NOT NULL,
+            middle_name TEXT,
+            last_name TEXT NOT NULL,
+            bio TEXT,
+            race_column TEXT,           
+            total_level INTEGER NOT NULL DEFAULT 0,
+            birth_place TEXT,
+            age INTEGER,
             karma INTEGER DEFAULT 0,
-            current_health INTEGER NOT NULL,
-            max_health INTEGER NOT NULL,
-            current_mana INTEGER NOT NULL,
-            max_mana INTEGER NOT NULL,
-            description TEXT,
-            is_active BOOLEAN DEFAULT TRUE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            talent TEXT,
+            is_active BOOLEAN DEFAULT TRUE
         )
         """)
+
+        # Insert default character
+        default_character = [
+            (1, 'James', None, 'Gerard', 
+             'A young student beginning his journey into space exploration', "humanoid",
+             15, 'Earth', 19, 0, 'Adaptive Learning', True)
+        ]
+
+        cursor.executemany("""
+        INSERT OR IGNORE INTO characters (
+            id, first_name, middle_name, last_name, bio, race_column,
+            total_level, birth_place, age, karma, talent, is_active
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, default_character)
         
         # Commit changes
         conn.commit()

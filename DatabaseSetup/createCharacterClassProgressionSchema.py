@@ -31,20 +31,38 @@ def create_character_class_progression_schema():
             id INTEGER PRIMARY KEY,
             character_id INTEGER NOT NULL,
             class_id INTEGER NOT NULL,
-            current_level INTEGER NOT NULL DEFAULT 1,
-            current_exp INTEGER NOT NULL DEFAULT 0,
-            is_active BOOLEAN DEFAULT FALSE,
-            unlocked_at TIMESTAMP,
-            acquisition_order INTEGER NOT NULL,
-            is_auto_level BOOLEAN DEFAULT FALSE,
-            is_inflicted BOOLEAN DEFAULT FALSE,
-            auto_spell_selection_mode TEXT CHECK(auto_spell_selection_mode IN ('Random', 'Ordered', 'Hybrid')),
-            spell_selection_data JSON,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            current_level INTEGER NOT NULL DEFAULT 0,
+            current_experience INTEGER NOT NULL DEFAULT 0,
+            unlocked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (character_id) REFERENCES characters(id),
-            FOREIGN KEY (class_id) REFERENCES character_classes(id)
+            FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE,
+            FOREIGN KEY (class_id) REFERENCES classes(id),
+            UNIQUE(character_id, class_id)
         )
+        """)
+        
+        # Insert default progression for James Gerard
+        default_progression = [
+            # Racial Classes
+            (1, 1, 1, 1, 0),  # Human [1]
+            
+            # Job Classes
+            (2, 1, 2, 5, 0),  # Student [5]
+            (3, 1, 3, 2, 0),  # Welder [2]
+            (4, 1, 4, 2, 0),  # Flight Simulator Enthusiast [2]
+            (5, 1, 5, 5, 0)   # Ship Operations Trainee [5]
+        ]
+
+        cursor.executemany("""
+        INSERT OR IGNORE INTO character_class_progression (
+            id, character_id, class_id, current_level, current_experience
+        ) VALUES (?, ?, ?, ?, ?)
+        """, default_progression)
+        
+        # Create index for faster lookups
+        cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_char_class_prog_lookup 
+        ON character_class_progression(character_id, class_id)
         """)
         
         # Commit changes

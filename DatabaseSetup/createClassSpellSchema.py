@@ -8,8 +8,8 @@ import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-def create_class_spell_schema():
-    """Create the class spells table schema"""
+def create_class_spell_schema():  # This name matches what initializeSchema.py expects
+    """Create the class spell level table schema"""
     try:
         # Get path to database in parent directory
         current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -25,39 +25,37 @@ def create_class_spell_schema():
         # Enable foreign keys
         cursor.execute("PRAGMA foreign_keys = ON")
         
-        # Create class spells table
+        # Create class spell levels table
         cursor.execute("""
-        CREATE TABLE IF NOT EXISTS class_spells (
-            id INTEGER PRIMARY KEY,
-            class_id INTEGER NOT NULL,
-            spell_id INTEGER NOT NULL,
-            min_level INTEGER NOT NULL DEFAULT 1,
-            is_auto_granted BOOLEAN DEFAULT FALSE,
-            auto_grant_order INTEGER,
-            is_optional BOOLEAN DEFAULT TRUE,
-            prerequisites_json JSON,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (class_id) REFERENCES character_classes(id),
-            FOREIGN KEY (spell_id) REFERENCES spells(id)
-        )
-        """)
-        
-        # Create character spell acquisition table
-        cursor.execute("""
-        CREATE TABLE IF NOT EXISTS character_spell_acquisition (
+        CREATE TABLE IF NOT EXISTS class_spell_levels (
             id INTEGER PRIMARY KEY,
             character_id INTEGER NOT NULL,
             class_id INTEGER NOT NULL,
-            spell_id INTEGER NOT NULL,
-            acquired_at_level INTEGER NOT NULL,
-            acquisition_order INTEGER NOT NULL,
-            is_active BOOLEAN DEFAULT TRUE,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            level_number INTEGER NOT NULL,
+            purchase_order INTEGER NOT NULL,
+            spell_selection_1 INTEGER,
+            spell_selection_2 INTEGER,
+            spell_selection_3 INTEGER,
+            spell_selection_4 INTEGER,
+            spell_selection_5 INTEGER,
+            spell_selection_6 INTEGER,
+            unlocked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (character_id) REFERENCES characters(id),
-            FOREIGN KEY (class_id) REFERENCES character_classes(id),
-            FOREIGN KEY (spell_id) REFERENCES spells(id)
+            FOREIGN KEY (class_id) REFERENCES classes(id)
         )
+        """)
+        
+        # Create index for faster lookups
+        cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_class_spell_levels_char_class 
+        ON class_spell_levels(character_id, class_id)
+        """)
+        
+        # Create index for spell tracking
+        cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_class_spell_levels_purchase 
+        ON class_spell_levels(character_id, class_id, purchase_order)
         """)
         
         # Commit changes

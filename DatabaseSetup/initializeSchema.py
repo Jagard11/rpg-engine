@@ -24,57 +24,19 @@ def initialize_schemas():
     
     # Get list of all schema files in dependency order
     schema_files = [
-        # Level 1: Foundation tables
-        "TableCleanup.py",                    # First to clean existing tables
-        "createBaseStatSchema.py",            # No dependencies
-        "createCharacterSchema.py",           # No character-specific dependencies
-        "createRaceSchema.py",                # No dependencies
-        "createCharacterClassSchema.py",      # No dependencies
-        "createMagicSchoolSchema.py",         # No dependencies
-        "createDamageTypeSchema.py",          # No dependencies
-        "createItemSchema.py",                # No dependencies
-        "createQuestSchema.py",               # No dependencies
-        "createTalentSchema.py",              # No dependencies
-        "createAbilitySchema.py",             # No dependencies
-        "createRaceCategorySchema.py",        # No dependencies
-
-        # Level 2: Basic dependent tables
-        "createProgressionSchema.py",         # Depends on characters
-        "createAchievementSchema.py",         # Depends on characters
-        "createRacialTraitSchema.py",         # Depends on races
-        "createClassLevelSchema.py",          # Depends on classes
-        "createSpellTierSchema.py",           # Depends on magic schools
-        "createCharacterStatSchema.py",       # Depends on characters and base stats
-        "createEquipmentSlotSchema.py",       # Depends on items
-        "createQuestRequirementSchema.py",    # Depends on quests
-        "createQuestRewardSchema.py",         # Depends on quests
+        # First clean existing tables
+        "TableCleanup.py",
         
-        # Level 3: Complex dependent tables
-        "createRaceEvolutionSchema.py",       # Depends on races
-        "createClassPrerequisiteSchema.py",   # Depends on classes
-        "createClassEvolutionSchema.py",      # Depends on classes
-        "createSpellSchema.py",               # Depends on magic schools, damage types
-        "createAbilityRequirementSchema.py",  # Depends on abilities, classes, races
-        "createStatModifierSchema.py",        # Depends on characters, base stats
-        "createStatScalingSchema.py",         # Depends on classes, base stats
-        "createCharacterInventorySchema.py",  # Depends on characters, items
+        # Level 1: Foundation tables (no dependencies)
+        "createCharacterSchema.py",    # Characters must exist first
+        "createClassSchema.py",        # Classes are referenced by many tables
+        "createSpellSchema.py",        # Spells are referenced by class spell levels
         
-        # Level 4: Junction tables and complex dependencies
-        "createCharacterRacialTraitSchema.py",    
-        "createCharacterClassProgressionSchema.py",
-        "createCharacterSpellSlotSchema.py",
-        "createSpellEffectSchema.py",
-        "createCharacterSpellSchema.py",
-        "createClassSpellSchema.py",
-        "createCharacterAbilitySchema.py",
-        "createAbilityEffectSchema.py",
-        "createCharacterEquipmentSchema.py",
-        "createCharacterQuestSchema.py",
-        "createClassAbilitySchema.py",
-        "createTalentConditionSchema.py",
-        "createTalentEffectSchema.py",
-        "createCharacterTalentSchema.py",
-        "createCharacterRaceProgressionSchema.py"
+        # Level 2: Dependent tables
+        "createCharacterStatsSchema.py",           # Depends on characters
+        "createPrerequisiteSchema.py",             # Depends on classes
+        "createCharacterClassProgressionSchema.py", # Depends on characters and classes
+        "createClassSpellSchema.py",               # Depends on characters, classes, and spells
     ]
     
     logger.info(f"Starting schema initialization with {len(schema_files)} files...")
