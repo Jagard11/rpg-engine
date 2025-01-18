@@ -71,12 +71,9 @@ def create_timestamp_triggers():
                 AFTER INSERT ON {table_name}
                 BEGIN
                     UPDATE {table_name}
-                    SET created_at = CASE 
-                            WHEN created_at IS NULL THEN DATETIME('now')
-                            ELSE created_at
-                        END,
+                    SET created_at = DATETIME('now'),
                         updated_at = DATETIME('now')
-                    WHERE rowid = NEW.rowid;
+                    WHERE rowid = NEW.rowid AND created_at IS NULL;
                 END;
                 """)
             
@@ -91,7 +88,6 @@ def create_timestamp_triggers():
                 CREATE TRIGGER {trigger_name}
                 AFTER UPDATE ON {table_name}
                 FOR EACH ROW
-                WHEN NEW.created_at = OLD.created_at  -- Preserve created_at
                 BEGIN
                     UPDATE {table_name}
                     SET updated_at = DATETIME('now')
