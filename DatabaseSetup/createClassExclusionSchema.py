@@ -43,8 +43,20 @@ def create_class_exclusion_schema():
             min_value INTEGER,
             max_value INTEGER,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (class_id) REFERENCES classes(id)
         )
+        """)
+
+        # Create trigger for updated_at
+        cursor.execute("""
+        CREATE TRIGGER IF NOT EXISTS update_exclusions_timestamp
+        AFTER UPDATE ON class_exclusions
+        BEGIN
+            UPDATE class_exclusions 
+            SET updated_at = CURRENT_TIMESTAMP 
+            WHERE id = NEW.id;
+        END;
         """)
         
         # Create trigger to validate target_id based on exclusion_type

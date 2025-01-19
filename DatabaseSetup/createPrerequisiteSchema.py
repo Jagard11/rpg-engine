@@ -46,8 +46,20 @@ def create_prerequisite_schema():
             min_value INTEGER,
             max_value INTEGER,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (class_id) REFERENCES classes(id)
         )
+        """)
+        
+        # Create trigger for updated_at
+        cursor.execute("""
+        CREATE TRIGGER IF NOT EXISTS update_prerequisites_timestamp
+        AFTER UPDATE ON class_prerequisites
+        BEGIN
+            UPDATE class_prerequisites 
+            SET updated_at = CURRENT_TIMESTAMP 
+            WHERE id = NEW.id;
+        END;
         """)
         
         # Create trigger to validate target_id based on prerequisite_type
