@@ -13,19 +13,52 @@ def create_new_race(name: str, category: str, description: str) -> Tuple[bool, s
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
+        # First get the category_id from class_categories
+        cursor.execute("""
+            SELECT id FROM class_categories 
+            WHERE name = ? AND is_racial = TRUE
+        """, (category,))
+        category_result = cursor.fetchone()
+        if not category_result:
+            return False, f"Race category {category} not found"
+        
+        category_id = category_result[0]
+        
+        # Get a default subcategory for this category
+        cursor.execute("""
+            SELECT id FROM class_subcategories 
+            WHERE name = 'Magekin'
+        """)
+        subcategory_result = cursor.fetchone()
+        if not subcategory_result:
+            return False, "Default subcategory not found"
+            
+        subcategory_id = subcategory_result[0]
+        
+        # Insert the new race class
         cursor.execute("""
             INSERT INTO classes (
                 name, description, class_type, is_racial, 
-                category, race_category
-            ) VALUES (?, ?, 'Base', TRUE, ?, ?)
-        """, (name, description, category, category))
+                category_id, subcategory_id,
+                base_hp, base_mp, base_physical_attack, base_physical_defense,
+                base_agility, base_magical_attack, base_magical_defense,
+                base_resistance, base_special
+            ) VALUES (
+                ?, ?, 1, TRUE, 
+                ?, ?,
+                10, 10, 10, 10,
+                10, 10, 10,
+                10, 10
+            )
+        """, (name, description, category_id, subcategory_id))
+        
         conn.commit()
         return True, "Race created successfully!"
     except Exception as e:
         return False, f"Error creating race: {str(e)}"
     finally:
         conn.close()
-
+        
 def create_character(first_name, middle_name, last_name, bio, birth_place, age, talent, race_category, selected_classes):
     """Create a new character with selected classes"""
     conn = get_db_connection()
