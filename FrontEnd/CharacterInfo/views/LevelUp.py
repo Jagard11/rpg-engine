@@ -133,7 +133,7 @@ def render_level_up_interface(character_id: int):
     if filtered_classes:
         # Create class selection radio buttons
         class_options = [
-            f"{c['name']} (Level {c['current_level'] + 1})" 
+            f"{c['name']} (Level {c['current_level']})" 
             if c['current_level'] > 0 
             else f"{c['name']} (New Class)"
             for c in filtered_classes
