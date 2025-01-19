@@ -1,4 +1,4 @@
-# ./DatabaseSetup/createClassCategorySchema.py
+# ./DatabaseSetup/createClassSubcategorySchema.py
 
 import sqlite3
 import os
@@ -8,15 +8,15 @@ import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-def create_class_category_schema():
-    """Create the class category table schema"""
+def create_class_subcategory_schema():
+    """Create the class subcategory table schema"""
     try:
         # Get path to database in parent directory
         current_dir = os.path.dirname(os.path.abspath(__file__))
         parent_dir = os.path.dirname(current_dir)
         db_path = os.path.join(parent_dir, 'rpg_data.db')
         
-        logger.info(f"Creating Class Category schema in database: {db_path}")
+        logger.info(f"Creating Class subcategory schema in database: {db_path}")
         
         # Connect to database
         conn = sqlite3.connect(db_path)
@@ -27,38 +27,37 @@ def create_class_category_schema():
         
         # Create prerequisites table
         cursor.execute("""
-        CREATE TABLE IF NOT EXISTS class_categories (
+        CREATE TABLE IF NOT EXISTS class_subcategories (
             id INTEGER PRIMARY KEY,
             name TEXT NOT NULL UNIQUE,
-            is_racial BOOLEAN NOT NULL DEFAULT FALSE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """)
 
-        # insert default class categories
-        default_categories = [
-            # Race Categories
-            (1, 'Humanoid', True),
-            (2, 'Demi-Human', True),
-            (3, 'Heteromorph', True),
-            
-            # Job Categories
-            (4, 'Knowledge', False),
-            (5, 'Craft', False),
-            (6, 'Pilot', False),
-            (7, 'Teamwork', False)
+        # insert default class subcategories
+        default_subcategories = [
+            # Race Subcategories
+            (1, 'Magekin'),
+            (2, 'Bioengineered'),
+            (3, 'Construct'),
+
+            # Job Subcategories
+            (4, 'Academia'),
+            (5, 'Trades'),
+            (6, 'Fixed Wing Aircraft'),
+            (7, 'Crew'),
         ]
 
         cursor.executemany("""
-        INSERT OR IGNORE INTO class_categories (
-            id, name, is_racial          
-        ) VALUES (?, ?, ?)
-        """, default_categories)
+        INSERT OR IGNORE INTO class_subcategories (
+            id, name            
+        ) VALUES (?, ?)
+        """, default_subcategories)
         
         # Commit changes
         conn.commit()
-        logger.info("Class Category schema creation completed successfully.")
+        logger.info("Class subcategory schema creation completed successfully.")
         
     except sqlite3.Error as e:
         logger.error(f"SQLite error occurred: {str(e)}")
@@ -73,7 +72,7 @@ def create_class_category_schema():
 
 def main():
     """Entry point for schema creation"""
-    create_class_category_schema()
+    create_class_subcategory_schema()
 
 if __name__ == "__main__":
     main()

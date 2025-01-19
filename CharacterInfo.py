@@ -212,16 +212,18 @@ def get_available_classes_for_level_up(character_id: int) -> List[Dict]:
                 c.description,
                 c.class_type,
                 c.is_racial,
-                c.category,
-                c.subcategory,
+                cat.name as category,
+                subcat.name as subcategory,
                 c.karma_requirement_min,
                 c.karma_requirement_max,
                 COALESCE(cp.current_level, 0) as current_level
             FROM classes c
+            LEFT JOIN class_categories cat ON c.category_id = cat.id
+            LEFT JOIN class_subcategories subcat ON c.subcategory_id = subcat.id
             LEFT JOIN character_class_progression cp ON 
                 cp.class_id = c.id AND cp.character_id = ?
             WHERE 
-                (c.is_racial = FALSE OR c.category = ?) AND
+                (c.is_racial = FALSE OR cat.is_racial = TRUE AND cat.name = ?) AND
                 ? BETWEEN c.karma_requirement_min AND c.karma_requirement_max AND
                 NOT EXISTS (
                     SELECT 1 
@@ -235,12 +237,38 @@ def get_available_classes_for_level_up(character_id: int) -> List[Dict]:
                         cp2.current_level >= p.required_level
                     )
                 )
-            ORDER BY c.is_racial DESC, c.class_type, c.category, c.name
+            ORDER BY c.is_racial DESC, c.class_type, cat.name, c.name
         """, (character_id, race_category, karma, character_id))
 
         columns = ['id', 'name', 'description', 'type', 'is_racial', 'category', 
                   'subcategory', 'karma_min', 'karma_max', 'current_level']
         return [dict(zip(columns, row)) for row in cursor.fetchall()]
+    finally:
+        conn.close()
+
+def load_available_classes() -> List[tuple]:
+    """Load list of available classes from database"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT 
+                c.id, 
+                c.name, 
+                c.description, 
+                c.class_type, 
+                c.is_racial,
+                cat.name as category,
+                subcat.name as subcategory
+            FROM classes c
+            LEFT JOIN class_categories cat ON c.category_id = cat.id
+            LEFT JOIN class_subcategories subcat ON c.subcategory_id = subcat.id
+            ORDER BY c.is_racial DESC, c.class_type, cat.name, c.name
+        """)
+        return cursor.fetchall()
+    except Exception as e:
+        st.error(f"Error loading available classes: {str(e)}")
+        return []
     finally:
         conn.close()
 
@@ -522,33 +550,6 @@ def render_character_view():
     else:
         st.info("No characters found. Create one in the 'Create Character' tab!")
 
-def load_racial_classes(race_category: str) -> List[tuple]:
-    """Load racial classes based on race category"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute("""
-            SELECT 
-                c.id, 
-                c.name, 
-                c.description,
-                c.subcategory
-            FROM classes c
-            WHERE c.is_racial = TRUE 
-            AND c.category = ?
-            ORDER BY c.subcategory, c.name
-        """, (race_category,))
-        return cursor.fetchall()
-    except Exception as e:
-        st.error(f"Error loading racial classes: {str(e)}")
-        return []
-    finally:
-        conn.close()
-
-def get_subcategories(racial_classes: List[tuple]) -> List[str]:
-    """Get unique subcategories from racial classes"""
-    return sorted(set(rc[3] for rc in racial_classes if rc[3] is not None))
-
 def render_character_creation_form():
     """Render the character creation form"""
     st.subheader("Create New Character")
@@ -583,62 +584,59 @@ def render_character_creation_form():
             
         talent = st.text_input("Talent", key="talent")
         
-        # Race selection
-        st.subheader("Select Race")
-        racial_classes = load_racial_classes(race_category)
+        # Class selection
+        st.subheader("Select Classes")
+        available_classes = load_available_classes()
+        selected_classes = []
         
-        if racial_classes:
-            # Get subcategories for filtering
-            subcategories = get_subcategories(racial_classes)
-            
-            # Subcategory filters
-            if subcategories:
-                st.write("Filter by Subcategories:")
-                selected_subcategories = set()
-                cols = st.columns(min(3, len(subcategories)))
-                for i, subcat in enumerate(subcategories):
-                    with cols[i % 3]:
-                        if st.checkbox(subcat, key=f"subcat_{subcat}"):
-                            selected_subcategories.add(subcat)
-                
-                # Filter races based on selected subcategories
-                if selected_subcategories:
-                    filtered_races = [rc for rc in racial_classes if rc[3] in selected_subcategories]
-                else:
-                    filtered_races = racial_classes
-            else:
-                filtered_races = racial_classes
-            
-            # Display races as radio buttons
-            st.write("Available Races:")
-            selected_race = None
-            race_options = [(rc[0], f"{rc[1]} - {rc[2]}") for rc in filtered_races]
-            
-            selected_race_id = st.radio(
-                "Select Race",
-                options=[r[0] for r in race_options],
-                format_func=lambda x: next(r[1] for r in race_options if r[0] == x),
-                key="race_selection"
-            )
-            
-            if selected_race_id:
-                selected_race = (selected_race_id, 1)  # Default level 1 for new characters
-        else:
-            st.warning(f"No races available for {race_category} category.")
-            selected_race = None
+        # Group classes by type
+        racial_classes = [c for c in available_classes if c[4]]  # is_racial
+        job_classes = [c for c in available_classes if not c[4]]  # not is_racial
+        
+        # Racial class selection
+        st.write("Racial Classes")
+        for class_info in racial_classes:
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                if st.checkbox(f"{class_info[1]} - {class_info[2]}", key=f"class_{class_info[0]}"):
+                    with col2:
+                        level = st.number_input(
+                            "Level",
+                            min_value=1,
+                            max_value=100,
+                            value=1,
+                            key=f"level_{class_info[0]}"
+                        )
+                        selected_classes.append((class_info[0], level))
+        
+        # Job class selection
+        st.write("Job Classes")
+        for class_info in job_classes:
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                if st.checkbox(f"{class_info[1]} - {class_info[2]}", key=f"class_{class_info[0]}"):
+                    with col2:
+                        level = st.number_input(
+                            "Level",
+                            min_value=1,
+                            max_value=100,
+                            value=1,
+                            key=f"level_{class_info[0]}"
+                        )
+                        selected_classes.append((class_info[0], level))
         
         # Submit button
         if st.form_submit_button("Create Character"):
             if not first_name:
                 st.error("First name is required!")
-            elif not selected_race:
-                st.error("Please select a race!")
+            elif not selected_classes:
+                st.error("Please select at least one class!")
             else:
                 success, message = create_character(
                     first_name, middle_name, last_name,
                     bio, birth_place, age, talent,
-                    race_category,
-                    [selected_race]  # Pass only the selected race
+                    race_category,  # Added race_category
+                    selected_classes
                 )
                 if success:
                     st.success(message)
@@ -646,7 +644,7 @@ def render_character_creation_form():
                     load_character_list()
                 else:
                     st.error(message)
-                    
+
 def create_character(first_name, middle_name, last_name, bio, birth_place, age, talent, race_category, selected_classes):
     """Create a new character with selected classes"""
     conn = get_db_connection()
@@ -829,4 +827,3 @@ def render_level_up_tab():
     if selected_index is not None:
         character_id = st.session_state.character_list[selected_index][0]
         render_level_up_interface(character_id)
-
