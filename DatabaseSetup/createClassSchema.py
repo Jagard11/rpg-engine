@@ -25,7 +25,7 @@ def create_class_schema():
         # Enable foreign keys
         cursor.execute("PRAGMA foreign_keys = ON")
         
-        # Create classes table without ANY check constraints
+        # Create classes table without karma requirements and ANY check constraints
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS classes (
             id INTEGER PRIMARY KEY,
@@ -44,8 +44,15 @@ def create_class_schema():
             base_magical_defense INTEGER NOT NULL DEFAULT 0,
             base_resistance INTEGER NOT NULL DEFAULT 0,
             base_special INTEGER NOT NULL DEFAULT 0,
-            karma_requirement_min INTEGER DEFAULT -1000,
-            karma_requirement_max INTEGER DEFAULT 1000,
+            hp_per_level INTEGER NOT NULL DEFAULT 0,
+            mp_per_level INTEGER NOT NULL DEFAULT 0,
+            physical_attack_per_level INTEGER NOT NULL DEFAULT 0,
+            physical_defense_per_level INTEGER NOT NULL DEFAULT 0,
+            agility_per_level INTEGER NOT NULL DEFAULT 0,
+            magical_attack_per_level INTEGER NOT NULL DEFAULT 0,
+            magical_defense_per_level INTEGER NOT NULL DEFAULT 0,
+            resistance_per_level INTEGER NOT NULL DEFAULT 0,
+            special_per_level INTEGER NOT NULL DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (class_type) REFERENCES class_types(id),
@@ -80,18 +87,37 @@ def create_class_schema():
         END;
         """)
 
-        # Insert default classes
+        # Insert default classes with per-level stats
         default_classes = [
             # Racial Classes
-            (1, 'Human', 'Basic human attributes and capabilities', 1, True, 1, 1, 10, 5, 5, 5, 5, 5, 5, 5, 5, -1000, 1000),
-            (2, 'Tinakris', 'Genetically modified super soldiers', 1, True, 2, 2, 20, 10, 10, 10, 10, 10, 10, 10, 10, -1000, 1000),
-            (3, 'Jexi', 'Robotic beings modeled after the dead.', 1, True, 3, 3, 30, 15, 15, 15, 15, 15, 15, 15, 15, -1000, 1000),
+            (1, 'Human', 'Basic human attributes and capabilities', 1, True, 1, 1,
+             10, 5, 5, 5, 5, 5, 5, 5, 5,  # Base stats
+             2, 1, 1, 1, 1, 1, 1, 1, 1),  # Per level stats
+             
+            (2, 'Tinakris', 'Genetically modified super soldiers', 1, True, 2, 2,
+             20, 10, 10, 10, 10, 10, 10, 10, 10,  # Base stats
+             4, 2, 2, 2, 2, 2, 2, 2, 2),  # Per level stats
+             
+            (3, 'Jexi', 'Robotic beings modeled after the dead.', 1, True, 3, 3,
+             30, 15, 15, 15, 15, 15, 15, 15, 15,  # Base stats
+             6, 3, 3, 3, 3, 3, 3, 3, 3),  # Per level stats
             
-            # Job Classes
-            (4, 'Student', 'Disciplines needed to learn new subjects from others', 1, False, 4, 4, 5, 10, 2, 2, 3, 8, 5, 5, 5, -1000, 1000),
-            (5, 'Welder', 'Rudimentary welding capabilities', 1, False, 5, 5, 8, 3, 7, 5, 4, 2, 3, 4, 5, -1000, 1000),
-            (6, 'Fixed Wing Pilot', 'The knowledge to fly fixed wing craft in atmosphere', 1, False, 6, 6, 5, 8, 3, 3, 6, 5, 4, 4, 7, -1000, 1000),
-            (7, 'Crewman', 'Skills needed to colaborate with others on a vessel', 1, False, 7, 7, 7, 7, 4, 4, 5, 6, 5, 5, 6, -1000, 1000)
+            # Job Classes - using original stats but adding minimal per-level gains
+            (4, 'Student', 'Disciplines needed to learn new subjects from others', 1, False, 4, 4,
+             5, 10, 2, 2, 3, 8, 5, 5, 5,  # Base stats
+             1, 2, 1, 1, 1, 2, 1, 1, 1),  # Per level stats
+             
+            (5, 'Welder', 'Rudimentary welding capabilities', 1, False, 5, 5,
+             8, 3, 7, 5, 4, 2, 3, 4, 5,  # Base stats
+             2, 1, 2, 1, 1, 1, 1, 1, 1),  # Per level stats
+             
+            (6, 'Fixed Wing Pilot', 'The knowledge to fly fixed wing craft in atmosphere', 1, False, 6, 6,
+             5, 8, 3, 3, 6, 5, 4, 4, 7,  # Base stats
+             1, 2, 1, 1, 2, 1, 1, 1, 2),  # Per level stats
+             
+            (7, 'Crewman', 'Skills needed to collaborate with others on a vessel', 1, False, 7, 7,
+             7, 7, 4, 4, 5, 6, 5, 5, 6,  # Base stats
+             2, 2, 1, 1, 1, 1, 1, 1, 2)   # Per level stats
         ]
 
         cursor.executemany("""
@@ -100,8 +126,10 @@ def create_class_schema():
             base_hp, base_mp, base_physical_attack, base_physical_defense,
             base_agility, base_magical_attack, base_magical_defense,
             base_resistance, base_special,
-            karma_requirement_min, karma_requirement_max
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            hp_per_level, mp_per_level, physical_attack_per_level,
+            physical_defense_per_level, agility_per_level, magical_attack_per_level,
+            magical_defense_per_level, resistance_per_level, special_per_level
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, default_classes)
 
         # Create indexes for faster lookups

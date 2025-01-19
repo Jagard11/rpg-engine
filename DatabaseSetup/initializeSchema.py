@@ -38,6 +38,7 @@ def initialize_schemas():
         # Level 2: Dependent tables
         "createCharacterStatsSchema.py",           # Depends on characters
         "createPrerequisiteSchema.py",             # Depends on classes
+        "createClassExclusionSchema.py",           # Depends on classes
         "createCharacterClassProgressionSchema.py", # Depends on characters and classes
         "createClassSpellSchema.py",               # Depends on characters, classes, and spells
     ]

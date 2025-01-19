@@ -70,7 +70,7 @@ def get_available_classes_for_level_up(character_id: int) -> List[Dict]:
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        # Get character's race category
+        # Get character's race category and karma
         cursor.execute("""
             SELECT c.race_category_id, c.karma 
             FROM characters c 
@@ -79,9 +79,9 @@ def get_available_classes_for_level_up(character_id: int) -> List[Dict]:
         """, (character_id,))
         race_category_id, karma = cursor.fetchone()
 
-        # Get available classes based on prerequisites and karma
+        # Get available classes based on prerequisites
         cursor.execute("""
-            SELECT 
+            SELECT DISTINCT
                 c.id,
                 c.name,
                 c.description,
@@ -89,8 +89,6 @@ def get_available_classes_for_level_up(character_id: int) -> List[Dict]:
                 c.is_racial,
                 cat.name as category,
                 subcat.name as subcategory,
-                c.karma_requirement_min,
-                c.karma_requirement_max,
                 COALESCE(cp.current_level, 0) as current_level
             FROM classes c
             LEFT JOIN class_categories cat ON c.category_id = cat.id
@@ -99,25 +97,66 @@ def get_available_classes_for_level_up(character_id: int) -> List[Dict]:
             LEFT JOIN character_class_progression cp ON 
                 cp.class_id = c.id AND cp.character_id = ?
             WHERE 
-                (c.is_racial = FALSE OR cat.is_racial = TRUE AND cat.id = ?) AND
-                ? BETWEEN c.karma_requirement_min AND c.karma_requirement_max AND
-                NOT EXISTS (
-                    SELECT 1 
-                    FROM class_prerequisites p
-                    WHERE p.class_id = c.id AND
+                (c.is_racial = FALSE OR cat.is_racial = TRUE AND cat.id = ?) 
+                AND NOT EXISTS (
+                    -- Check karma exclusions
+                    SELECT 1 FROM class_exclusions ce
+                    WHERE ce.class_id = c.id
+                    AND ce.exclusion_type = 'karma'
+                    AND ? BETWEEN ce.min_value AND ce.max_value
+                )
+                AND NOT EXISTS (
+                    -- Check if any exclusions apply
+                    SELECT 1 FROM class_exclusions ce2
+                    WHERE ce2.class_id = c.id
+                    AND ce2.exclusion_type IN ('specific_class', 'category_total', 'subcategory_total', 'racial_total')
+                    AND EXISTS (
+                        -- Complex exclusion logic would go here
+                        -- For now, just exclude if there's any non-karma exclusion
+                        SELECT 1 FROM character_class_progression cp2
+                        WHERE cp2.character_id = ?
+                    )
+                )
+                AND (
+                    -- Allow classes with no prerequisites
                     NOT EXISTS (
-                        SELECT 1 
-                        FROM character_class_progression cp2
-                        WHERE cp2.character_id = ? AND
-                        cp2.class_id = p.required_class_id AND
-                        cp2.current_level >= p.required_level
+                        SELECT 1 FROM class_prerequisites cp
+                        WHERE cp.class_id = c.id
+                    )
+                    OR
+                    -- Or check if all prerequisite groups are satisfied
+                    EXISTS (
+                        SELECT prerequisite_group
+                        FROM class_prerequisites cp
+                        WHERE cp.class_id = c.id
+                        GROUP BY prerequisite_group
+                        HAVING COUNT(*) = (
+                            -- Count satisfied prerequisites per group
+                            SELECT COUNT(*)
+                            FROM class_prerequisites cp2
+                            WHERE cp2.class_id = c.id
+                            AND cp2.prerequisite_group = cp.prerequisite_group
+                            AND (
+                                -- Check karma prerequisites
+                                (cp2.prerequisite_type = 'karma' AND ? BETWEEN cp2.min_value AND cp2.max_value)
+                                OR 
+                                -- Check class level prerequisites
+                                (cp2.prerequisite_type = 'specific_class' AND EXISTS (
+                                    SELECT 1 FROM character_class_progression cp3
+                                    WHERE cp3.character_id = ?
+                                    AND cp3.class_id = cp2.target_id
+                                    AND cp3.current_level >= cp2.required_level
+                                ))
+                                -- Add more prerequisite type checks here
+                            )
+                        )
                     )
                 )
             ORDER BY c.is_racial DESC, t.id, cat.name, c.name
-        """, (character_id, race_category_id, karma, character_id))
+        """, (character_id, race_category_id, karma, character_id, karma, character_id))
 
         columns = ['id', 'name', 'description', 'type', 'is_racial', 'category', 
-                  'subcategory', 'karma_min', 'karma_max', 'current_level']
+                  'subcategory', 'current_level']
         return [dict(zip(columns, row)) for row in cursor.fetchall()]
     finally:
         conn.close()
