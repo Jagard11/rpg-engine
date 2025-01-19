@@ -8,7 +8,8 @@ from datetime import datetime
 from .models.Character import Character
 from .utils.database import get_db_connection
 from .views.CharacterView import render_character_view
-from .views.CharacterCreation import render_character_creation_form, render_new_race_form
+from .views.CharacterCreation import render_character_creation_form
+from .views.RaceCreation import render_race_creation_form
 from .views.LevelUp import render_level_up_tab
 
 def init_character_state():
@@ -68,7 +69,7 @@ def render_character_tab():
         render_character_creation_form()
         
     with tab3:
-        render_new_race_form()
+        render_race_creation_form()
 
     with tab4:
         if st.session_state.character_list:
