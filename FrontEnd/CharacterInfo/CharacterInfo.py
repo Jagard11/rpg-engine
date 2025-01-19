@@ -8,7 +8,7 @@ from datetime import datetime
 from .models.Character import Character
 from .utils.database import get_db_connection
 from .views.CharacterView import render_character_view
-from .views.CharacterCreation import render_character_creation_form
+from .views.CharacterCreation import render_character_creation_form, render_new_race_form
 from .views.LevelUp import render_level_up_tab
 
 def init_character_state():
@@ -18,8 +18,6 @@ def init_character_state():
     if 'character_list' not in st.session_state:
         st.session_state.character_list = []
         load_character_list()
-    if 'show_new_race_form' not in st.session_state:
-        st.session_state.show_new_race_form = False
     if 'selected_class_type' not in st.session_state:
         st.session_state.selected_class_type = "All"
     if 'selected_category' not in st.session_state:
@@ -58,7 +56,7 @@ def render_character_tab():
     st.header("Character Management")
     
     # Tabs for different character operations
-    tab1, tab2, tab3 = st.tabs(["View Characters", "Create Character", "Level Up"])
+    tab1, tab2, tab3, tab4 = st.tabs(["View Characters", "Create Character", "Create Race", "Level Up"])
     
     with tab1:
         if st.session_state.character_list:
@@ -68,8 +66,11 @@ def render_character_tab():
             
     with tab2:
         render_character_creation_form()
-
+        
     with tab3:
+        render_new_race_form()
+
+    with tab4:
         if st.session_state.character_list:
             render_level_up_tab()
         else:

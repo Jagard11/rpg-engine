@@ -109,13 +109,43 @@ def create_character(first_name, middle_name, last_name, bio, birth_place, age, 
     finally:
         conn.close()
 
+def verify_race_exists(name: str) -> bool:
+    """Verify that a race exists in the database"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT COUNT(*) FROM classes 
+            WHERE name = ? AND is_racial = TRUE
+        """, (name,))
+        count = cursor.fetchone()[0]
+        return count > 0
+    finally:
+        conn.close()
+
+def clear_success_banner():
+    """Clear the success banner after timeout"""
+    st.session_state.show_success_banner = False
+
 def render_new_race_form():
     """Render form for creating a new race"""
     st.subheader("Create New Race")
     
-    with st.form("new_race_form"):
+    # Initialize session state for banner visibility if not exists
+    if 'show_success_banner' not in st.session_state:
+        st.session_state.show_success_banner = False
+    if 'success_race_name' not in st.session_state:
+        st.session_state.success_race_name = ""
+    
+    # Get race categories
+    race_categories = get_available_race_categories()
+    
+    # Create two columns - one for form, one for success banner
+    form_col, banner_col = st.columns([2, 1])
+    
+    with form_col:
+        # Form inputs
         name = st.text_input("Race Name")
-        race_categories = get_available_race_categories()
         category_id = st.selectbox(
             "Race Category",
             options=[cat[0] for cat in race_categories],
@@ -123,28 +153,45 @@ def render_new_race_form():
         )
         description = st.text_area("Description")
         
-        if st.form_submit_button("Create Race"):
+        if st.button("Create Race"):
             if name and category_id:
                 success, message = create_new_race(name, category_id, description)
                 if success:
-                    st.success(message)
-                    st.session_state.show_new_race_form = False
+                    # Verify the race was actually added
+                    if verify_race_exists(name):
+                        st.session_state.show_success_banner = True
+                        st.session_state.success_race_name = name
+                        # Schedule banner removal after 10 seconds
+                        st.rerun()
+                    else:
+                        st.error("Race creation appeared successful but verification failed. Please try again.")
                 else:
                     st.error(message)
             else:
                 st.error("Name and category are required!")
+    
+    # Show success banner in the right column if active
+    with banner_col:
+        if st.session_state.show_success_banner:
+            st.markdown("""
+            <div style="padding: 1rem; background-color: #28a745; border-radius: 0.5rem; margin: 1rem 0;">
+                <p style="color: white; font-size: 1.1rem; margin: 0;">
+                    ✅ Race Successfully Added!
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Add race details under the banner
+            st.markdown(f"**{st.session_state.success_race_name}** has been added to the database.")
+            
+            # Schedule the banner to disappear
+            import time
+            time.sleep(0.1)  # Small delay to ensure banner shows
+            st.session_state.show_success_banner = False
 
 def render_character_creation_form():
     """Render the character creation form"""
     st.subheader("Create New Character")
-    
-    # Add button to show/hide new race form
-    if st.button("Add New Race"):
-        st.session_state.show_new_race_form = not st.session_state.show_new_race_form
-
-    if st.session_state.show_new_race_form:
-        render_new_race_form()
-        st.divider()
     
     with st.form("character_creation"):
         col1, col2, col3 = st.columns(3)
