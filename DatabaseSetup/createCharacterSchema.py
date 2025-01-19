@@ -49,7 +49,7 @@ def create_character_schema():
         default_character = [
             (1, 'James', None, 'Gerard', 
              'A young student beginning his journey into space exploration',
-             15, 'Earth', 19, 0, 'Adaptive Learning', 'Humanoid', True)
+             14, 'Earth', 19, 0, 'Adaptive Learning', 'Humanoid', True)
         ]
 
         cursor.executemany("""
