@@ -38,26 +38,40 @@ def create_character_schema():
             age INTEGER,
             karma INTEGER DEFAULT 0,
             talent TEXT,
-            race_category TEXT CHECK(race_category IN ('Humanoid', 'Demi-Human', 'Heteromorphic')) NOT NULL DEFAULT 'Humanoid',
+            race_category_id INTEGER NOT NULL,
             is_active BOOLEAN DEFAULT TRUE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (race_category_id) REFERENCES class_categories(id)
         )
         """)
 
         # Insert default character
+        # First get the Humanoid category ID
+        cursor.execute("""
+            SELECT id FROM class_categories 
+            WHERE name = 'Humanoid' AND is_racial = TRUE
+        """)
+        humanoid_id = cursor.fetchone()[0]
+
         default_character = [
             (1, 'James', None, 'Gerard', 
              'A young student beginning his journey into space exploration',
-             14, 'Earth', 19, 0, 'Adaptive Learning', 'Humanoid', True)
+             15, 'Earth', 19, 0, 'Adaptive Learning', humanoid_id, True)
         ]
 
         cursor.executemany("""
         INSERT OR IGNORE INTO characters (
             id, first_name, middle_name, last_name, bio, 
-            total_level, birth_place, age, karma, talent, race_category, is_active
+            total_level, birth_place, age, karma, talent, race_category_id, is_active
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, default_character)
+        
+        # Create index for race category lookups
+        cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_characters_race_category
+        ON characters(race_category_id)
+        """)
         
         # Commit changes
         conn.commit()

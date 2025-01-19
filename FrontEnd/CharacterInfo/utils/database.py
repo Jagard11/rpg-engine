@@ -25,7 +25,7 @@ def load_character(character_id: int) -> Optional[Character]:
                 age,
                 karma,
                 talent,
-                race_category,
+                race_category_id,
                 is_active,
                 created_at,
                 updated_at
@@ -72,11 +72,12 @@ def get_available_classes_for_level_up(character_id: int) -> List[Dict]:
     try:
         # Get character's race category
         cursor.execute("""
-            SELECT race_category, karma 
-            FROM characters 
-            WHERE id = ?
+            SELECT c.race_category_id, c.karma 
+            FROM characters c 
+            JOIN class_categories cc ON c.race_category_id = cc.id
+            WHERE c.id = ?
         """, (character_id,))
-        race_category, karma = cursor.fetchone()
+        race_category_id, karma = cursor.fetchone()
 
         # Get available classes based on prerequisites and karma
         cursor.execute("""
@@ -84,7 +85,7 @@ def get_available_classes_for_level_up(character_id: int) -> List[Dict]:
                 c.id,
                 c.name,
                 c.description,
-                c.class_type,
+                t.name as type,
                 c.is_racial,
                 cat.name as category,
                 subcat.name as subcategory,
@@ -94,10 +95,11 @@ def get_available_classes_for_level_up(character_id: int) -> List[Dict]:
             FROM classes c
             LEFT JOIN class_categories cat ON c.category_id = cat.id
             LEFT JOIN class_subcategories subcat ON c.subcategory_id = subcat.id
+            LEFT JOIN class_types t ON c.class_type = t.id
             LEFT JOIN character_class_progression cp ON 
                 cp.class_id = c.id AND cp.character_id = ?
             WHERE 
-                (c.is_racial = FALSE OR cat.is_racial = TRUE AND cat.name = ?) AND
+                (c.is_racial = FALSE OR cat.is_racial = TRUE AND cat.id = ?) AND
                 ? BETWEEN c.karma_requirement_min AND c.karma_requirement_max AND
                 NOT EXISTS (
                     SELECT 1 
@@ -111,8 +113,8 @@ def get_available_classes_for_level_up(character_id: int) -> List[Dict]:
                         cp2.current_level >= p.required_level
                     )
                 )
-            ORDER BY c.is_racial DESC, c.class_type, cat.name, c.name
-        """, (character_id, race_category, karma, character_id))
+            ORDER BY c.is_racial DESC, t.id, cat.name, c.name
+        """, (character_id, race_category_id, karma, character_id))
 
         columns = ['id', 'name', 'description', 'type', 'is_racial', 'category', 
                   'subcategory', 'karma_min', 'karma_max', 'current_level']
@@ -146,14 +148,15 @@ def load_available_classes() -> List[tuple]:
                 c.id, 
                 c.name, 
                 c.description, 
-                c.class_type, 
+                t.name as type, 
                 c.is_racial,
                 cat.name as category,
                 subcat.name as subcategory
             FROM classes c
+            LEFT JOIN class_types t ON c.class_type = t.id
             LEFT JOIN class_categories cat ON c.category_id = cat.id
             LEFT JOIN class_subcategories subcat ON c.subcategory_id = subcat.id
-            ORDER BY c.is_racial DESC, c.class_type, cat.name, c.name
+            ORDER BY c.is_racial DESC, t.id, cat.name, c.name
         """)
         return cursor.fetchall()
     except Exception as e:

@@ -4,62 +4,52 @@ import streamlit as st
 from typing import List, Tuple
 from ..utils.database import get_db_connection, load_available_classes
 
-def get_available_race_categories() -> List[str]:
-    """Get list of available race categories"""
-    return ["Humanoid", "Demi-Human", "Heteromorphic"]
+def get_available_race_categories() -> List[Tuple[int, str]]:
+    """Get list of available race categories from database"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT id, name 
+            FROM class_categories 
+            WHERE is_racial = TRUE 
+            ORDER BY name
+        """)
+        return cursor.fetchall()
+    finally:
+        conn.close()
 
-def create_new_race(name: str, category: str, description: str) -> Tuple[bool, str]:
+def create_new_race(name: str, category_id: int, description: str) -> Tuple[bool, str]:
     """Create a new race class"""
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        # First get the category_id from class_categories
-        cursor.execute("""
-            SELECT id FROM class_categories 
-            WHERE name = ? AND is_racial = TRUE
-        """, (category,))
-        category_result = cursor.fetchone()
-        if not category_result:
-            return False, f"Race category {category} not found"
-        
-        category_id = category_result[0]
-        
-        # Get a default subcategory for this category
+        # Get subcategory for the race
         cursor.execute("""
             SELECT id FROM class_subcategories 
-            WHERE name = 'Magekin'
+            WHERE name = 'Magekin' 
+            LIMIT 1
         """)
-        subcategory_result = cursor.fetchone()
-        if not subcategory_result:
-            return False, "Default subcategory not found"
-            
-        subcategory_id = subcategory_result[0]
-        
-        # Insert the new race class
+        subcategory_id = cursor.fetchone()[0]
+
+        # Get class type for the race (base)
+        cursor.execute("SELECT id FROM class_types WHERE name = 'base' LIMIT 1")
+        class_type_id = cursor.fetchone()[0]
+
         cursor.execute("""
             INSERT INTO classes (
                 name, description, class_type, is_racial, 
-                category_id, subcategory_id,
-                base_hp, base_mp, base_physical_attack, base_physical_defense,
-                base_agility, base_magical_attack, base_magical_defense,
-                base_resistance, base_special
-            ) VALUES (
-                ?, ?, 1, TRUE, 
-                ?, ?,
-                10, 10, 10, 10,
-                10, 10, 10,
-                10, 10
-            )
-        """, (name, description, category_id, subcategory_id))
-        
+                category_id, subcategory_id
+            ) VALUES (?, ?, ?, TRUE, ?, ?)
+        """, (name, description, class_type_id, category_id, subcategory_id))
         conn.commit()
         return True, "Race created successfully!"
     except Exception as e:
         return False, f"Error creating race: {str(e)}"
     finally:
         conn.close()
-        
-def create_character(first_name, middle_name, last_name, bio, birth_place, age, talent, race_category, selected_classes):
+
+def create_character(first_name, middle_name, last_name, bio, birth_place, age, talent, race_category_id, selected_classes):
     """Create a new character with selected classes"""
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -71,9 +61,9 @@ def create_character(first_name, middle_name, last_name, bio, birth_place, age, 
         cursor.execute("""
             INSERT INTO characters (
                 first_name, middle_name, last_name, bio, birth_place, 
-                age, talent, race_category, total_level, karma, is_active
+                age, talent, race_category_id, total_level, karma, is_active
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0, TRUE)
-        """, (first_name, middle_name, last_name, bio, birth_place, age, talent, race_category))
+        """, (first_name, middle_name, last_name, bio, birth_place, age, talent, race_category_id))
         
         character_id = cursor.lastrowid
         
@@ -125,12 +115,17 @@ def render_new_race_form():
     
     with st.form("new_race_form"):
         name = st.text_input("Race Name")
-        category = st.selectbox("Race Category", get_available_race_categories())
+        race_categories = get_available_race_categories()
+        category_id = st.selectbox(
+            "Race Category",
+            options=[cat[0] for cat in race_categories],
+            format_func=lambda x: next(cat[1] for cat in race_categories if cat[0] == x)
+        )
         description = st.text_area("Description")
         
         if st.form_submit_button("Create Race"):
-            if name and category:
-                success, message = create_new_race(name, category, description)
+            if name and category_id:
+                success, message = create_new_race(name, category_id, description)
                 if success:
                     st.success(message)
                     st.session_state.show_new_race_form = False
@@ -169,7 +164,13 @@ def render_character_creation_form():
         with col2:
             age = st.number_input("Age", min_value=0, key="age")
         with col3:
-            race_category = st.selectbox("Race Category", get_available_race_categories(), key="race_category")
+            race_categories = get_available_race_categories()
+            race_category_id = st.selectbox(
+                "Race Category",
+                options=[cat[0] for cat in race_categories],
+                format_func=lambda x: next(cat[1] for cat in race_categories if cat[0] == x),
+                key="race_category"
+            )
             
         talent = st.text_input("Talent", key="talent")
         
@@ -224,7 +225,7 @@ def render_character_creation_form():
                 success, message = create_character(
                     first_name, middle_name, last_name,
                     bio, birth_place, age, talent,
-                    race_category,
+                    race_category_id,
                     selected_classes
                 )
                 if success:

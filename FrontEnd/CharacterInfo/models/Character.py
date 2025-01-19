@@ -16,7 +16,7 @@ class Character:
     age: Optional[int]
     karma: int
     talent: Optional[str]
-    race_category: str
+    race_category_id: int
     is_active: bool
     created_at: str
     updated_at: str

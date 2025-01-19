@@ -41,8 +41,9 @@ def load_character_list():
                 COALESCE(c.last_name, ''),
                 c.total_level,
                 c.talent,
-                c.race_category
+                cc.name as race_category
             FROM characters c
+            JOIN class_categories cc ON c.race_category_id = cc.id
             WHERE c.is_active = TRUE
             ORDER BY c.first_name, c.last_name
         """)

@@ -1,7 +1,7 @@
 # ./FrontEnd/CharacterInfo/views/CharacterView.py
 
 import streamlit as st
-from typing import List
+from typing import List, Tuple
 from ..utils.database import (
     get_db_connection,
     load_character,
@@ -9,9 +9,20 @@ from ..utils.database import (
     can_change_race_category
 )
 
-def get_available_race_categories() -> List[str]:
-    """Get list of available race categories"""
-    return ["Humanoid", "Demi-Human", "Heteromorphic"]
+def get_available_race_categories() -> List[Tuple[int, str]]:
+    """Get list of available race categories from database"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT id, name 
+            FROM class_categories 
+            WHERE is_racial = TRUE 
+            ORDER BY name
+        """)
+        return cursor.fetchall()
+    finally:
+        conn.close()
 
 def render_character_view():
     """Display existing character information"""
@@ -39,24 +50,40 @@ def render_character_view():
                     st.subheader("Basic Information")
                     st.write(f"Name: {character.first_name} {character.middle_name or ''} {character.last_name or ''}")
                     st.write(f"Level: {character.total_level}")
-                    st.write(f"Race Category: {character.race_category}")
+                    
+                    # Get race category name
+                    conn = get_db_connection()
+                    cursor = conn.cursor()
+                    try:
+                        cursor.execute("""
+                            SELECT name 
+                            FROM class_categories 
+                            WHERE id = ?
+                        """, (character.race_category_id,))
+                        race_category_name = cursor.fetchone()[0]
+                        st.write(f"Race Category: {race_category_name}")
+                    finally:
+                        conn.close()
                     
                     # Race category change
                     if can_change_race_category(character_id):
-                        new_race_category = st.selectbox(
+                        race_categories = get_available_race_categories()
+                        new_category_id = st.selectbox(
                             "Change Race Category",
-                            get_available_race_categories(),
-                            index=get_available_race_categories().index(character.race_category)
+                            options=[cat[0] for cat in race_categories],
+                            format_func=lambda x: next(cat[1] for cat in race_categories if cat[0] == x),
+                            index=next(i for i, cat in enumerate(race_categories) if cat[0] == character.race_category_id)
                         )
-                        if new_race_category != character.race_category:
+                        
+                        if new_category_id != character.race_category_id:
                             conn = get_db_connection()
                             cursor = conn.cursor()
                             try:
                                 cursor.execute("""
                                     UPDATE characters 
-                                    SET race_category = ? 
+                                    SET race_category_id = ? 
                                     WHERE id = ?
-                                """, (new_race_category, character_id))
+                                """, (new_category_id, character_id))
                                 conn.commit()
                                 st.success("Race category updated!")
                                 st.rerun()
