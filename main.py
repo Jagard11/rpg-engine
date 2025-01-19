@@ -5,7 +5,7 @@ import sqlite3
 import os
 from pathlib import Path
 from ServerMessage import render_server_tab
-from CharacterInfo import init_character_state, render_character_tab
+from FrontEnd.CharacterInfo import init_character_state, render_character_tab
 from DatabaseInspector import render_db_inspector_tab
 
 # Must be the first Streamlit command
