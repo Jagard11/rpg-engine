@@ -28,6 +28,7 @@ def initialize_schemas():
         "TableCleanup.py",
         
         # Level 1: Foundation tables (no dependencies)
+        "createClassCategorySchema.py",# Class Categories are used in job and race records
         "createCharacterSchema.py",    # Characters must exist first
         "createClassSchema.py",        # Classes are referenced by many tables
         "createSpellSchema.py",        # Spells are referenced by class spell levels

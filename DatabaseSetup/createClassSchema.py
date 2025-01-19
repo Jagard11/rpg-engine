@@ -31,7 +31,7 @@ def create_class_schema():
             id INTEGER PRIMARY KEY,
             name TEXT NOT NULL UNIQUE,
             description TEXT,
-            class_type TEXT NOT NULL CHECK(class_type IN ('Base', 'High', 'Rare')),
+            class_type INTEGER NOT NULL,
             is_racial BOOLEAN DEFAULT FALSE,
             category TEXT,
             subcategory TEXT,
@@ -47,20 +47,21 @@ def create_class_schema():
             karma_requirement_min INTEGER DEFAULT -1000,
             karma_requirement_max INTEGER DEFAULT 1000,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (class_type) REFERENCES class_categories(id)
         )
         """)
 
         # Insert default classes
         default_classes = [
             # Racial Classes
-            (1, 'Human', 'Basic human attributes and capabilities', 'Base', True, 'Humanoid', 'Human', 10, 5, 5, 5, 5, 5, 5, 5, 5, -1000, 1000),
+            (1, 'Human', 'Basic human attributes and capabilities', 1, True, 'Humanoid', 'Human', 10, 5, 5, 5, 5, 5, 5, 5, 5, -1000, 1000),
             
             # Job Classes
-            (2, 'Student', 'Basic academic knowledge and study skills', 'Base', False, 'Academic', None, 5, 10, 2, 2, 3, 8, 5, 5, 5, -1000, 1000),
-            (3, 'Welder', 'Rudimentary welding capabilities', 'Base', False, 'Craft', 'Metal', 8, 3, 7, 5, 4, 2, 3, 4, 5, -1000, 1000),
-            (4, 'Flight Simulator Enthusiast', 'Basic understanding of flight principles', 'Base', False, 'Pilot', 'Simulation', 5, 8, 3, 3, 6, 5, 4, 4, 7, -1000, 1000),
-            (5, 'Ship Operations Trainee', 'Beginning to learn Terevolost systems', 'Base', False, 'Pilot', 'Ship', 7, 7, 4, 4, 5, 6, 5, 5, 6, -1000, 1000)
+            (2, 'Student', 'Basic academic knowledge and study skills', 1, False, 'Academic', None, 5, 10, 2, 2, 3, 8, 5, 5, 5, -1000, 1000),
+            (3, 'Welder', 'Rudimentary welding capabilities', 1, False, 'Craft', 'Metal', 8, 3, 7, 5, 4, 2, 3, 4, 5, -1000, 1000),
+            (4, 'Flight Simulator Enthusiast', 'Basic understanding of flight principles', 1, False, 'Pilot', 'Simulation', 5, 8, 3, 3, 6, 5, 4, 4, 7, -1000, 1000),
+            (5, 'Ship Operations Trainee', 'Beginning to learn Terevolost systems', 1, False, 'Pilot', 'Ship', 7, 7, 4, 4, 5, 6, 5, 5, 6, -1000, 1000)
         ]
 
         cursor.executemany("""
