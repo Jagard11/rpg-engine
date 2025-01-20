@@ -1,6 +1,7 @@
 # ./FrontEnd/CharacterInfo/views/JobClassesTab.py
 
 import streamlit as st
+import pandas as pd
 from typing import Dict, List, Optional, Tuple
 from ..utils.database import get_db_connection
 
@@ -245,11 +246,7 @@ def render_job_classes_tab():
             
             # Display table with row selection
             selection = st.data_editor(
-                table_data,
-                column_config={
-                    col: st.column_config.Column(label=col.title())
-                    for col in columns
-                },
+                pd.DataFrame(table_data, columns=columns),
                 disabled=True,
                 hide_index=False,
                 key="job_classes_table",
