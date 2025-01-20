@@ -11,6 +11,7 @@ from .views.CharacterView import render_character_view
 from .views.CharacterCreation import render_character_creation_form
 from .views.RaceCreation import render_race_creation_form
 from .views.LevelUp import render_level_up_tab
+from .views.JobClassesTab import render_job_classes_tab
 
 def init_character_state():
     """Initialize character-related session state variables"""
@@ -57,7 +58,13 @@ def render_character_tab():
     st.header("Character Management")
     
     # Tabs for different character operations
-    tab1, tab2, tab3, tab4 = st.tabs(["View Characters", "Create Character", "Create Race", "Level Up"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        "View Characters",
+        "Create Character",
+        "Create Race",
+        "Level Up",
+        "Job Classes"
+    ])
     
     with tab1:
         if st.session_state.character_list:
@@ -76,3 +83,6 @@ def render_character_tab():
             render_level_up_tab()
         else:
             st.info("No characters found. Create one in the 'Create Character' tab!")
+
+    with tab5:
+        render_job_classes_tab()
