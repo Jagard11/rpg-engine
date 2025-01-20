@@ -20,17 +20,18 @@ def get_class_types() -> List[Dict]:
         conn.close()
 
 def get_class_categories() -> List[Dict]:
-    """Get all class categories"""
+    """Get all non-racial class categories"""
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
         cursor.execute("""
-            SELECT id, name, is_racial 
+            SELECT id, name
             FROM class_categories 
-            ORDER BY is_racial DESC, name
+            WHERE is_racial = FALSE
+            ORDER BY name
         """)
         results = cursor.fetchall()
-        return [{"id": r[0], "name": r[1], "is_racial": r[2]} for r in results]
+        return [{"id": r[0], "name": r[1]} for r in results]
     finally:
         conn.close()
 
@@ -64,7 +65,7 @@ def get_class_by_id(class_id: int) -> Optional[Dict]:
             JOIN class_types ct ON c.class_type = ct.id
             JOIN class_categories cc ON c.category_id = cc.id
             LEFT JOIN class_subcategories cs ON c.subcategory_id = cs.id
-            WHERE c.id = ?
+            WHERE c.id = ? AND c.is_racial = FALSE
         """, (class_id,))
         result = cursor.fetchone()
         if not result:
@@ -89,7 +90,6 @@ def save_class(class_data: Dict) -> Tuple[bool, str]:
                     name = ?,
                     description = ?,
                     class_type = ?,
-                    is_racial = ?,
                     category_id = ?,
                     subcategory_id = ?,
                     base_hp = ?,
@@ -110,21 +110,23 @@ def save_class(class_data: Dict) -> Tuple[bool, str]:
                     magical_defense_per_level = ?,
                     resistance_per_level = ?,
                     special_per_level = ?
-                WHERE id = ?
+                WHERE id = ? AND is_racial = FALSE
             """, (
                 class_data['name'], class_data['description'],
-                class_data['class_type'], class_data['is_racial'],
-                class_data['category_id'], class_data['subcategory_id'],
-                class_data['base_hp'], class_data['base_mp'],
-                class_data['base_physical_attack'], class_data['base_physical_defense'],
-                class_data['base_agility'], class_data['base_magical_attack'],
-                class_data['base_magical_defense'], class_data['base_resistance'],
-                class_data['base_special'], class_data['hp_per_level'],
-                class_data['mp_per_level'], class_data['physical_attack_per_level'],
-                class_data['physical_defense_per_level'], class_data['agility_per_level'],
-                class_data['magical_attack_per_level'], class_data['magical_defense_per_level'],
-                class_data['resistance_per_level'], class_data['special_per_level'],
-                class_data['id']
+                class_data['class_type'], class_data['category_id'],
+                class_data['subcategory_id'], class_data['base_hp'],
+                class_data['base_mp'], class_data['base_physical_attack'],
+                class_data['base_physical_defense'], class_data['base_agility'],
+                class_data['base_magical_attack'], class_data['base_magical_defense'],
+                class_data['base_resistance'], class_data['base_special'],
+                class_data['hp_per_level'], class_data['mp_per_level'],
+                class_data['physical_attack_per_level'],
+                class_data['physical_defense_per_level'],
+                class_data['agility_per_level'],
+                class_data['magical_attack_per_level'],
+                class_data['magical_defense_per_level'],
+                class_data['resistance_per_level'],
+                class_data['special_per_level'], class_data['id']
             ))
             message = "Class updated successfully"
         else:
@@ -138,20 +140,23 @@ def save_class(class_data: Dict) -> Tuple[bool, str]:
                     hp_per_level, mp_per_level, physical_attack_per_level,
                     physical_defense_per_level, agility_per_level, magical_attack_per_level,
                     magical_defense_per_level, resistance_per_level, special_per_level
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, FALSE, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 class_data['name'], class_data['description'],
-                class_data['class_type'], class_data['is_racial'],
-                class_data['category_id'], class_data['subcategory_id'],
-                class_data['base_hp'], class_data['base_mp'],
-                class_data['base_physical_attack'], class_data['base_physical_defense'],
-                class_data['base_agility'], class_data['base_magical_attack'],
-                class_data['base_magical_defense'], class_data['base_resistance'],
-                class_data['base_special'], class_data['hp_per_level'],
-                class_data['mp_per_level'], class_data['physical_attack_per_level'],
-                class_data['physical_defense_per_level'], class_data['agility_per_level'],
-                class_data['magical_attack_per_level'], class_data['magical_defense_per_level'],
-                class_data['resistance_per_level'], class_data['special_per_level']
+                class_data['class_type'], class_data['category_id'],
+                class_data['subcategory_id'], class_data['base_hp'],
+                class_data['base_mp'], class_data['base_physical_attack'],
+                class_data['base_physical_defense'], class_data['base_agility'],
+                class_data['base_magical_attack'], class_data['base_magical_defense'],
+                class_data['base_resistance'], class_data['base_special'],
+                class_data['hp_per_level'], class_data['mp_per_level'],
+                class_data['physical_attack_per_level'],
+                class_data['physical_defense_per_level'],
+                class_data['agility_per_level'],
+                class_data['magical_attack_per_level'],
+                class_data['magical_defense_per_level'],
+                class_data['resistance_per_level'],
+                class_data['special_per_level']
             ))
             message = "Class created successfully"
         
@@ -215,11 +220,6 @@ def render_class_editor(class_data: Optional[Dict] = None):
             )
         
         with col2:
-            is_racial = st.checkbox(
-                "Is Racial Class",
-                value=class_data.get('is_racial', False) if class_data else False
-            )
-            
             if class_data:
                 default_subcategory_index = next(
                     (i for i, s in enumerate(subcategories) if s["id"] == class_data.get('subcategory_id')), 
@@ -334,7 +334,6 @@ def render_class_editor(class_data: Optional[Dict] = None):
                 'name': name,
                 'description': description,
                 'class_type': class_type,
-                'is_racial': is_racial,
                 'category_id': category,
                 'subcategory_id': subcategory,
                 'base_hp': base_hp,
@@ -364,10 +363,8 @@ def render_class_editor(class_data: Optional[Dict] = None):
             else:
                 st.error(message)
 
-# ./FrontEnd/CharacterInfo/views/JobClassesTab.py (continued from previous implementation)
-
 def get_all_classes() -> List[Dict]:
-    """Get list of all classes"""
+    """Get list of all non-racial classes"""
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
@@ -375,7 +372,6 @@ def get_all_classes() -> List[Dict]:
             SELECT 
                 c.id,
                 c.name,
-                c.is_racial,
                 ct.name as type_name,
                 cc.name as category_name,
                 cs.name as subcategory_name
@@ -383,7 +379,8 @@ def get_all_classes() -> List[Dict]:
             JOIN class_types ct ON c.class_type = ct.id
             JOIN class_categories cc ON c.category_id = cc.id
             LEFT JOIN class_subcategories cs ON c.subcategory_id = cs.id
-            ORDER BY c.is_racial DESC, cc.name, c.name
+            WHERE c.is_racial = FALSE
+            ORDER BY cc.name, c.name
         """)
         columns = [col[0] for col in cursor.description]
         return [dict(zip(columns, row)) for row in cursor.fetchall()]
@@ -413,7 +410,7 @@ def delete_class(class_id: int) -> Tuple[bool, str]:
         cursor.execute("DELETE FROM class_exclusions WHERE class_id = ?", (class_id,))
         
         # Delete the class
-        cursor.execute("DELETE FROM classes WHERE id = ?", (class_id,))
+        cursor.execute("DELETE FROM classes WHERE id = ? AND is_racial = FALSE", (class_id,))
         
         cursor.execute("COMMIT")
         return True, "Class deleted successfully"
@@ -439,7 +436,7 @@ def render_job_classes_tab():
         # Group classes by category
         class_groups = {}
         for c in classes:
-            category = "Racial Classes" if c['is_racial'] else "Job Classes"
+            category = c['category_name']
             if category not in class_groups:
                 class_groups[category] = []
             class_groups[category].append(c)
