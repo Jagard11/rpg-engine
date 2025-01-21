@@ -231,179 +231,190 @@ def render_job_classes_tab():
         # Execute query and display results
         results, columns = execute_query(st.session_state.sql_query)
         
-        # Convert results to list of lists for table display
-        if results:
-            table_data = []
-            for row in results:
-                table_row = []
-                for col in columns:
-                    val = row.get(col, '')
-                    # Truncate long text for better display
-                    if isinstance(val, str) and len(val) > 50:
-                        val = val[:47] + "..."
-                    table_row.append(val)
-                table_data.append(table_row)
+        # Create DataFrame for display
+        df_data = []
+        for idx, row in enumerate(results):
+            row_data = {'select': False}  # Initialize selection column
+            for col in columns:
+                val = row.get(col, '')
+                # Truncate long text for better display
+                if isinstance(val, str) and len(val) > 50:
+                    val = val[:47] + "..."
+                row_data[col] = val
+            df_data.append(row_data)
+
+        # Create DataFrame
+        df = pd.DataFrame(df_data)
+
+        # Display table with selection
+        selection = st.data_editor(
+            df,
+            column_config={
+                "select": st.column_config.CheckboxColumn(
+                    "Select",
+                    default=False,
+                    help="Select a class to edit"
+                )
+            },
+            disabled=[col for col in df.columns if col != 'select'],
+            hide_index=True
+        )
+
+        # Handle selection
+        if selection is not None and 'select' in selection:
+            selected_rows = selection[selection['select']].index
+            if len(selected_rows) > 0:
+                selected_idx = selected_rows[0]
+                st.session_state.selected_class_id = results[selected_idx]['id']
+                # Deselect all other rows
+                for idx in selected_rows[1:]:
+                    selection.at[idx, 'select'] = False
+            else:
+                st.session_state.selected_class_id = None
             
-            # Display table with row selection
-            selection = st.data_editor(
-                pd.DataFrame(table_data, columns=columns),
-                disabled=True,
-                hide_index=False,
-                key="job_classes_table",
-                num_rows="dynamic"
-            )
+        # Add/Remove buttons
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Add New Class", use_container_width=True):
+                st.session_state.selected_class_id = None
+                st.rerun()
+        with col2:
+            if st.button("Delete Selected Class", use_container_width=True):
+                if st.session_state.selected_class_id:
+                    success, message = delete_class(st.session_state.selected_class_id)
+                    if success:
+                        st.success(message)
+                        st.session_state.selected_class_id = None
+                        st.rerun()
+                    else:
+                        st.error(message)
+        
+        # Display class details form if a class is selected or we're adding new
+        st.markdown("---")
+        if st.session_state.selected_class_id is not None or st.session_state.selected_class_id == None:
+            class_data = get_class_details(st.session_state.selected_class_id) if st.session_state.selected_class_id else {}
             
-            # Handle row selection - check if any row is selected
-            if hasattr(selection, '_selected_rows') and selection._selected_rows:
-                selected_row = results[selection._selected_rows[0]]
-                st.session_state.selected_class_id = selected_row['id']
+            # Load lookup data
+            class_types = get_class_types()
+            categories = get_class_categories()
+            subcategories = get_class_subcategories()
             
-            # Add/Remove buttons
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("Add New Class", use_container_width=True):
-                    st.session_state.selected_class_id = None
-                    st.rerun()
-            with col2:
-                if st.button("Delete Selected Class", use_container_width=True):
-                    if st.session_state.selected_class_id:
-                        success, message = delete_class(st.session_state.selected_class_id)
-                        if success:
-                            st.success(message)
-                            st.session_state.selected_class_id = None
-                            st.rerun()
-                        else:
-                            st.error(message)
-            
-            # Display class details form if a class is selected or we're adding new
-            st.markdown("---")
-            if st.session_state.selected_class_id is not None:
-                class_data = get_class_details(st.session_state.selected_class_id) if st.session_state.selected_class_id else {}
+            # Create form
+            with st.form("class_details_form"):
+                st.subheader("Class Details")
                 
-                # Load lookup data
-                class_types = get_class_types()
-                categories = get_class_categories()
-                subcategories = get_class_subcategories()
-                
-                # Create form
-                with st.form("class_details_form"):
-                    st.subheader("Class Details")
-                    
-                    # Basic info
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
-                        name = st.text_input(
-                            "Name",
-                            value=class_data.get('name', '')
-                        )
-                    with col2:
-                        class_type = st.selectbox(
-                            "Type",
-                            options=[t["id"] for t in class_types],
-                            format_func=lambda x: next(t["name"] for t in class_types if t["id"] == x),
-                            index=next(
-                                (i for i, t in enumerate(class_types) 
-                                 if t["id"] == class_data.get('class_type', 1)),
-                                0
-                            )
-                        )
-                    with col3:
-                        category = st.selectbox(
-                            "Category",
-                            options=[c["id"] for c in categories],
-                            format_func=lambda x: next(c["name"] for c in categories if c["id"] == x),
-                            index=next(
-                                (i for i, c in enumerate(categories) 
-                                 if c["id"] == class_data.get('category_id', 1)),
-                                0
-                            )
-                        )
-                    
-                    subcategory = st.selectbox(
-                        "Subcategory",
-                        options=[s["id"] for s in subcategories],
-                        format_func=lambda x: next(s["name"] for s in subcategories if s["id"] == x),
+                # Basic info
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    name = st.text_input(
+                        "Name",
+                        value=class_data.get('name', '')
+                    )
+                with col2:
+                    class_type = st.selectbox(
+                        "Type",
+                        options=[t["id"] for t in class_types],
+                        format_func=lambda x: next(t["name"] for t in class_types if t["id"] == x),
                         index=next(
-                            (i for i, s in enumerate(subcategories) 
-                             if s["id"] == class_data.get('subcategory_id', 1)),
+                            (i for i, t in enumerate(class_types) 
+                             if t["id"] == class_data.get('class_type', 1)),
                             0
                         )
                     )
-                    
-                    description = st.text_area(
-                        "Description",
-                        value=class_data.get('description', '')
+                with col3:
+                    category = st.selectbox(
+                        "Category",
+                        options=[c["id"] for c in categories],
+                        format_func=lambda x: next(c["name"] for c in categories if c["id"] == x),
+                        index=next(
+                            (i for i, c in enumerate(categories) 
+                             if c["id"] == class_data.get('category_id', 1)),
+                            0
+                        )
                     )
+                
+                subcategory = st.selectbox(
+                    "Subcategory",
+                    options=[s["id"] for s in subcategories],
+                    format_func=lambda x: next(s["name"] for s in subcategories if s["id"] == x),
+                    index=next(
+                        (i for i, s in enumerate(subcategories) 
+                         if s["id"] == class_data.get('subcategory_id', 1)),
+                        0
+                    )
+                )
+                
+                description = st.text_area(
+                    "Description",
+                    value=class_data.get('description', '')
+                )
+                
+                # Stats
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    st.markdown("**Base Stats**")
+                    base_hp = st.number_input("Base HP", value=class_data.get('base_hp', 0))
+                    base_mp = st.number_input("Base MP", value=class_data.get('base_mp', 0))
+                    base_physical_attack = st.number_input("Base Physical Attack", value=class_data.get('base_physical_attack', 0))
+                    base_physical_defense = st.number_input("Base Physical Defense", value=class_data.get('base_physical_defense', 0))
+                    base_agility = st.number_input("Base Agility", value=class_data.get('base_agility', 0))
+                    base_magical_attack = st.number_input("Base Magical Attack", value=class_data.get('base_magical_attack', 0))
+                    base_magical_defense = st.number_input("Base Magical Defense", value=class_data.get('base_magical_defense', 0))
+                    base_resistance = st.number_input("Base Resistance", value=class_data.get('base_resistance', 0))
+                    base_special = st.number_input("Base Special", value=class_data.get('base_special', 0))
+
+                with col2:
+                    st.markdown("**Per Level Stats (1/2)**")
+                    hp_per_level = st.number_input("HP per Level", value=class_data.get('hp_per_level', 0))
+                    mp_per_level = st.number_input("MP per Level", value=class_data.get('mp_per_level', 0))
+                    physical_attack_per_level = st.number_input("Physical Attack per Level", value=class_data.get('physical_attack_per_level', 0))
+                    physical_defense_per_level = st.number_input("Physical Defense per Level", value=class_data.get('physical_defense_per_level', 0))
+                    agility_per_level = st.number_input("Agility per Level", value=class_data.get('agility_per_level', 0))
+
+                with col3:
+                    st.markdown("**Per Level Stats (2/2)**")
+                    magical_attack_per_level = st.number_input("Magical Attack per Level", value=class_data.get('magical_attack_per_level', 0))
+                    magical_defense_per_level = st.number_input("Magical Defense per Level", value=class_data.get('magical_defense_per_level', 0))
+                    resistance_per_level = st.number_input("Resistance per Level", value=class_data.get('resistance_per_level', 0))
+                    special_per_level = st.number_input("Special per Level", value=class_data.get('special_per_level', 0))
+
+                # Save button
+                if st.form_submit_button("Save Changes", use_container_width=True):
+                    # Prepare class data
+                    updated_class_data = {
+                        'id': st.session_state.selected_class_id,
+                        'name': name,
+                        'description': description,
+                        'class_type': class_type,
+                        'category_id': category,
+                        'subcategory_id': subcategory,
+                        'base_hp': base_hp,
+                        'base_mp': base_mp,
+                        'base_physical_attack': base_physical_attack,
+                        'base_physical_defense': base_physical_defense,
+                        'base_agility': base_agility,
+                        'base_magical_attack': base_magical_attack,
+                        'base_magical_defense': base_magical_defense,
+                        'base_resistance': base_resistance,
+                        'base_special': base_special,
+                        'hp_per_level': hp_per_level,
+                        'mp_per_level': mp_per_level,
+                        'physical_attack_per_level': physical_attack_per_level,
+                        'physical_defense_per_level': physical_defense_per_level,
+                        'agility_per_level': agility_per_level,
+                        'magical_attack_per_level': magical_attack_per_level,
+                        'magical_defense_per_level': magical_defense_per_level,
+                        'resistance_per_level': resistance_per_level,
+                        'special_per_level': special_per_level
+                    }
                     
-                    # Stats
-                    col1, col2, col3 = st.columns(3)
-                    
-                    with col1:
-                        st.markdown("**Base Stats**")
-                        base_hp = st.number_input("Base HP", value=class_data.get('base_hp', 0))
-                        base_mp = st.number_input("Base MP", value=class_data.get('base_mp', 0))
-                        base_physical_attack = st.number_input("Base Physical Attack", value=class_data.get('base_physical_attack', 0))
-                        base_physical_defense = st.number_input("Base Physical Defense", value=class_data.get('base_physical_defense', 0))
-                        base_agility = st.number_input("Base Agility", value=class_data.get('base_agility', 0))
-                        base_magical_attack = st.number_input("Base Magical Attack", value=class_data.get('base_magical_attack', 0))
-                        base_magical_defense = st.number_input("Base Magical Defense", value=class_data.get('base_magical_defense', 0))
-                        base_resistance = st.number_input("Base Resistance", value=class_data.get('base_resistance', 0))
-                        base_special = st.number_input("Base Special", value=class_data.get('base_special', 0))
-
-                    with col2:
-                        st.markdown("**Per Level Stats (1/2)**")
-                        hp_per_level = st.number_input("HP per Level", value=class_data.get('hp_per_level', 0))
-                        mp_per_level = st.number_input("MP per Level", value=class_data.get('mp_per_level', 0))
-                        physical_attack_per_level = st.number_input("Physical Attack per Level", value=class_data.get('physical_attack_per_level', 0))
-                        physical_defense_per_level = st.number_input("Physical Defense per Level", value=class_data.get('physical_defense_per_level', 0))
-                        agility_per_level = st.number_input("Agility per Level", value=class_data.get('agility_per_level', 0))
-
-                    with col3:
-                        st.markdown("**Per Level Stats (2/2)**")
-                        magical_attack_per_level = st.number_input("Magical Attack per Level", value=class_data.get('magical_attack_per_level', 0))
-                        magical_defense_per_level = st.number_input("Magical Defense per Level", value=class_data.get('magical_defense_per_level', 0))
-                        resistance_per_level = st.number_input("Resistance per Level", value=class_data.get('resistance_per_level', 0))
-                        special_per_level = st.number_input("Special per Level", value=class_data.get('special_per_level', 0))
-
-                    # Save button
-                    if st.form_submit_button("Save Changes", use_container_width=True):
-                        # Prepare class data
-                        updated_class_data = {
-                            'id': st.session_state.selected_class_id,
-                            'name': name,
-                            'description': description,
-                            'class_type': class_type,
-                            'category_id': category,
-                            'subcategory_id': subcategory,
-                            'base_hp': base_hp,
-                            'base_mp': base_mp,
-                            'base_physical_attack': base_physical_attack,
-                            'base_physical_defense': base_physical_defense,
-                            'base_agility': base_agility,
-                            'base_magical_attack': base_magical_attack,
-                            'base_magical_defense': base_magical_defense,
-                            'base_resistance': base_resistance,
-                            'base_special': base_special,
-                            'hp_per_level': hp_per_level,
-                            'mp_per_level': mp_per_level,
-                            'physical_attack_per_level': physical_attack_per_level,
-                            'physical_defense_per_level': physical_defense_per_level,
-                            'agility_per_level': agility_per_level,
-                            'magical_attack_per_level': magical_attack_per_level,
-                            'magical_defense_per_level': magical_defense_per_level,
-                            'resistance_per_level': resistance_per_level,
-                            'special_per_level': special_per_level
-                        }
+                    success, message = save_class(updated_class_data)
+                    if success:
+                        st.success(message)
+                        st.rerun()
+                    else:
+                        st.error(message)
                         
-                        success, message = save_class(updated_class_data)
-                        if success:
-                            st.success(message)
-                            st.rerun()
-                        else:
-                            st.error(message)
-                            
-        else:
-            st.warning("No results found for the current query.")
-            
     except Exception as e:
         st.error(f"Error executing query: {str(e)}")
