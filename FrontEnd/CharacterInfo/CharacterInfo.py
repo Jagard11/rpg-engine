@@ -9,9 +9,43 @@ from .models.Character import Character
 from .utils.database import get_db_connection
 from .views.CharacterView import render_character_view
 from .views.CharacterCreation import render_character_creation_form
-from .views.RaceCreation import render_race_creation_form
+from .views.RaceEditor.interface import render_race_editor  # Updated import
+from .views.JobClassEditor.interface import render_job_editor  # Updated import
 from .views.LevelUp import render_level_up_tab
-from .views.JobClassesTab import render_job_classes_tab
+
+def render_character_tab():
+    """Display character information"""
+    st.header("Character Management")
+    
+    # Tabs for different character operations
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        "View Characters",
+        "Create Character",
+        "Race Editor",  # Changed from Create Race
+        "Job Editor",   # Changed from Job Classes
+        "Level Up"
+    ])
+    
+    with tab1:
+        if st.session_state.character_list:
+            render_character_view()
+        else:
+            st.info("No characters found. Create one in the 'Create Character' tab!")
+            
+    with tab2:
+        render_character_creation_form()
+        
+    with tab3:
+        render_race_editor()  # Updated call
+
+    with tab4:
+        render_job_editor()   # Updated call
+
+    with tab5:
+        if st.session_state.character_list:
+            render_level_up_tab()
+        else:
+            st.info("No characters found. Create one in the 'Create Character' tab!")
 
 def init_character_state():
     """Initialize character-related session state variables"""
@@ -53,36 +87,3 @@ def load_character_list():
     finally:
         conn.close()
 
-def render_character_tab():
-    """Display character information"""
-    st.header("Character Management")
-    
-    # Tabs for different character operations
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "View Characters",
-        "Create Character",
-        "Create Race",
-        "Level Up",
-        "Job Classes"
-    ])
-    
-    with tab1:
-        if st.session_state.character_list:
-            render_character_view()
-        else:
-            st.info("No characters found. Create one in the 'Create Character' tab!")
-            
-    with tab2:
-        render_character_creation_form()
-        
-    with tab3:
-        render_race_creation_form()
-
-    with tab4:
-        if st.session_state.character_list:
-            render_level_up_tab()
-        else:
-            st.info("No characters found. Create one in the 'Create Character' tab!")
-
-    with tab5:
-        render_job_classes_tab()

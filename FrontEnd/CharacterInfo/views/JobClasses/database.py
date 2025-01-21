@@ -18,21 +18,25 @@ def get_class_types() -> List[Dict[str, any]]:
     finally:
         conn.close()
 
-def get_class_categories() -> List[Dict[str, any]]:
-    """Get list of non-racial class categories"""
+def get_class_categories(is_racial: bool = False) -> List[Dict]:
+    """Get class categories based on type
+    
+    Args:
+        is_racial: If True, return only racial categories, if False return only non-racial categories
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
         cursor.execute("""
             SELECT id, name 
             FROM class_categories 
-            WHERE is_racial = 0
+            WHERE is_racial = ?
             ORDER BY name
-        """)
+        """, (is_racial,))
         return [{"id": row[0], "name": row[1]} for row in cursor.fetchall()]
     finally:
         conn.close()
-
+        
 def get_class_subcategories() -> List[Dict[str, any]]:
     """Get list of class subcategories"""
     conn = get_db_connection()
