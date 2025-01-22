@@ -10,6 +10,7 @@ from CharacterManagement import (
     render_race_editor
 )
 from ServerMessage import render_server_tab
+from LocationManager import render_location_editor_tab
 from DatabaseInspector import render_db_inspector_tab
 
 def init_database():
@@ -24,7 +25,7 @@ st.set_page_config(page_title="RPG Character Management", layout="wide")
 init_database()
 
 # Create tabs
-tab1, tab2, tab3 = st.tabs(["Character Editors", "Server Message", "Database Editor"])
+tab1, tab2, tab3, tab4 = st.tabs(["Character Editors", "Server Message", "Location Editor", "Database Editor"])
 
 with tab1:
     # Create subtabs for different editors
@@ -47,4 +48,7 @@ with tab2:
     render_server_tab()
 
 with tab3:
+    render_location_editor_tab()
+
+with tab4:
     render_db_inspector_tab()
