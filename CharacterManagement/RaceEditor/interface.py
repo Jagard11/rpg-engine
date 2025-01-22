@@ -1,9 +1,15 @@
 # ./CharacterManagement/RaceEditor/interface.py
 
 import streamlit as st
-from typing import Optional
+from typing import Optional, Dict, List
 from .database import get_all_races, get_race_details, save_race, delete_race
-from .forms import render_race_form
+from .forms import render_race_form, get_class_types, get_race_categories, get_subcategories
+
+def get_name_from_id(items: List[Dict], target_id: Optional[int]) -> Optional[str]:
+    """Helper function to get name from id in a list of dicts"""
+    if target_id is None:
+        return None
+    return next((item["name"] for item in items if item["id"] == target_id), None)
 
 def render_race_editor():
     """Main interface for the race editor"""
@@ -25,18 +31,53 @@ def render_race_editor():
     with col1:
         st.subheader("Race List")
 
-        # Search and filter
+        # Search and filter section
         st.session_state.race_search_term = st.text_input(
             "Search Races",
             value=st.session_state.race_search_term
         )
 
+        # Get filter options
+        class_types = [{"id": None, "name": "All Types"}] + get_class_types()
+        categories = [{"id": None, "name": "All Categories"}] + get_race_categories()
+        subcategories = [{"id": None, "name": "All Subcategories"}] + get_subcategories()
+
+        # Filter dropdowns
+        selected_type = st.selectbox(
+            "Class Type",
+            options=[t["id"] for t in class_types],
+            format_func=lambda x: next(t["name"] for t in class_types if t["id"] == x),
+            index=0
+        )
+
+        selected_category = st.selectbox(
+            "Category",
+            options=[c["id"] for c in categories],
+            format_func=lambda x: next(c["name"] for c in categories if c["id"] == x),
+            index=0
+        )
+
+        selected_subcategory = st.selectbox(
+            "Subcategory",
+            options=[s["id"] for s in subcategories],
+            format_func=lambda x: next(s["name"] for s in subcategories if s["id"] == x),
+            index=0
+        )
+
+        # Convert selected IDs to names for filtering
+        selected_type_name = get_name_from_id(class_types, selected_type)
+        selected_category_name = get_name_from_id(categories, selected_category)
+        selected_subcategory_name = get_name_from_id(subcategories, selected_subcategory)
+
         # Get and filter races
         all_races = get_all_races()
         filtered_races = [
             race for race in all_races
-            if not st.session_state.race_search_term or 
-            st.session_state.race_search_term.lower() in race['name'].lower()
+            if (not st.session_state.race_search_term or 
+                st.session_state.race_search_term.lower() in race['name'].lower()) and
+            (selected_type_name in (None, "All Types") or race['type_name'] == selected_type_name) and
+            (selected_category_name in (None, "All Categories") or race['category_name'] == selected_category_name) and
+            (selected_subcategory_name in (None, "All Subcategories") or race['subcategory_name'] == selected_subcategory_name)
         ]
 
         # Display race list
