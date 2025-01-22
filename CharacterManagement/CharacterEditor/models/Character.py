@@ -1,4 +1,4 @@
-# CharacterManagement/CharacterEditor/models/Character.py
+# ./CharacterManagement/CharacterEditor/models/Character.py
 
 from dataclasses import dataclass
 from typing import Optional

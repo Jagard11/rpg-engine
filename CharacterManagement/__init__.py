@@ -1,4 +1,4 @@
-# CharacterManagement/__init__.py
+# ./CharacterManagement/__init__.py
 
 from .CharacterEditor.interface import render_character_editor
 from .JobEditor.interface import render_job_editor
