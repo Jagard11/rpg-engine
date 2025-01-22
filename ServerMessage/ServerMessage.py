@@ -95,7 +95,9 @@ def render_server_tab():
 # Keep your existing helper functions (load_instruction_file, load_message_data, send_to_server, refresh_message_data)
 def load_instruction_file(instruction_type: InstructionType) -> str:
     """Load the content of the selected instruction file"""
-    file_path = Path(f"ServerMessages/Instructions/{instruction_type.value}.txt")
+    # Use os.path.join to create a path compatible with both Windows and Linux
+    file_path = os.path.join("ServerMessage", "Instructions", f"{instruction_type.value}.txt")
+    
     try:
         with open(file_path, 'r') as file:
             return file.read()
@@ -105,7 +107,8 @@ def load_instruction_file(instruction_type: InstructionType) -> str:
 def load_message_data() -> str:
     """Load the content of the message data file"""
     try:
-        with open("ServerMessages/MessageData/MessageData.txt", 'r') as file:
+        file_path = os.path.join("ServerMessage", "MessageData", "MessageData.txt")
+        with open(file_path, 'r') as file:
             return file.read()
     except Exception as e:
         return f"Error loading message data: {str(e)}"
