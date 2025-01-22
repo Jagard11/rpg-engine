@@ -116,9 +116,15 @@ def render_race_editor():
                 copied_race.pop('id', None)
                 copied_race['name'] = f"{copied_race['name']} (Copy)"
                 
-                # Save the copied race
+                # Save the copied race and get the new race details
                 success, message = save_race(copied_race)
                 if success:
+                    # Find the newly created race by name
+                    all_races = get_all_races()
+                    new_race = next((race for race in all_races 
+                                   if race['name'] == copied_race['name']), None)
+                    if new_race:
+                        st.session_state.selected_race_id = new_race['id']
                     st.success(message)
                     st.rerun()
                 else:
