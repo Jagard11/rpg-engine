@@ -9,6 +9,7 @@ from CharacterManagement import (
     render_job_editor, 
     render_race_editor
 )
+from ServerMessage import render_server_tab
 
 def init_database():
     """Initialize database connection"""
@@ -21,8 +22,8 @@ def init_database():
 st.set_page_config(page_title="RPG Character Management", layout="wide")
 init_database()
 
-# Character Editors tab
-tab1, = st.tabs(["Character Editors"])
+# Create tabs
+tab1, tab2 = st.tabs(["Character Editors", "Server Message"])
 
 with tab1:
     # Create subtabs for different editors
@@ -40,3 +41,6 @@ with tab1:
         
     with race_tab:
         render_race_editor()
+
+with tab2:
+    render_server_tab()
