@@ -12,49 +12,12 @@ from ...JobClasses.database import (
     get_class_details,
     get_class_prerequisites,
     get_class_exclusions,
-    save_class
+    save_class,
+    get_class_types,
+    get_class_categories,
+    get_class_subcategories,
+    get_all_classes
 )
-
-def handle_prerequisite_group_add():
-    """Add a new prerequisite group"""
-    if 'prereq_groups' not in st.session_state:
-        st.session_state.prereq_groups = []
-    st.session_state.prereq_groups.append([])
-
-def handle_prerequisite_add(group_idx: int, prereq_type: str):
-    """Add a new prerequisite to a group"""
-    if 'prereq_groups' not in st.session_state:
-        st.session_state.prereq_groups = []
-    st.session_state.prereq_groups[group_idx].append({
-        'type': prereq_type,
-        'target_id': None,
-        'required_level': None,
-        'min_value': None,
-        'max_value': None
-    })
-
-def handle_prerequisite_remove(group_idx: int, req_idx: int):
-    """Remove a prerequisite from a group"""
-    st.session_state.prereq_groups[group_idx].pop(req_idx)
-
-def handle_prerequisite_group_remove(group_idx: int):
-    """Remove a prerequisite group"""
-    st.session_state.prereq_groups.pop(group_idx)
-
-def handle_exclusion_add(exclusion_type: str):
-    """Add a new exclusion"""
-    if 'exclusions' not in st.session_state:
-        st.session_state.exclusions = []
-    st.session_state.exclusions.append({
-        'type': exclusion_type,
-        'target_id': None,
-        'min_value': None,
-        'max_value': None
-    })
-
-def handle_exclusion_remove(idx: int):
-    """Remove an exclusion"""
-    st.session_state.exclusions.pop(idx)
 
 def render_class_editor(
     class_id: Optional[int] = None,
@@ -96,11 +59,6 @@ def render_class_editor(
             if exclusions:
                 st.session_state.exclusions = exclusions
 
-    # Action buttons outside forms
-    if st.button(f"Add Prerequisite Group (OR)", key=f"{mode_prefix}add_prereq_group"):
-        handle_prerequisite_group_add()
-        st.experimental_rerun()
-
     # Render forms and manage state
     with st.form(f"{mode_prefix}class_editor_form", clear_on_submit=False):
         basic_info = render_basic_info(
@@ -116,12 +74,113 @@ def render_class_editor(
             stats_data = render_stats_section(class_data or {})
         
         with prereq_tab:
-            prereqs = render_prerequisites_section(
-                mode_prefix=mode_prefix,
-                include_racial=is_racial
-            )
+            # Add prerequisite group button within the tab
+            if st.form_submit_button(f"{mode_prefix}Add Prerequisite Group (OR)"):
+                if 'prereq_groups' not in st.session_state:
+                    st.session_state.prereq_groups = []
+                st.session_state.prereq_groups.append([])
+                st.rerun()
+
+            # Prerequisite groups management
+            for group_idx, prereq_group in enumerate(st.session_state.prereq_groups):
+                st.markdown(f"#### Group {group_idx + 1} (Any of these)")
+
+                # Type selection for new requirements
+                prereq_type = st.selectbox(
+                    "Prerequisite Type",
+                    ["Class", "Category Total", "Subcategory Total", "Karma"],
+                    key=f"{mode_prefix}prereq_type_{group_idx}"
+                )
+
+                # Add to group button
+                if st.form_submit_button(f"{mode_prefix}Add to Group {group_idx + 1}"):
+                    type_mapping = {
+                        "Class": "specific_class",
+                        "Category Total": "category_total",
+                        "Subcategory Total": "subcategory_total",
+                        "Karma": "karma"
+                    }
+                    st.session_state.prereq_groups[group_idx].append({
+                        'type': type_mapping[prereq_type],
+                        'target_id': None,
+                        'required_level': None,
+                        'min_value': None,
+                        'max_value': None
+                    })
+                    st.rerun()
+
+                # Display requirements in this group
+                for req_idx, req in enumerate(prereq_group):
+                    st.markdown("---")
+                    col1, col2 = st.columns([3, 1])
+                    
+                    with col1:
+                        if req['type'] == "specific_class":
+                            classes = get_all_classes(include_racial=is_racial)
+                            options = [c for c in classes]
+                            selected_idx = st.selectbox(
+                                "Class",
+                                range(len(options)),
+                                format_func=lambda x: f"{options[x]['name']} ({options[x]['category']})",
+                                key=f"{mode_prefix}class_{group_idx}_{req_idx}"
+                            )
+                            if selected_idx is not None:
+                                req['target_id'] = options[selected_idx]['id']
+                                req['required_level'] = st.number_input(
+                                    "Required Level",
+                                    min_value=1,
+                                    value=req.get('required_level', 1),
+                                    key=f"{mode_prefix}level_{group_idx}_{req_idx}"
+                                )
+                        
+                        elif req['type'] in ["category_total", "subcategory_total"]:
+                            items = (get_class_categories(is_racial=is_racial) 
+                                   if req['type'] == "category_total" 
+                                   else get_class_subcategories())
+                            selected_idx = st.selectbox(
+                                "Category" if req['type'] == "category_total" else "Subcategory",
+                                range(len(items)),
+                                format_func=lambda x: items[x]['name'],
+                                key=f"{mode_prefix}cat_{group_idx}_{req_idx}"
+                            )
+                            if selected_idx is not None:
+                                req['target_id'] = items[selected_idx]['id']
+                                req['required_level'] = st.number_input(
+                                    "Required Total Levels",
+                                    min_value=1,
+                                    value=req.get('required_level', 1),
+                                    key=f"{mode_prefix}total_{group_idx}_{req_idx}"
+                                )
+                        
+                        elif req['type'] == "karma":
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                req['min_value'] = st.number_input(
+                                    "Minimum Karma",
+                                    value=req.get('min_value', -1000),
+                                    key=f"{mode_prefix}karma_min_{group_idx}_{req_idx}"
+                                )
+                            with col2:
+                                req['max_value'] = st.number_input(
+                                    "Maximum Karma",
+                                    value=req.get('max_value', 1000),
+                                    key=f"{mode_prefix}karma_max_{group_idx}_{req_idx}"
+                                )
+
+                    with col2:
+                        if st.form_submit_button(f"{mode_prefix}Remove Requirement {group_idx}-{req_idx}"):
+                            st.session_state.prereq_groups[group_idx].pop(req_idx)
+                            st.rerun()
+
+                if st.form_submit_button(f"{mode_prefix}Remove Group {group_idx + 1}"):
+                    st.session_state.prereq_groups.pop(group_idx)
+                    st.rerun()
+            
+            # Store prerequisites data
+            prereqs = st.session_state.prereq_groups
         
         with excl_tab:
+            # Render exclusions section
             exclusions = render_exclusions_section(
                 mode_prefix=mode_prefix,
                 include_racial=is_racial
@@ -151,42 +210,9 @@ def render_class_editor(
                         del st.session_state.prereq_groups
                     if 'exclusions' in st.session_state:
                         del st.session_state.exclusions
-                    st.experimental_rerun()
+                    st.rerun()
                 else:
                     st.error(message)
             
             except Exception as e:
                 st.error(f"Error saving changes: {str(e)}")
-
-    # Action buttons for prerequisites after form
-    for group_idx, prereq_group in enumerate(st.session_state.prereq_groups):
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            st.write(f"Group {group_idx + 1}")
-        with col2:
-            if st.button(f"Add to Group {group_idx + 1}", key=f"{mode_prefix}add_req_{group_idx}"):
-                prereq_type = st.session_state.get(f"{mode_prefix}prereq_type_{group_idx}")
-                if prereq_type:
-                    handle_prerequisite_add(group_idx, prereq_type)
-                    st.experimental_rerun()
-
-        for req_idx, _ in enumerate(prereq_group):
-            if st.button(f"Remove {req_idx + 1}", key=f"{mode_prefix}remove_req_{group_idx}_{req_idx}"):
-                handle_prerequisite_remove(group_idx, req_idx)
-                st.experimental_rerun()
-
-        if st.button(f"Remove Group {group_idx + 1}", key=f"{mode_prefix}remove_group_{group_idx}"):
-            handle_prerequisite_group_remove(group_idx)
-            st.experimental_rerun()
-
-    # Action buttons for exclusions after form
-    for idx, _ in enumerate(st.session_state.exclusions):
-        if st.button(f"Remove Exclusion {idx + 1}", key=f"{mode_prefix}remove_excl_{idx}"):
-            handle_exclusion_remove(idx)
-            st.experimental_rerun()
-
-    if st.button("Add Exclusion", key=f"{mode_prefix}add_exclusion"):
-        exclusion_type = st.session_state.get(f"{mode_prefix}excl_type")
-        if exclusion_type:
-            handle_exclusion_add(exclusion_type)
-            st.experimental_rerun()
