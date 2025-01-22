@@ -7,93 +7,39 @@ def get_db_connection():
     """Create a database connection"""
     return sqlite3.connect('rpg_data.db')
 
-def get_all_races() -> List[Dict]:
-    """Get list of all racial classes"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute("""
-            SELECT 
-                c.id,
-                c.name,
-                c.description,
-                ct.name as type_name,
-                cc.name as category_name,
-                cs.name as subcategory_name,
-                c.base_hp,
-                c.base_mp,
-                c.base_physical_attack,
-                c.base_physical_defense,
-                c.base_agility,
-                c.base_magical_attack,
-                c.base_magical_defense,
-                c.base_resistance,
-                c.base_special,
-                c.hp_per_level,
-                c.mp_per_level,
-                c.physical_attack_per_level,
-                c.physical_defense_per_level,
-                c.agility_per_level,
-                c.magical_attack_per_level,
-                c.magical_defense_per_level,
-                c.resistance_per_level,
-                c.special_per_level
-            FROM classes c
-            JOIN class_types ct ON c.class_type = ct.id
-            JOIN class_categories cc ON c.category_id = cc.id
-            LEFT JOIN class_subcategories cs ON c.subcategory_id = cs.id
-            WHERE c.is_racial = TRUE
-            ORDER BY cc.name, c.name
-        """)
+def check_name_exists(name: str, exclude_id: Optional[int] = None) -> bool:
+    """Check if a class name already exists
+    
+    Args:
+        name: The name to check
+        exclude_id: Optional ID to exclude from the check (for updates)
         
-        columns = [col[0] for col in cursor.description]
-        return [dict(zip(columns, row)) for row in cursor.fetchall()]
-    finally:
-        conn.close()
-
-def get_race_details(race_id: int) -> Optional[Dict]:
-    """Get full details of a specific racial class"""
+    Returns:
+        bool: True if name exists, False otherwise
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("""
-            SELECT 
-                c.*,
-                ct.name as type_name,
-                cc.name as category_name,
-                cs.name as subcategory_name
-            FROM classes c
-            JOIN class_types ct ON c.class_type = ct.id
-            JOIN class_categories cc ON c.category_id = cc.id
-            LEFT JOIN class_subcategories cs ON c.subcategory_id = cs.id
-            WHERE c.id = ? AND c.is_racial = TRUE
-        """, (race_id,))
-        
-        result = cursor.fetchone()
-        if result:
-            columns = [desc[0] for desc in cursor.description]
-            return dict(zip(columns, result))
-        return None
-    finally:
-        conn.close()
-
-def get_race_categories() -> List[Dict]:
-    """Get list of racial class categories"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute("""
-            SELECT id, name 
-            FROM class_categories 
-            WHERE is_racial = TRUE
-            ORDER BY name
-        """)
-        return [{"id": row[0], "name": row[1]} for row in cursor.fetchall()]
+        if exclude_id is not None:
+            cursor.execute("""
+                SELECT COUNT(*) FROM classes 
+                WHERE name = ? AND id != ?
+            """, (name, exclude_id))
+        else:
+            cursor.execute("""
+                SELECT COUNT(*) FROM classes 
+                WHERE name = ?
+            """, (name,))
+        return cursor.fetchone()[0] > 0
     finally:
         conn.close()
 
 def save_race(race_data: Dict) -> Tuple[bool, str]:
     """Save or update a racial class"""
+    # First check if name is already taken
+    if check_name_exists(race_data['name'], race_data.get('id')):
+        return False, f"Error saving race: A class with the name '{race_data['name']}' already exists"
+
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
@@ -218,5 +164,75 @@ def delete_race(race_id: int) -> Tuple[bool, str]:
     except Exception as e:
         cursor.execute("ROLLBACK")
         return False, f"Error deleting race: {str(e)}"
+    finally:
+        conn.close()
+
+def get_race_details(race_id: int) -> Optional[Dict]:
+    """Get full details of a specific racial class"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT 
+                c.*,
+                ct.name as type_name,
+                cc.name as category_name,
+                cs.name as subcategory_name
+            FROM classes c
+            JOIN class_types ct ON c.class_type = ct.id
+            JOIN class_categories cc ON c.category_id = cc.id
+            LEFT JOIN class_subcategories cs ON c.subcategory_id = cs.id
+            WHERE c.id = ? AND c.is_racial = TRUE
+        """, (race_id,))
+        
+        result = cursor.fetchone()
+        if result:
+            columns = [desc[0] for desc in cursor.description]
+            return dict(zip(columns, result))
+        return None
+    finally:
+        conn.close()
+
+def get_all_races() -> List[Dict]:
+    """Get list of all racial classes"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT 
+                c.id,
+                c.name,
+                c.description,
+                ct.name as type_name,
+                cc.name as category_name,
+                cs.name as subcategory_name,
+                c.base_hp,
+                c.base_mp,
+                c.base_physical_attack,
+                c.base_physical_defense,
+                c.base_agility,
+                c.base_magical_attack,
+                c.base_magical_defense,
+                c.base_resistance,
+                c.base_special,
+                c.hp_per_level,
+                c.mp_per_level,
+                c.physical_attack_per_level,
+                c.physical_defense_per_level,
+                c.agility_per_level,
+                c.magical_attack_per_level,
+                c.magical_defense_per_level,
+                c.resistance_per_level,
+                c.special_per_level
+            FROM classes c
+            JOIN class_types ct ON c.class_type = ct.id
+            JOIN class_categories cc ON c.category_id = cc.id
+            LEFT JOIN class_subcategories cs ON c.subcategory_id = cs.id
+            WHERE c.is_racial = TRUE
+            ORDER BY cc.name, c.name
+        """)
+        
+        columns = [col[0] for col in cursor.description]
+        return [dict(zip(columns, row)) for row in cursor.fetchall()]
     finally:
         conn.close()
