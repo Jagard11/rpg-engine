@@ -1,7 +1,7 @@
 # ./DatabaseInspector/__init__.py
 
 """
-Job Editor module for managing job classes.
+Database Editor module for viewing database schemas and editing database tables.
 """
 
 from .DatabaseInspector import render_db_inspector_tab
