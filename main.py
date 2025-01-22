@@ -1,49 +1,43 @@
+#!/usr/bin/env python3
 # ./main.py
 
 import streamlit as st
-import sqlite3
-import os
 from pathlib import Path
-from ServerMessage import render_server_tab
-from FrontEnd.CharacterInfo import init_character_state, render_character_tab
-from DatabaseInspector import render_db_inspector_tab
 
-# Must be the first Streamlit command
-st.set_page_config(page_title="RPG Communication Interface", layout="wide")
+# Import character management module
+from CharacterManagement import (
+    render_character_editor,
+    render_job_editor, 
+    render_race_editor
+)
 
 def init_database():
-    """Initialize database if it doesn't exist"""
-    try:
-        # Check if database exists
-        db_path = Path('rpg_data.db')
-        if not db_path.exists():
-            st.error("Database not found. Please run DatabaseSetup/setupDatabase.py to create the initial database.")
-            raise FileNotFoundError("Database not found")
-            
-        # Import and run timestamp trigger creation
-        import sys
-        sys.path.append('DatabaseSetup')
-        from DatabaseTimestampTriggers import create_timestamp_triggers
-        create_timestamp_triggers()
-            
-    except Exception as e:
-        st.error(f"Error initializing database: {str(e)}")
-        raise
+    """Initialize database connection"""
+    db_path = Path('rpg_data.db')
+    if not db_path.exists():
+        st.error("Database not found. Please run SchemaManager/initializeSchema.py first.")
+        raise FileNotFoundError("Database not found")
 
-# Initialize database before any other operations
+# Initialize application
+st.set_page_config(page_title="RPG Character Management", layout="wide")
 init_database()
 
-# Initialize character state
-init_character_state()
-
-# Main app with tabs
-tab1, tab2, tab3 = st.tabs(["Server Messages", "Character", "Database Inspector"])
+# Character Editors tab
+tab1, = st.tabs(["Character Editors"])
 
 with tab1:
-    render_server_tab()
+    # Create subtabs for different editors
+    char_tab, job_tab, race_tab = st.tabs([
+        "Character Editor",
+        "Job Editor", 
+        "Race Editor"
+    ])
     
-with tab2:
-    render_character_tab()
-
-with tab3:
-    render_db_inspector_tab()
+    with char_tab:
+        render_character_editor()
+        
+    with job_tab:
+        render_job_editor()
+        
+    with race_tab:
+        render_race_editor()
