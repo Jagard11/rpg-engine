@@ -3,6 +3,7 @@
 import sqlite3
 import streamlit as st
 from typing import Dict, List, Optional
+from .forms.raceSelect import render_race_table
 
 def get_class_types() -> List[Dict]:
     """Get available class types from database"""
@@ -265,6 +266,7 @@ def render_race_form(race_data: Optional[Dict] = None) -> Dict:
     with st.form("race_editor_form"):
         # Create tabs
         tabs = st.tabs([
+            "render_race_table",
             "Basic Information",
             "Base Stats",
             "Stats Per Level",
@@ -276,24 +278,27 @@ def render_race_form(race_data: Optional[Dict] = None) -> Dict:
         
         # Render each tab's content
         with tabs[0]:
+            race_select = render_race_table()
+
+        with tabs[1]:
             basic_info = render_basic_info_tab(race_data)
             
-        with tabs[1]:
+        with tabs[2]:
             base_stats = render_base_stats_tab(race_data)
             
-        with tabs[2]:
+        with tabs[3]:
             stats_per_level = render_stats_per_level_tab(race_data)
             
-        with tabs[3]:
+        with tabs[4]:
             prerequisites = render_prerequisites_tab()
             
-        with tabs[4]:
+        with tabs[5]:
             exceptions = render_exceptions_tab()
             
-        with tabs[5]:
+        with tabs[6]:
             spell_list = render_spell_list_tab()
             
-        with tabs[6]:
+        with tabs[7]:
             appearance = render_appearance_tab()
         
         # Submit button
@@ -303,6 +308,7 @@ def render_race_form(race_data: Optional[Dict] = None) -> Dict:
             # Combine all the data from tabs
             return {
                 'id': race_data.get('id') if race_data else None,
+                **race_select,
                 **basic_info,
                 **base_stats,
                 **stats_per_level,

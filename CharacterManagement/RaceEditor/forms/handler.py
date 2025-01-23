@@ -1,107 +1,60 @@
 # ./CharacterManagement/RaceEditor/forms/handler.py
 
 import streamlit as st
-import sqlite3
 from typing import Dict, Optional
-
-from .baseInfo import render_basic_info_tab
+from .baseInfo import render_basic_info_tab, get_class_types, get_race_categories, get_subcategories
 from .baseStats import render_base_stats_tab
 from .statsPerLevel import render_stats_per_level_tab
 from .prerequisites import render_prerequisites_tab
+from .raceSelect import render_race_select_tab
 
-def save_race_data(race_data: Dict) -> tuple[bool, str]:
-    """Save race data to database"""
-    try:
-        conn = sqlite3.connect('rpg_data.db')
-        cursor = conn.cursor()
-        
-        if race_data.get('id'):
-            # Update existing race
-            fields = [f"{k} = ?" for k in race_data.keys() if k != 'id']
-            query = f"""
-                UPDATE classes 
-                SET {', '.join(fields)}
-                WHERE id = ? AND is_racial = TRUE
-            """
-            values = [v for k, v in race_data.items() if k != 'id']
-            values.append(race_data['id'])
-            
-            cursor.execute(query, values)
-        else:
-            # Insert new race
-            fields = [k for k in race_data.keys() if k != 'id']
-            placeholders = ['?' for _ in fields]
-            query = f"""
-                INSERT INTO classes ({', '.join(fields)}, is_racial)
-                VALUES ({', '.join(placeholders)}, TRUE)
-            """
-            values = [race_data[k] for k in fields]
-            
-            cursor.execute(query, values)
-            race_data['id'] = cursor.lastrowid
-        
-        conn.commit()
-        return True, f"Race {'updated' if race_data.get('id') else 'created'} successfully!"
-        
-    except Exception as e:
-        return False, f"Error saving race: {str(e)}"
-    finally:
-        conn.close()
-
-def render_race_form(race_data: Optional[Dict] = None) -> None:
-    """Render the complete race form with tabs"""
+def render_race_form(race_data: Optional[Dict] = None) -> Dict:
+    """Render the race editor form with tabs"""
     
-    # Create tabs
-    tab1, tab2, tab3, tab4 = st.tabs([
+    # Get filter options
+    class_types = get_class_types()
+    categories = get_race_categories()
+    subcategories = get_subcategories()
+    
+    tabs = st.tabs([
+        "Race Select",
         "Basic Information",
         "Base Stats",
-        "Stats per Level",
+        "Stats Per Level",
         "Prerequisites"
     ])
     
     # Render each tab
-    with tab1:
+        
+    with tabs[0]:
+        render_race_select_tab(class_types, categories, subcategories)
+        
+    with tabs[1]:
         basic_info = render_basic_info_tab(race_data)
-    
-    with tab2:
+            
+    with tabs[2]:
         base_stats = render_base_stats_tab(race_data)
-    
-    with tab3:
+            
+    with tabs[3]:
         stats_per_level = render_stats_per_level_tab(race_data)
-    
-    with tab4:
+            
+    with tabs[4]:
         prerequisites = render_prerequisites_tab(race_data)
     
-    # Main save button for race data
-    if st.button("Save Race"):
+    # Submit button
+    submitted = st.button("Save Race")
+    
+    if submitted:
         if not basic_info.get('name'):
             st.error("Name is required!")
-            return
+            return None
             
-        try:
-            # First save the main race data
-            save_data = {
-                'id': race_data.get('id') if race_data else None,
-                **basic_info,
-                **base_stats,
-                **stats_per_level
-            }
-            
-            success, message = save_race_data(save_data)
-            if not success:
-                st.error(message)
-                return
-                
-            # Now save prerequisites if they exist
-            if prerequisites:
-                from .prerequisites import save_prerequisites
-                race_id = save_data.get('id') or race_data.get('id')
-                if race_id:
-                    save_prerequisites(race_id, prerequisites.get('prerequisites', []))
-            
-            st.success(message)
-            if not race_data:  # If this was a new race
-                st.rerun()  # Refresh to show prerequisites tab
-                
-        except Exception as e:
-            st.error(f"Error saving race: {str(e)}")
+        return {
+            'id': race_data.get('id') if race_data else None,
+            **basic_info,
+            **base_stats,
+            **stats_per_level,
+            **prerequisites
+        }
+    
+    return None

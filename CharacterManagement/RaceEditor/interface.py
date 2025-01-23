@@ -35,60 +35,16 @@ def render_race_editor():
 
     with col1:
         st.subheader("Race List")
-
+        
         # Search and filter section
         st.session_state.race_search_term = st.text_input(
             "Search Races",
             value=st.session_state.race_search_term
         )
 
-        # Get filter options
-        class_types = [{"id": None, "name": "All Types"}] + get_class_types()
-        categories = [{"id": None, "name": "All Categories"}] + get_race_categories()
-        subcategories = [{"id": None, "name": "All Subcategories"}] + get_subcategories()
-
-        # Filter dropdowns
-        selected_type = st.selectbox(
-            "Class Type",
-            options=[t["id"] for t in class_types],
-            format_func=lambda x: next(t["name"] for t in class_types if t["id"] == x),
-            index=0
-        )
-
-        selected_category = st.selectbox(
-            "Category",
-            options=[c["id"] for c in categories],
-            format_func=lambda x: next(c["name"] for c in categories if c["id"] == x),
-            index=0
-        )
-
-        selected_subcategory = st.selectbox(
-            "Subcategory",
-            options=[s["id"] for s in subcategories],
-            format_func=lambda x: next(s["name"] for s in subcategories if s["id"] == x),
-            index=0
-        )
-
-        # Convert selected IDs to names for filtering
-        selected_type_name = get_name_from_id(class_types, selected_type)
-        selected_category_name = get_name_from_id(categories, selected_category)
-        selected_subcategory_name = get_name_from_id(subcategories, selected_subcategory)
-
-        # Get and filter races
-        all_races = get_all_races()
-        filtered_races = [
-            race for race in all_races
-            if (not st.session_state.race_search_term or 
-                st.session_state.race_search_term.lower() in race['name'].lower()) and
-            (selected_type_name in (None, "All Types") or race['type_name'] == selected_type_name) and
-            (selected_category_name in (None, "All Categories") or race['category_name'] == selected_category_name) and
-            (selected_subcategory_name in (None, "All Subcategories") or race['subcategory_name'] == selected_subcategory_name)
-        ]
-
         # Display race list
-        st.write(f"Found {len(filtered_races)} races")
-        
-        for race in filtered_races:
+        all_races = get_all_races()
+        for race in all_races:
             col_race, col_delete = st.columns([5, 1])
             with col_race:
                 if st.button(
@@ -98,10 +54,9 @@ def render_race_editor():
                     type="primary" if race['id'] == st.session_state.selected_race_id else "secondary"
                 ):
                     st.session_state.selected_race_id = race['id']
-                    st.session_state.show_delete_confirm = False  # Reset delete confirmation
+                    st.session_state.show_delete_confirm = False
                     st.rerun()
-            
-            # Only show delete button for selected race
+
             with col_delete:
                 if race['id'] == st.session_state.selected_race_id:
                     if not st.session_state.show_delete_confirm:
@@ -143,7 +98,6 @@ def render_race_editor():
         # Show editor form
         form_data = render_race_form(race_data)
         
-        # Handle form submission
         if form_data:
             success, message = save_race(form_data)
             if success:
@@ -153,25 +107,3 @@ def render_race_editor():
                 st.rerun()
             else:
                 st.error(message)
-
-        # Copy button
-        if st.session_state.selected_race_id:
-            if st.button("Copy Race", type="secondary"):
-                # Create a copy of race_data without the id
-                copied_race = race_data.copy()
-                copied_race.pop('id', None)
-                copied_race['name'] = f"{copied_race['name']} (Copy)"
-                
-                # Save the copied race and get the new race details
-                success, message = save_race(copied_race)
-                if success:
-                    # Find the newly created race by name
-                    all_races = get_all_races()
-                    new_race = next((race for race in all_races 
-                                   if race['name'] == copied_race['name']), None)
-                    if new_race:
-                        st.session_state.selected_race_id = new_race['id']
-                    st.success(message)
-                    st.rerun()
-                else:
-                    st.error(message)
