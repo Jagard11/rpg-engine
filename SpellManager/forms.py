@@ -11,6 +11,17 @@ def get_db_connection():
     db_path = Path('rpg_data.db')
     return sqlite3.connect(db_path)
 
+def load_spell_type() -> List[Dict]:
+    """Load all spell types from database"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT id, name FROM spell_type ORDER BY name")
+    
+    spell_type = [{"id": row[0], "name": row[1]} for row in cursor.fetchall()]
+    conn.close()
+    return spell_type
+
 def load_spells() -> List[Dict]:
     """Load all spells from database"""
     conn = get_db_connection()
@@ -38,13 +49,14 @@ def save_spell(spell_data: Dict) -> bool:
         if 'id' in spell_data and spell_data['id']:
             cursor.execute("""
                 UPDATE spells 
-                SET name=?, description=?, spell_tier=?, is_super_tier=?, mp_cost=?,
+                SET name=?, spell_type_id=?, description=?, spell_tier=?, is_super_tier=?, mp_cost=?,
                     casting_time=?, range=?, area_of_effect=?, damage_base=?,
                     damage_scaling=?, healing_base=?, healing_scaling=?,
                     status_effects=?, duration=?
                 WHERE id=?
             """, (
-                spell_data['name'], spell_data['description'], spell_data['spell_tier'],
+                spell_data['name'], spell_data['spell_type_id'], spell_data['description'], 
+                spell_data['spell_tier'],
                 spell_data['is_super_tier'], spell_data['mp_cost'], spell_data['casting_time'],
                 spell_data['range'], spell_data['area_of_effect'], spell_data['damage_base'],
                 spell_data['damage_scaling'], spell_data['healing_base'], 
@@ -54,12 +66,12 @@ def save_spell(spell_data: Dict) -> bool:
         else:
             cursor.execute("""
                 INSERT INTO spells (
-                    name, description, spell_tier, is_super_tier, mp_cost,
+                    name, spell_type_id, description, spell_tier, is_super_tier, mp_cost,
                     casting_time, range, area_of_effect, damage_base, damage_scaling,
                     healing_base, healing_scaling, status_effects, duration
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
-                spell_data['name'], spell_data['description'], spell_data['spell_tier'],
+                spell_data['name'], spell_data['spell_type_id'], spell_data['description'], spell_data['spell_tier'],
                 spell_data['is_super_tier'], spell_data['mp_cost'], spell_data['casting_time'],
                 spell_data['range'], spell_data['area_of_effect'], spell_data['damage_base'],
                 spell_data['damage_scaling'], spell_data['healing_base'],
@@ -96,119 +108,179 @@ def render_spell_editor_tab():
     """Main interface for the spell editor tab"""
     st.header("Spell Editor")
     
-    # Load existing spells
-    spells = load_spells()
+    # Handle tab selection 
+    selected_tab = st.radio("Choose View", ["Spell List", "Spell Editor"], horizontal=True, label_visibility="hidden")
     
-    # Create tabs for list view and editor
-    list_tab, editor_tab = st.tabs(["Spell List", "Spell Editor"])
-    
-    with list_tab:
-        if spells:
-            # Convert spells to DataFrame for table display
-            df = pd.DataFrame(spells)
+    if selected_tab == "Spell List":
+        # Load list content regardless of tab state
+            # Load existing spells
+            spells = load_spells()
             
-            # Reorder and rename columns for display
-            display_columns = ['name', 'spell_tier', 'mp_cost', 'is_super_tier', 'damage_base', 'healing_base']
-            display_names = {
-                'name': 'Name',
-                'spell_tier': 'Tier',
-                'mp_cost': 'MP Cost',
-                'is_super_tier': 'Super Tier',
-                'damage_base': 'Base Damage',
-                'healing_base': 'Base Healing'
-            }
-            
-            display_df = df[display_columns].rename(columns=display_names)
-            
-            # Create selectable table
-            selected_indices = st.data_editor(
-                display_df,
-                hide_index=True,
-                column_config={
-                    "Super Tier": st.column_config.CheckboxColumn(
-                        "Super Tier",
-                        help="Whether this is a super tier spell",
-                        default=False,
-                    )
-                },
-                disabled=True,
-                key="spell_table"
-            )
-            
-            # Handle row selection
-            if st.session_state.spell_table:
-                selected_row = st.session_state.spell_table['edited_rows']
-                if selected_row:
-                    row_idx = list(selected_row.keys())[0]
-                    selected_spell = spells[row_idx]
-                    st.session_state.editing_spell = selected_spell
-                    st.session_state.active_tab = "editor"
-                    st.experimental_rerun()
-        else:
-            st.info("No spells found. Create one in the editor tab!")
-    
-    with editor_tab:
-        spell_data = st.session_state.get('editing_spell', {})
-        
-        with st.form("spell_editor_form_tab"):
-            name = st.text_input("Spell Name", value=spell_data.get('name', ''))
-            description = st.text_area("Description", value=spell_data.get('description', ''))
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                tier = st.number_input("Spell Tier", min_value=0, max_value=10, 
-                                     value=spell_data.get('spell_tier', 0))
-                mp_cost = st.number_input("MP Cost", min_value=0, 
-                                        value=spell_data.get('mp_cost', 0))
-                casting_time = st.text_input("Casting Time", 
-                                           value=spell_data.get('casting_time', ''))
-                is_super_tier = st.checkbox("Super Tier Spell", 
-                                          value=spell_data.get('is_super_tier', False))
-                range_val = st.text_input("Range", value=spell_data.get('range', ''))
+            if spells:
+                # Add action buttons
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    if st.button("Add New Spell"):
+                        st.session_state.editing_spell = {}
+                        st.session_state.selected_tab = "Spell Editor"
+                        st.rerun()
+                        
+                with col2:
+                    if st.button("Copy Selected Spell"):
+                        selected_rows = [i for i, row in st.session_state.spell_table.get('edited_rows', {}).items() 
+                                       if row.get('Select', False)]
+                        if selected_rows:
+                            spell_to_copy = spells[selected_rows[0]]
+                            copied_spell = spell_to_copy.copy()
+                            copied_spell.pop('id')  # Remove ID to create new entry
+                            copied_spell['name'] = f"{copied_spell['name']} (Copy)"
+                            st.session_state.editing_spell = copied_spell
+                            st.session_state.spell_editor_tab = 1
+                            st.rerun()
+                        else:
+                            st.warning("Please select a spell to copy")
+                            
+                with col3:
+                    if st.button("Delete Selected Spell"):
+                        selected_rows = [i for i, row in st.session_state.spell_table.get('edited_rows', {}).items() 
+                                       if row.get('Select', False)]
+                        if selected_rows:
+                            spell_to_delete = spells[selected_rows[0]]
+                            if delete_spell(spell_to_delete['id']):
+                                st.success("Spell deleted successfully!")
+                                st.rerun()
+                        else:
+                            st.warning("Please select a spell to delete")
                 
-            with col2:
-                area = st.text_input("Area of Effect", 
-                                   value=spell_data.get('area_of_effect', ''))
-                duration = st.text_input("Duration", 
-                                       value=spell_data.get('duration', ''))
-            
-            col3, col4 = st.columns(2)
-            with col3:
-                damage_base = st.number_input("Base Damage", min_value=0,
-                                            value=spell_data.get('damage_base', 0))
-                damage_scaling = st.text_input("Damage Scaling",
-                                             value=spell_data.get('damage_scaling', ''))
+                # Convert spells to DataFrame for table display
+                df = pd.DataFrame(spells)
                 
-            with col4:
-                healing_base = st.number_input("Base Healing", min_value=0,
-                                             value=spell_data.get('healing_base', 0))
-                healing_scaling = st.text_input("Healing Scaling",
-                                              value=spell_data.get('healing_scaling', ''))
+                # Add selection column
+                df['Select'] = False
                 
-            status_effects = st.text_area("Status Effects", 
-                                        value=spell_data.get('status_effects', ''))
-            
-            submitted = st.form_submit_button("Save Spell")
-            if submitted:
-                spell_data = {
-                    'id': spell_data.get('id'),
-                    'name': name,
-                    'description': description,
-                    'spell_tier': tier,
-                    'is_super_tier': is_super_tier,
-                    'mp_cost': mp_cost,
-                    'casting_time': casting_time,
-                    'range': range_val,
-                    'area_of_effect': area,
-                    'damage_base': damage_base,
-                    'damage_scaling': damage_scaling,
-                    'healing_base': healing_base,
-                    'healing_scaling': healing_scaling,
-                    'status_effects': status_effects,
-                    'duration': duration
+                # Reorder and rename columns for display
+                display_columns = ['Select', 'id', 'name', 'spell_tier', 'mp_cost', 'is_super_tier', 'damage_base', 'healing_base']
+                display_names = {
+                    'Select': 'Select',
+                    'id': 'ID',
+                    'name': 'Name',
+                    'spell_tier': 'Tier',
+                    'mp_cost': 'MP Cost',
+                    'is_super_tier': 'Super Tier',
+                    'damage_base': 'Base Damage',
+                    'spell_type_name': 'Type',
                 }
                 
-                if save_spell(spell_data):
-                    st.success("Spell saved successfully!")
-                    st.session_state.editing_spell = {}
-                    st.experimental_rerun()
+                display_df = df[display_columns].rename(columns=display_names)
+                
+                # Create selectable table
+                edited_df = st.data_editor(
+                    display_df,
+                    hide_index=True,
+                    column_config={
+                        "Select": st.column_config.CheckboxColumn(
+                            "Select",
+                            help="Select spell to edit",
+                            required=True
+                        ),
+                        "Super Tier": st.column_config.CheckboxColumn(
+                            "Super Tier",
+                            help="Whether this is a super tier spell",
+                            default=False,
+                        )
+                    },
+                    disabled=["ID", "Name", "Tier", "MP Cost", "Super Tier", "Base Damage", "Base Healing"],
+                    key="spell_table"
+                )
+                
+                # Handle row selection
+                if st.session_state.spell_table and 'edited_rows' in st.session_state.spell_table:
+                    selected_rows = [i for i, row in st.session_state.spell_table['edited_rows'].items() 
+                                   if row.get('Select', False)]
+                    if selected_rows:
+                        selected_spell = spells[selected_rows[0]]
+                        st.session_state.editing_spell = selected_spell
+                        st.session_state.spell_editor_tab = 1
+                        st.rerun()
+            else:
+                st.info("No spells found. Create one in the editor tab!")
+    
+    else:  # Spell Editor tab
+        # Load editor content regardless of tab state
+            spell_data = st.session_state.get('editing_spell', {})
+            
+            with st.form("spell_editor_form_tab"):
+                name = st.text_input("Spell Name", value=spell_data.get('name', ''))
+                
+                spell_type = load_spell_type()
+                spell_type_options = {st['id']: st['name'] for st in spell_type}
+                spell_type_id = st.selectbox(
+                    "Spell Type",
+                    options=list(spell_type_options.keys()),
+                    format_func=lambda x: spell_type_options[x],
+                    index=0 if not spell_data.get('spell_type_id') else 
+                          list(spell_type_options.keys()).index(spell_data['spell_type_id'])
+                )
+                
+                description = st.text_area("Description", value=spell_data.get('description', ''))
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    tier = st.number_input("Spell Tier", min_value=0, max_value=10, 
+                                         value=spell_data.get('spell_tier', 0))
+                    mp_cost = st.number_input("MP Cost", min_value=0, 
+                                            value=spell_data.get('mp_cost', 0))
+                    casting_time = st.text_input("Casting Time", 
+                                               value=spell_data.get('casting_time', ''))
+                    is_super_tier = st.checkbox("Super Tier Spell", 
+                                              value=spell_data.get('is_super_tier', False))
+                    range_val = st.text_input("Range", value=spell_data.get('range', ''))
+                    
+                with col2:
+                    area = st.text_input("Area of Effect", 
+                                       value=spell_data.get('area_of_effect', ''))
+                    duration = st.text_input("Duration", 
+                                           value=spell_data.get('duration', ''))
+                
+                col3, col4 = st.columns(2)
+                with col3:
+                    damage_base = st.number_input("Base Damage", min_value=0,
+                                                value=spell_data.get('damage_base', 0))
+                    damage_scaling = st.text_input("Damage Scaling",
+                                                 value=spell_data.get('damage_scaling', ''))
+                    
+                with col4:
+                    healing_base = st.number_input("Base Healing", min_value=0,
+                                                 value=spell_data.get('healing_base', 0))
+                    healing_scaling = st.text_input("Healing Scaling",
+                                                  value=spell_data.get('healing_scaling', ''))
+                    
+                status_effects = st.text_area("Status Effects", 
+                                            value=spell_data.get('status_effects', ''))
+                
+                submitted = st.form_submit_button("Save Spell")
+                if submitted:
+                    spell_data = {
+                        'id': spell_data.get('id'),
+                        'name': name,
+                        'spell_type_id': spell_type_id,
+                        'description': description,
+                        'spell_tier': tier,
+                        'is_super_tier': is_super_tier,
+                        'mp_cost': mp_cost,
+                        'casting_time': casting_time,
+                        'range': range_val,
+                        'area_of_effect': area,
+                        'damage_base': damage_base,
+                        'damage_scaling': damage_scaling,
+                        'healing_base': healing_base,
+                        'healing_scaling': healing_scaling,
+                        'status_effects': status_effects,
+                        'duration': duration
+                    }
+                    
+                    if save_spell(spell_data):
+                        st.success("Spell saved successfully!")
+                        st.session_state.editing_spell = {}
+                        st.session_state.spell_editor_tab = 0
+                        st.rerun()
