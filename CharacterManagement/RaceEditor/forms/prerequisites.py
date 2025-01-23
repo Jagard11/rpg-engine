@@ -78,6 +78,7 @@ def save_prerequisites(race_id: int, prerequisites: List[Dict]) -> None:
         cursor.execute("ROLLBACK")
         raise e
     finally:
+        cursor.close()
         conn.close()
 
 def render_prerequisites_tab(race_data: Optional[Dict] = None) -> Dict:
@@ -90,31 +91,41 @@ def render_prerequisites_tab(race_data: Optional[Dict] = None) -> Dict:
     # Get existing prerequisites
     prerequisites = get_prerequisites(race_data['id'])
     
+    # Initialize or update session state for prerequisites
+    if 'prerequisites' not in st.session_state or st.session_state.get('race_id') != race_data['id']:
+        st.session_state.prerequisites = prerequisites
+        st.session_state.race_id = race_data['id']
+    
     # Group prerequisites by prerequisite_group
     prereq_groups = {}
-    for prereq in prerequisites:
+    for prereq in st.session_state.prerequisites:
         group = prereq['prerequisite_group']
         if group not in prereq_groups:
             prereq_groups[group] = []
         prereq_groups[group].append(prereq)
     
-    # Initialize session state for prerequisites if needed
+    # Initialize prerequisites list in session state if not present
     if 'prerequisites' not in st.session_state:
-        st.session_state.prerequisites = prerequisites
-    
+        st.session_state.prerequisites = []
+        
     # Button to add new prerequisite group
     if st.button("Add Prerequisite Group"):
-        new_group = max(prereq_groups.keys(), default=0) + 1
-        st.session_state.prerequisites.append({
+        # Get the new group number (either 1 or max + 1)
+        new_group = max([0] + [p['prerequisite_group'] for p in st.session_state.prerequisites]) + 1
+        
+        # Create a new prerequisite record
+        new_prerequisite = {
             'prerequisite_group': new_group,
-            'prerequisite_type': 'specific_class',
+            'prerequisite_type': 'specific_race',  # Default to specific race type
             'target_id': None,
-            'required_level': None,
+            'required_level': 0,
             'min_value': None,
             'max_value': None
-        })
-        prereq_groups[new_group] = [st.session_state.prerequisites[-1]]
-        st.rerun()
+        }
+        
+        # Add to session state
+        st.session_state.prerequisites.append(new_prerequisite)
+        st.rerun()  # Rerun to update the display
     
     # Render each prerequisite group
     for group_num, group_prereqs in sorted(prereq_groups.items()):
@@ -122,16 +133,20 @@ def render_prerequisites_tab(race_data: Optional[Dict] = None) -> Dict:
             st.write("All prerequisites in this group must be met (AND)")
             
             # Button to add prerequisite to group
-            if st.button(f"Add Prerequisite to Group {group_num}"):
-                st.session_state.prerequisites.append({
+            if st.button(f"Add Prerequisite to Group {group_num}", key=f"add_prereq_{group_num}"):
+                # Create a new prerequisite in the same group
+                new_prerequisite = {
                     'prerequisite_group': group_num,
-                    'prerequisite_type': 'specific_class',
+                    'prerequisite_type': 'specific_race',  # Default to specific race type
                     'target_id': None,
-                    'required_level': None,
+                    'required_level': 0,
                     'min_value': None,
                     'max_value': None
-                })
-                st.rerun()
+                }
+                
+                # Add to session state
+                st.session_state.prerequisites.append(new_prerequisite)
+                st.rerun()  # Rerun to update the display
             
             # Render each prerequisite in the group
             for i, prereq in enumerate(group_prereqs):
@@ -141,48 +156,120 @@ def render_prerequisites_tab(race_data: Optional[Dict] = None) -> Dict:
                     with col1:
                         prereq_type = st.selectbox(
                             "Type",
-                            options=['specific_class', 'category_total', 
-                                   'subcategory_total', 'karma', 'quest', 
-                                   'achievement'],
+                            options=[
+                                # Race-related prerequisites
+                                'specific_race', 'race_category_total', 'race_subcategory_total',
+                                # Job-related prerequisites
+                                'specific_job', 'job_category_total', 'job_subcategory_total',
+                                # Other prerequisites
+                                'karma', 'quest', 'achievement'
+                            ],
                             key=f"type_{group_num}_{i}",
-                            index=['specific_class', 'category_total', 
-                                  'subcategory_total', 'karma', 'quest', 
-                                  'achievement'].index(prereq['prerequisite_type'])
+                            index=[
+                                'specific_race', 'race_category_total', 'race_subcategory_total',
+                                'specific_job', 'job_category_total', 'job_subcategory_total',
+                                'karma', 'quest', 'achievement'
+                            ].index(prereq.get('prerequisite_type', 'specific_race'))
                         )
+                        prereq['prerequisite_type'] = prereq_type
                     
                     with col2:
                         # Show appropriate selector based on prerequisite type
-                        if prereq_type in ['specific_class']:
-                            # Get all classes
+                        if prereq_type in ['specific_race', 'specific_job']:
                             cursor = sqlite3.connect('rpg_data.db').cursor()
-                            cursor.execute("SELECT id, name FROM classes ORDER BY name")
+                            if prereq_type == 'specific_race':
+                                cursor.execute("""
+                                    SELECT id, name 
+                                    FROM classes 
+                                    WHERE is_racial = TRUE 
+                                    ORDER BY name
+                                """)
+                                label = "Race"
+                            else:  # specific_job
+                                cursor.execute("""
+                                    SELECT id, name 
+                                    FROM classes 
+                                    WHERE is_racial = FALSE 
+                                    ORDER BY name
+                                """)
+                                label = "Job"
+                            
                             classes = [{"id": row[0], "name": row[1]} for row in cursor.fetchall()]
+                            cursor.close()
                             
                             target_index = find_index_by_id(classes, prereq.get('target_id', 0))
                             prereq['target_id'] = st.selectbox(
-                                "Class",
+                                label,
                                 options=[c["id"] for c in classes],
                                 format_func=lambda x: next(c["name"] for c in classes if c["id"] == x),
                                 key=f"target_{group_num}_{i}",
                                 index=target_index
                             )
                             
-                        elif prereq_type in ['category_total']:
-                            categories = get_race_categories()
+                        elif prereq_type in ['race_category_total', 'job_category_total']:
+                            conn = sqlite3.connect('rpg_data.db')
+                            cursor = conn.cursor()
+                            
+                            if prereq_type == 'race_category_total':
+                                cursor.execute("""
+                                    SELECT id, name 
+                                    FROM class_categories 
+                                    WHERE is_racial = TRUE 
+                                    ORDER BY name
+                                """)
+                                label = "Race Category"
+                            else:  # job_category_total
+                                cursor.execute("""
+                                    SELECT id, name 
+                                    FROM class_categories 
+                                    WHERE is_racial = FALSE 
+                                    ORDER BY name
+                                """)
+                                label = "Job Category"
+                            
+                            categories = [{"id": row[0], "name": row[1]} for row in cursor.fetchall()]
+                            cursor.close()
+                            conn.close()
+                            
                             target_index = find_index_by_id(categories, prereq.get('target_id', 0))
                             prereq['target_id'] = st.selectbox(
-                                "Category",
+                                label,
                                 options=[cat["id"] for cat in categories],
                                 format_func=lambda x: next(cat["name"] for cat in categories if cat["id"] == x),
                                 key=f"target_{group_num}_{i}",
                                 index=target_index
                             )
                             
-                        elif prereq_type in ['subcategory_total']:
-                            subcategories = get_subcategories()
+                        elif prereq_type in ['race_subcategory_total', 'job_subcategory_total']:
+                            conn = sqlite3.connect('rpg_data.db')
+                            cursor = conn.cursor()
+                            
+                            if prereq_type == 'race_subcategory_total':
+                                cursor.execute("""
+                                    SELECT DISTINCT cs.id, cs.name
+                                    FROM class_subcategories cs
+                                    JOIN classes c ON c.subcategory_id = cs.id
+                                    WHERE c.is_racial = TRUE
+                                    ORDER BY cs.name
+                                """)
+                                label = "Race Subcategory"
+                            else:  # job_subcategory_total
+                                cursor.execute("""
+                                    SELECT DISTINCT cs.id, cs.name
+                                    FROM class_subcategories cs
+                                    JOIN classes c ON c.subcategory_id = cs.id
+                                    WHERE c.is_racial = FALSE
+                                    ORDER BY cs.name
+                                """)
+                                label = "Job Subcategory"
+                            
+                            subcategories = [{"id": row[0], "name": row[1]} for row in cursor.fetchall()]
+                            cursor.close()
+                            conn.close()
+                            
                             target_index = find_index_by_id(subcategories, prereq.get('target_id', 0))
                             prereq['target_id'] = st.selectbox(
-                                "Subcategory",
+                                label,
                                 options=[sub["id"] for sub in subcategories],
                                 format_func=lambda x: next(sub["name"] for sub in subcategories if sub["id"] == x),
                                 key=f"target_{group_num}_{i}",
@@ -222,13 +309,5 @@ def render_prerequisites_tab(race_data: Optional[Dict] = None) -> Dict:
                         if st.button("❌", key=f"delete_{group_num}_{i}"):
                             st.session_state.prerequisites.remove(prereq)
                             st.rerun()
-    
-    # Save button for prerequisites
-    if st.button("Save Prerequisites"):
-        try:
-            save_prerequisites(race_data['id'], st.session_state.prerequisites)
-            st.success("Prerequisites saved successfully!")
-        except Exception as e:
-            st.error(f"Error saving prerequisites: {str(e)}")
     
     return {'prerequisites': st.session_state.prerequisites}
