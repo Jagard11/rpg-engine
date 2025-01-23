@@ -95,8 +95,15 @@ def delete_spell(spell_id: int) -> bool:
         conn.close()
 
 def render_spell_editor():
-    """Main interface for the spell editor"""
-    st.header("Spell Editor")
+    """Main interface for the ability and spell editor"""
+    st.header("Ability & Spell Editor")
+    
+    # Add ability type selector
+    ability_type = st.radio(
+        "Ability Type",
+        ["Spell", "Physical Ability", "Passive Ability", "Monster Ability", "Martial Art"],
+        horizontal=True
+    )
     
     # Load existing spells
     spells = load_spells()
@@ -135,34 +142,66 @@ def render_spell_editor():
             
             col1, col2 = st.columns(2)
             with col1:
-                tier = st.number_input("Spell Tier", min_value=0, max_value=10, 
-                                     value=spell_data.get('spell_tier', 0))
-                mp_cost = st.number_input("MP Cost", min_value=0, 
-                                        value=spell_data.get('mp_cost', 0))
-                casting_time = st.text_input("Casting Time", 
-                                           value=spell_data.get('casting_time', ''))
+                if ability_type == "Spell":
+                    tier = st.number_input("Spell Tier", min_value=0, max_value=10, 
+                                         value=spell_data.get('spell_tier', 0))
+                    mp_cost = st.number_input("MP Cost", min_value=0, 
+                                            value=spell_data.get('mp_cost', 0))
+                    casting_time = st.text_input("Casting Time", 
+                                               value=spell_data.get('casting_time', ''))
+                    is_super_tier = st.checkbox("Super Tier Spell", 
+                                              value=spell_data.get('is_super_tier', False))
+                else:
+                    uses_per_day = st.number_input("Uses Per Day", min_value=0,
+                                                 value=spell_data.get('uses_per_day', 0))
+                    stamina_cost = st.number_input("Stamina Cost", min_value=0,
+                                                value=spell_data.get('stamina_cost', 0))
+                    if ability_type == "Martial Art":
+                        weapon_requirements = st.text_input("Weapon Requirements",
+                                                         value=spell_data.get('weapon_requirements', ''))
+                    elif ability_type == "Monster Ability":
+                        racial_requirement = st.text_input("Racial Requirement",
+                                                        value=spell_data.get('racial_requirement', ''))
+                
                 range_val = st.text_input("Range", value=spell_data.get('range', ''))
                 
             with col2:
-                is_super_tier = st.checkbox("Super Tier Spell", 
-                                          value=spell_data.get('is_super_tier', False))
+                cooldown = st.text_input("Cooldown/Recovery Time",
+                                      value=spell_data.get('cooldown', ''))
                 area = st.text_input("Area of Effect", 
                                    value=spell_data.get('area_of_effect', ''))
                 duration = st.text_input("Duration", 
                                        value=spell_data.get('duration', ''))
+                
+                if ability_type != "Passive Ability":
+                    activation_time = st.text_input("Activation Time",
+                                                 value=spell_data.get('activation_time', ''))
             
             col3, col4 = st.columns(2)
             with col3:
-                damage_base = st.number_input("Base Damage", min_value=0,
-                                            value=spell_data.get('damage_base', 0))
-                damage_scaling = st.text_input("Damage Scaling",
-                                             value=spell_data.get('damage_scaling', ''))
+                if ability_type != "Passive Ability":
+                    damage_base = st.number_input("Base Damage", min_value=0,
+                                                value=spell_data.get('damage_base', 0))
+                    damage_scaling = st.text_input("Damage Scaling",
+                                                 value=spell_data.get('damage_scaling', ''))
+                    
+                    if ability_type in ["Physical Ability", "Martial Art"]:
+                        st.selectbox("Damage Type", 
+                                   ["Slashing", "Piercing", "Blunt", "Mixed"],
+                                   index=0 if not spell_data.get('damage_type') else \
+                                   ["Slashing", "Piercing", "Blunt", "Mixed"].index(spell_data.get('damage_type')))
                 
             with col4:
-                healing_base = st.number_input("Base Healing", min_value=0,
-                                             value=spell_data.get('healing_base', 0))
-                healing_scaling = st.text_input("Healing Scaling",
-                                              value=spell_data.get('healing_scaling', ''))
+                if ability_type != "Passive Ability":
+                    healing_base = st.number_input("Base Healing", min_value=0,
+                                                 value=spell_data.get('healing_base', 0))
+                    healing_scaling = st.text_input("Healing Scaling",
+                                                  value=spell_data.get('healing_scaling', ''))
+                
+                    combo_potential = st.selectbox("Combo Potential",
+                                                ["None", "Starter", "Linker", "Finisher"],
+                                                index=0 if not spell_data.get('combo_potential') else \
+                                                ["None", "Starter", "Linker", "Finisher"].index(spell_data.get('combo_potential')))
                 
             status_effects = st.text_area("Status Effects", 
                                         value=spell_data.get('status_effects', ''))
