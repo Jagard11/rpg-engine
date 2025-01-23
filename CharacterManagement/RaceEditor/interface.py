@@ -3,7 +3,12 @@
 import streamlit as st
 from typing import Optional, Dict, List
 from .database import get_all_races, get_race_details, save_race, delete_race
-from .forms import render_race_form, get_class_types, get_race_categories, get_subcategories
+from .forms import (
+    render_race_form,
+    get_class_types,
+    get_race_categories,
+    get_subcategories
+)
 
 def get_name_from_id(items: List[Dict], target_id: Optional[int]) -> Optional[str]:
     """Helper function to get name from id in a list of dicts"""
