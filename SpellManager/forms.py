@@ -2,6 +2,7 @@
 
 import sqlite3
 import streamlit as st
+import pandas as pd
 from typing import Dict, List, Optional
 from pathlib import Path
 
@@ -103,30 +104,53 @@ def render_spell_editor_tab():
     
     with list_tab:
         if spells:
-            for spell in spells:
-                with st.expander(f"{spell['name']} (Tier {spell['spell_tier']})"):
-                    st.write(f"**Description:** {spell['description']}")
-                    st.write(f"**MP Cost:** {spell['mp_cost']}")
-                    st.write(f"**Casting Time:** {spell['casting_time']}")
-                    st.write(f"**Range:** {spell['range']}")
-                    
-                    col1, col2 = st.columns(2)
-                    if col1.button("Edit", key=f"tab_edit_{spell['id']}"):
-                        st.session_state.editing_spell = spell
-                        st.session_state.active_tab = "editor"
-                        st.experimental_rerun()
-                        
-                    if col2.button("Delete", key=f"tab_delete_{spell['id']}"):
-                        if delete_spell(spell['id']):
-                            st.success("Spell deleted successfully!")
-                            st.experimental_rerun()
+            # Convert spells to DataFrame for table display
+            df = pd.DataFrame(spells)
+            
+            # Reorder and rename columns for display
+            display_columns = ['name', 'spell_tier', 'mp_cost', 'is_super_tier', 'damage_base', 'healing_base']
+            display_names = {
+                'name': 'Name',
+                'spell_tier': 'Tier',
+                'mp_cost': 'MP Cost',
+                'is_super_tier': 'Super Tier',
+                'damage_base': 'Base Damage',
+                'healing_base': 'Base Healing'
+            }
+            
+            display_df = df[display_columns].rename(columns=display_names)
+            
+            # Create selectable table
+            selected_indices = st.data_editor(
+                display_df,
+                hide_index=True,
+                column_config={
+                    "Super Tier": st.column_config.CheckboxColumn(
+                        "Super Tier",
+                        help="Whether this is a super tier spell",
+                        default=False,
+                    )
+                },
+                disabled=True,
+                key="spell_table"
+            )
+            
+            # Handle row selection
+            if st.session_state.spell_table:
+                selected_row = st.session_state.spell_table['edited_rows']
+                if selected_row:
+                    row_idx = list(selected_row.keys())[0]
+                    selected_spell = spells[row_idx]
+                    st.session_state.editing_spell = selected_spell
+                    st.session_state.active_tab = "editor"
+                    st.experimental_rerun()
         else:
             st.info("No spells found. Create one in the editor tab!")
     
     with editor_tab:
         spell_data = st.session_state.get('editing_spell', {})
         
-        with st.form("tab_spell_editor_form"):
+        with st.form("spell_editor_form_tab"):
             name = st.text_input("Spell Name", value=spell_data.get('name', ''))
             description = st.text_area("Description", value=spell_data.get('description', ''))
             
