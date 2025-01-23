@@ -17,7 +17,7 @@ def create_spell_type_schema():
         cursor = conn.cursor()
         
         cursor.execute("""
-        CREATE TABLE IF NOT EXISTS spell_types (
+        CREATE TABLE IF NOT EXISTS spell_type (
             id INTEGER PRIMARY KEY,
             name TEXT NOT NULL UNIQUE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -36,7 +36,7 @@ def create_spell_type_schema():
         ]
 
         cursor.executemany("""
-        INSERT OR IGNORE INTO spell_types (id, name) 
+        INSERT OR IGNORE INTO spell_type (id, name) 
         VALUES (?, ?)
         """, default_types)
         
@@ -47,7 +47,7 @@ def create_spell_type_schema():
         if 'spell_type_id' not in columns:
             cursor.execute("""
             ALTER TABLE spells 
-            ADD COLUMN spell_type_id INTEGER REFERENCES spell_types(id)
+            ADD COLUMN spell_type_id INTEGER REFERENCES spell_type(id)
             """)
 
         conn.commit()
