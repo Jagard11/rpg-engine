@@ -7,7 +7,8 @@ from pathlib import Path
 from CharacterManagement import (
     render_character_editor,
     render_job_editor, 
-    render_race_editor
+    render_race_editor,
+    render_spell_editor
 )
 from SpellManager import render_spell_editor_tab
 from ServerMessage import render_server_tab
@@ -30,10 +31,11 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs(["Character Editors", "Spell Editor", "Lo
 
 with tab1:
     # Create subtabs for different editors
-    char_tab, job_tab, race_tab = st.tabs([
+    char_tab, job_tab, race_tab, spell_tab = st.tabs([
         "Character Editor",
         "Job Editor", 
-        "Race Editor"
+        "Race Editor",
+        "Spell Editor"
     ])
     
     with char_tab:
@@ -44,6 +46,9 @@ with tab1:
         
     with race_tab:
         render_race_editor()
+        
+    with spell_tab:
+        render_spell_editor()
 
 with tab2:
     render_spell_editor_tab()
