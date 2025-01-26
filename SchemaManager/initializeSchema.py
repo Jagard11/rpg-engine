@@ -21,6 +21,8 @@ def initialize_schemas():
     """Initialize all database schemas in the correct order"""
     # Get current directory (DatabaseSetup)
     current_dir = os.path.dirname(os.path.abspath(__file__))
+    schemas_dir = os.path.join(current_dir, 'schemas')
+
     
     # Get list of all schema files in dependency order
     schema_files = [
@@ -28,19 +30,25 @@ def initialize_schemas():
         "TableCleanup.py",
         
         # Level 1: Foundation tables (no dependencies)
-        "createClassTypeSchema.py",         # Class Types are used in job and race records
-        "createClassCategorySchema.py",     # Class Categories are used in job, race, and spell records
-        "createClassSubcategorySchema.py",  # Class subcategories are used in job, race, and spell records
-        "createCharacterSchema.py",         # Characters must exist first
-        "createClassSchema.py",             # Classes are referenced by many tables
-        "createSpellSchema.py",             # Spells are referenced by class spell levels
+        "createClassTypesSchema.py",         # Class Types are used in job and race records
+        "createClassCategoriesSchema.py",     # Class Categories are used in job, race, and spell records
+        "createClassSubcategoriesSchema.py",  # Class subcategories are used in job, race, and spell records
+        "createCharactersSchema.py",         # Characters must exist first
+        "createClassesSchema.py",             # Classes are referenced by many tables
+        "createSpellsSchema.py",             # Spells are referenced by class spell levels
         
         # Level 2: Dependent tables
         "createCharacterStatsSchema.py",           # Depends on characters
-        "createPrerequisiteSchema.py",             # Depends on classes
-        "createClassExclusionSchema.py",           # Depends on classes
+        "createClassPrerequisitesSchema.py",             # Depends on classes
+        "createClassExclusionsSchema.py",           # Depends on classes
         "createCharacterClassProgressionSchema.py", # Depends on characters and classes
-        "createClassSpellSchema.py",               # Depends on characters, classes, and spells
+        "createClassSpellLevelsSchema.py",               # Depends on characters, classes, and spells
+    
+        # Misc
+        "createClassPrerequisitesSchema.py",
+        "createSpellTiersSchema.py",
+        "createSpellTypeSchema.py",
+
     ]
     
     logger.info(f"Starting schema initialization with {len(schema_files)} files...")
@@ -52,7 +60,7 @@ def initialize_schemas():
         
         try:
             # Get full path to schema file
-            file_path = os.path.join(current_dir, schema_file)
+            file_path = os.path.join(schemas_dir, schema_file)
             if not os.path.exists(file_path):
                 logger.error(f"Schema file not found: {file_path}")
                 continue
