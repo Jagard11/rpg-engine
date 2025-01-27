@@ -27,7 +27,7 @@ def initialize_schemas():
     # Get list of all schema files in dependency order
     schema_files = [
         # First clean existing tables
-        "TableCleanup.py",
+        "../TableCleanup.py",
         
         # Level 1: Foundation tables (no dependencies)
         "createClassTypesSchema.py",         # Class Types are used in job and race records
