@@ -17,6 +17,26 @@ def import_module_from_file(file_path):
     spec.loader.exec_module(module)
     return module
 
+def find_create_function(module, filename):
+    """Find the create function in the module using various naming patterns"""
+    # Common function names to check
+    candidates = [
+        'main',
+        'create_schema',
+        filename[6:-3].lower(),  # Strip 'create' and '.py'
+    ]
+    
+    # Add specific schema creation function name
+    base_name = filename[6:-9].lower()  # Remove 'create' and 'Schema.py'
+    candidates.append(f'create_{base_name}_schema')
+    
+    # Check each candidate
+    for func_name in candidates:
+        if hasattr(module, func_name):
+            return getattr(module, func_name)
+    
+    return None
+
 def initialize_schemas():
     """Initialize all database schemas in the correct order"""
     # Get current directory (DatabaseSetup)
@@ -69,21 +89,15 @@ def initialize_schemas():
             logger.info(f"Importing {schema_file}...")
             module = import_module_from_file(file_path)
             
-            # Look for create function in various formats
-            func_name = None
-            if hasattr(module, 'main'):
-                func_name = 'main'
-            elif hasattr(module, schema_file[6:-3].lower()):  # Strip 'create' and '.py'
-                func_name = schema_file[6:-3].lower()
+            create_func = find_create_function(module, schema_file)
             
-            if func_name:
-                logger.info(f"Running {func_name}() for {schema_file}...")
-                func = getattr(module, func_name)
-                func()
+            if create_func:
+                logger.info(f"Running {create_func.__name__}() for {schema_file}...")
+                create_func()
                 successful_count += 1
                 logger.info(f"Successfully completed {schema_file}")
             else:
-                logger.warning(f"Warning: No entry point found for {schema_file}")
+                logger.warning(f"Warning: No create function found for {schema_file}")
 
         except Exception as e:
             logger.error(f"Error in {schema_file}: {str(e)}")
