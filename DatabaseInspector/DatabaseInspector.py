@@ -8,11 +8,11 @@ import json
 from typing import List, Tuple, Dict, Optional
 
 def get_tables() -> List[str]:
-    """Get list of all tables in the database"""
+    """Get list of all tables in the database, sorted alphabetically"""
     conn = sqlite3.connect('rpg_data.db')
     cursor = conn.cursor()
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
-    tables = [row[0] for row in cursor.fetchall()]
+    tables = sorted([row[0] for row in cursor.fetchall()])
     conn.close()
     return tables
 
