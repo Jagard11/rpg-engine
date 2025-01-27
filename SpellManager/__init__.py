@@ -1,7 +1,7 @@
 # ./SpellManager/__init__.py
 
 """
-Spell Editor module for managing class spells.
+Create and modify spell records.
 """
 
 from .forms import render_spell_editor_tab
