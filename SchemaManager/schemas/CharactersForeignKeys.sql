@@ -1,0 +1,1 @@
+ALTER TABLE characters ADD CONSTRAINT fk_characters_race_category_id_class_categories FOREIGN KEY (race_category_id) REFERENCES class_categories(id) ON DELETE NO ACTION ON UPDATE NO ACTION;

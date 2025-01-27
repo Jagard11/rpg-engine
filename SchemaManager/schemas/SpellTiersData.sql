@@ -1,0 +1,12 @@
+INSERT INTO spell_tiers (id, tier_name, tier_number, description, min_level, max_slots) VALUES (1, 'Cantrip', 0, NULL, NULL, NULL);
+INSERT INTO spell_tiers (id, tier_name, tier_number, description, min_level, max_slots) VALUES (2, 'Tier 1', 1, NULL, NULL, NULL);
+INSERT INTO spell_tiers (id, tier_name, tier_number, description, min_level, max_slots) VALUES (3, 'Tier 2', 2, NULL, NULL, NULL);
+INSERT INTO spell_tiers (id, tier_name, tier_number, description, min_level, max_slots) VALUES (4, 'Tier 3', 3, NULL, NULL, NULL);
+INSERT INTO spell_tiers (id, tier_name, tier_number, description, min_level, max_slots) VALUES (5, 'Tier 4', 4, NULL, NULL, NULL);
+INSERT INTO spell_tiers (id, tier_name, tier_number, description, min_level, max_slots) VALUES (6, 'Tier 5', 5, NULL, NULL, NULL);
+INSERT INTO spell_tiers (id, tier_name, tier_number, description, min_level, max_slots) VALUES (7, 'Tier 6', 6, NULL, NULL, NULL);
+INSERT INTO spell_tiers (id, tier_name, tier_number, description, min_level, max_slots) VALUES (8, 'Tier 7', 7, NULL, NULL, NULL);
+INSERT INTO spell_tiers (id, tier_name, tier_number, description, min_level, max_slots) VALUES (9, 'Tier 8', 8, NULL, NULL, NULL);
+INSERT INTO spell_tiers (id, tier_name, tier_number, description, min_level, max_slots) VALUES (10, 'Tier 9', 9, NULL, NULL, NULL);
+INSERT INTO spell_tiers (id, tier_name, tier_number, description, min_level, max_slots) VALUES (11, 'Tier 10', 10, NULL, NULL, NULL);
+INSERT INTO spell_tiers (id, tier_name, tier_number, description, min_level, max_slots) VALUES (12, 'Super Tier', 11, NULL, NULL, NULL);

@@ -1,0 +1,2 @@
+ALTER TABLE character_class_progression ADD CONSTRAINT fk_character_class_progression_class_id_classes FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE NO ACTION ON UPDATE NO ACTION;
+ALTER TABLE character_class_progression ADD CONSTRAINT fk_character_class_progression_character_id_characters FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE ON UPDATE NO ACTION;

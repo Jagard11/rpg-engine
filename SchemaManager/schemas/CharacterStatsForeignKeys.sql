@@ -1,0 +1,1 @@
+ALTER TABLE character_stats ADD CONSTRAINT fk_character_stats_character_id_characters FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE NO ACTION ON UPDATE NO ACTION;
