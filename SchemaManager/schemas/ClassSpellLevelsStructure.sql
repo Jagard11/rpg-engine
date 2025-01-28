@@ -12,7 +12,4 @@ CREATE TABLE IF NOT EXISTS class_spell_levels (
     spell_selection_6 INTEGER,
     unlocked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-,
-    FOREIGN KEY (class_id) REFERENCES classes(id),
-    FOREIGN KEY (character_id) REFERENCES characters(id)
 );

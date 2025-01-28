@@ -20,6 +20,4 @@ CREATE TABLE IF NOT EXISTS character_stats (
     base_special INTEGER NOT NULL DEFAULT 0,
     current_special INTEGER NOT NULL DEFAULT 0,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-,
-    FOREIGN KEY (character_id) REFERENCES characters(id)
 );

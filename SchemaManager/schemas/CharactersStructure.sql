@@ -13,6 +13,4 @@ CREATE TABLE IF NOT EXISTS characters (
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-,
-    FOREIGN KEY (race_category_id) REFERENCES class_categories(id)
 );

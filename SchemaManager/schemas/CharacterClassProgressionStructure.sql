@@ -6,7 +6,4 @@ CREATE TABLE IF NOT EXISTS character_class_progression (
     current_experience INTEGER NOT NULL DEFAULT 0,
     unlocked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-,
-    FOREIGN KEY (class_id) REFERENCES classes(id),
-    FOREIGN KEY (character_id) REFERENCES characters(id)
 );

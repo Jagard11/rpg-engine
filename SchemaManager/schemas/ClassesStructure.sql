@@ -26,8 +26,4 @@ CREATE TABLE IF NOT EXISTS classes (
     special_per_level INTEGER NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-,
-    FOREIGN KEY (subcategory_id) REFERENCES class_subcategories(id),
-    FOREIGN KEY (category_id) REFERENCES class_categories(id),
-    FOREIGN KEY (class_type) REFERENCES class_types(id)
 );

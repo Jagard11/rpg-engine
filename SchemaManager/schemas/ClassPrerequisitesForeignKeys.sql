@@ -1,1 +1,2 @@
 ALTER TABLE class_prerequisites ADD CONSTRAINT fk_class_prerequisites_class_id_classes FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE NO ACTION ON UPDATE NO ACTION;
+ALTER TABLE class_prerequisites ADD CONSTRAINT fk_class_prerequisites_class_id_classes FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE NO ACTION ON UPDATE NO ACTION;

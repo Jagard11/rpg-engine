@@ -7,6 +7,4 @@ CREATE TABLE IF NOT EXISTS class_exclusions (
     max_value INTEGER,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-,
-    FOREIGN KEY (class_id) REFERENCES classes(id)
 );

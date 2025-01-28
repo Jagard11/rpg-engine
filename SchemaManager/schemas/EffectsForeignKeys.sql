@@ -1,0 +1,1 @@
+ALTER TABLE effects ADD CONSTRAINT fk_effects_effect_type_id_effect_types FOREIGN KEY (effect_type_id) REFERENCES effect_types(id) ON DELETE NO ACTION ON UPDATE NO ACTION;
