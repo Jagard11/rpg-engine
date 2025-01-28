@@ -1,7 +1,5 @@
 # ./SpellManager/spellEffectsManager.py
 
-import pandas as pd
-
 import streamlit as st
 from .spellEffects import (
     load_effect_types,
@@ -10,53 +8,45 @@ from .spellEffects import (
     load_spell_effects,
     save_spell_effects
 )
-from .database import load_spells
 
 def render_spell_effects_manager():
     """Main interface for managing spell effects"""
     st.header("Spell Effects Manager")
-
-    # Create tabs for different aspects of effect management
-    list_tab, editor_tab, assignment_tab = st.tabs([
-        "Effects List", 
-        "Effect Editor",
-        "Spell Assignment"
-    ])
-
+    
+    effects = load_effects()
+    
+    # Create tabs
+    list_tab, editor_tab = st.tabs(["Effects List", "Effect Editor"])
+    
     with list_tab:
-        effects = load_effects()
         if effects:
-            effect_df = pd.DataFrame(effects)
-            st.dataframe(
-                effect_df,
-                column_config={
-                    "id": "ID",
-                    "name": "Name",
-                    "type_name": "Type",
-                    "base_value": "Base Value",
-                    "duration": "Duration",
-                    "tick_type": "Timing"
-                },
-                hide_index=True
-            )
-        else:
-            st.info("No effects created yet. Use the editor to create some!")
-
+            for idx, effect in enumerate(effects):
+                with st.expander(f"{effect['name']} ({effect['type_name']})"):
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.write(f"Base Value: {effect['base_value']}")
+                        st.write(f"Scaling: {effect['value_scaling']}")
+                        st.write(f"Duration: {effect['duration']}")
+                        st.write(f"Tick Type: {effect['tick_type']}")
+                    with col2:
+                        if st.button("Edit", key=f"edit_effect_{idx}"):
+                            st.session_state.editing_effect = effect
+                            st.rerun()
+                        if st.button("Delete", key=f"delete_effect_{idx}"):
+                            if save_effect({**effect, 'deleted': True}):
+                                st.rerun()
+    
     with editor_tab:
-        # Effect editing interface
         effect_types = load_effect_types()
         
-        if st.button("Create New Effect"):
+        if st.button("Create New Effect", key="create_new_effect"):
             st.session_state.editing_effect = {}
         
         if st.session_state.get('editing_effect') is not None:
-            with st.form("spell_effects_editor_form"):
+            with st.form(key="spell_effects_manager_form"):
                 effect_data = st.session_state.editing_effect
                 
-                name = st.text_input(
-                    "Effect Name", 
-                    value=effect_data.get('name', '')
-                )
+                name = st.text_input("Effect Name", value=effect_data.get('name', ''))
                 
                 type_options = {t['id']: t['name'] for t in effect_types}
                 effect_type = st.selectbox(
@@ -75,8 +65,7 @@ def render_spell_effects_manager():
                     )
                     value_scaling = st.text_input(
                         "Value Scaling",
-                        value=effect_data.get('value_scaling', ''),
-                        help="Formula for scaling with level/stats"
+                        value=effect_data.get('value_scaling', '')
                     )
                 
                 with col2:
@@ -86,7 +75,7 @@ def render_spell_effects_manager():
                         value=effect_data.get('duration', 0)
                     )
                     tick_type = st.selectbox(
-                        "Effect Timing",
+                        "Tick Type",
                         options=['immediate', 'start_of_turn', 'end_of_turn'],
                         index=['immediate', 'start_of_turn', 'end_of_turn'].index(
                             effect_data.get('tick_type', 'immediate')
@@ -98,8 +87,7 @@ def render_spell_effects_manager():
                     value=effect_data.get('description', '')
                 )
                 
-                submitted = st.form_submit_button("Save Effect")
-                if submitted:
+                if st.form_submit_button("Save Effect"):
                     effect = {
                         'id': effect_data.get('id'),
                         'name': name,
@@ -112,87 +100,6 @@ def render_spell_effects_manager():
                     }
                     
                     if save_effect(effect):
-                        st.success("Effect saved successfully!")
+                        st.success("Effect saved!")
                         st.session_state.editing_effect = None
                         st.rerun()
-
-    with assignment_tab:
-        # Spell-effect assignment interface
-        spells = load_spells()
-        if not spells:
-            st.info("No spells found. Create some spells first!")
-            return
-            
-        spell_options = {str(s['id']): f"{s['name']} (Tier {s['tier_name']})" 
-                        for s in spells}
-        
-        selected_spell = st.selectbox(
-            "Select Spell",
-            options=list(spell_options.keys()),
-            format_func=lambda x: spell_options[x]
-        )
-        
-        if selected_spell:
-            spell_id = int(selected_spell)
-            current_effects = load_spell_effects(spell_id)
-            
-            st.subheader("Current Effects")
-            for idx, effect in enumerate(current_effects):
-                with st.expander(f"{effect['name']} ({effect['type_name']})"):
-                    st.write(f"Base Value: {effect['base_value']}")
-                    st.write(f"Scaling: {effect['value_scaling']}")
-                    st.write(f"Duration: {effect['duration']} turns")
-                    st.write(f"Timing: {effect['tick_type']}")
-                    probability = st.slider(
-                        "Probability",
-                        min_value=0.0,
-                        max_value=1.0,
-                        value=effect.get('probability', 1.0),
-                        step=0.1,
-                        key=f"prob_{idx}"
-                    )
-                    effect['probability'] = probability
-                    
-                    if st.button(f"Remove Effect {idx}"):
-                        current_effects.pop(idx)
-                        save_spell_effects(spell_id, current_effects)
-                        st.rerun()
-            
-            st.subheader("Add Effect")
-            available_effects = load_effects()
-            
-            # Filter out effects already added to this spell
-            current_effect_ids = {e['id'] for e in current_effects}
-            available_effects = [e for e in available_effects 
-                               if e['id'] not in current_effect_ids]
-            
-            if available_effects:
-                effect_options = {str(e['id']): f"{e['name']} ({e['type_name']})" 
-                                for e in available_effects}
-                
-                selected_effect = st.selectbox(
-                    "Select Effect to Add",
-                    options=list(effect_options.keys()),
-                    format_func=lambda x: effect_options[x]
-                )
-                
-                if selected_effect:
-                    effect = next(e for e in available_effects 
-                                if str(e['id']) == selected_effect)
-                    probability = st.slider(
-                        "Effect Probability",
-                        min_value=0.0,
-                        max_value=1.0,
-                        value=1.0,
-                        step=0.1
-                    )
-                    
-                    if st.button("Add Effect"):
-                        current_effects.append({
-                            **effect,
-                            'probability': probability
-                        })
-                        save_spell_effects(spell_id, current_effects)
-                        st.rerun()
-            else:
-                st.info("All available effects have been added to this spell.")
