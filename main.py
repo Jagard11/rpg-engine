@@ -10,7 +10,7 @@ from CharacterManagement import (
     render_race_editor,
     render_spell_editor
 )
-from SpellManager import render_spell_editor_tab
+from SpellManager import render_spell_manager
 from ServerMessage import render_server_tab
 from LocationManager import render_location_editor_tab
 from DatabaseInspector import render_db_inspector_tab
@@ -51,7 +51,7 @@ with tab1:
         render_spell_editor()
 
 with tab2:
-    render_spell_editor_tab()
+    render_spell_manager()
 
 with tab3:
     render_location_editor_tab()
