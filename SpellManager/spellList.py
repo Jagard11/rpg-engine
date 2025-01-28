@@ -2,11 +2,20 @@
 
 import streamlit as st
 import pandas as pd
-from .database import load_spells, delete_spell
+from .database import load_spells, delete_spell, load_spells_with_query
 
 def render_spell_list():
     """Interface for viewing and managing the spell list"""
-    spells = load_spells()
+    
+    # Check if query should be executed
+    if st.session_state.get('execute_query'):
+        try:
+            spells = load_spells_with_query(st.session_state.spell_query)
+        except Exception as e:
+            st.error(f"Error executing query: {str(e)}")
+            spells = load_spells()  # Fallback to default loading
+    else:
+        spells = load_spells()
     
     if spells:
         col1, col2, col3 = st.columns(3)
@@ -44,7 +53,8 @@ def render_spell_list():
         
         df = pd.DataFrame(spells)
         
-        display_columns = ['id', 'name', 'tier_name', 'mp_cost', 'damage_base', 'healing_base']
+        # Dynamically get display columns from the query results
+        display_columns = df.columns.tolist()
         display_names = {
             'id': 'ID',
             'name': 'Name',
@@ -54,7 +64,8 @@ def render_spell_list():
             'healing_base': 'Base Healing',
         }
         
-        display_df = df[display_columns].rename(columns=display_names)
+        # Only rename columns that have a display name mapping
+        display_df = df.rename(columns={col: display_names.get(col, col) for col in display_columns})
         
         edited_df = st.data_editor(
             display_df,
