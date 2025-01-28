@@ -1,10 +1,10 @@
 # ./SpellManager/spellManager.py
 
-from typing import Dict, List
 import streamlit as st
 from .database import load_spells
 from .spellList import render_spell_list
 from .spellEditor import render_spell_editor
+from .spellEffectsManager import render_spell_effects_manager
 
 def render_spell_manager():
     """Main wrapper for the spell management interface"""
@@ -31,37 +31,13 @@ def render_spell_manager():
         st.session_state.spell_manager_tab = "Spell List"
     
     # Create subtabs
-    list_tab, editor_tab = st.tabs(["Spell List", "Spell Editor"])
+    list_tab, editor_tab, effects_tab = st.tabs(["Spell List", "Spell Editor", "Effects Manager"])
     
     with list_tab:
-        # Add SQL query input field
-        default_query = """
-            SELECT id, name, tier_name, mp_cost, damage_base, healing_base 
-            FROM spells 
-            JOIN spell_tiers ON spells.spell_tier = spell_tiers.id
-            ORDER BY spell_tier, name
-        """
-        
-        with st.expander("SQL Query", expanded=True):
-            st.markdown("#### Custom SQL Query")
-            st.markdown("Enter a custom SQL query to filter spells. Query must include `id` and `name` fields.")
-            query = st.text_area(
-                "Query",
-                value=default_query,
-                height=150,
-                key="spell_query"
-            )
-            
-            # Add execute button
-            col1, col2 = st.columns([1, 5])
-            with col1:
-                st.session_state.execute_query = st.button("Execute Query")
-        
-        # Add horizontal line for visual separation
-        st.markdown("---")
-        
-        # Render the spell list with the query
         render_spell_list()
     
     with editor_tab:
         render_spell_editor()
+        
+    with effects_tab:
+        render_spell_effects_manager()

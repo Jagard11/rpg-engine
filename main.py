@@ -11,23 +11,33 @@ from CharacterManagement import (
     render_spell_editor
 )
 from SpellManager import render_spell_manager
+from SpellManager.spellEffects import init_effects_tables
 from ServerMessage import render_server_tab
 from LocationManager import render_location_editor_tab
 from DatabaseInspector import render_db_inspector_tab
 
 def init_database():
-    """Initialize database connection"""
+    """Initialize database connection and required tables"""
     db_path = Path('rpg_data.db')
     if not db_path.exists():
         st.error("Database not found. Please run SchemaManager/initializeSchema.py first.")
         raise FileNotFoundError("Database not found")
+    
+    # Initialize effects tables
+    init_effects_tables()
 
 # Initialize application
 st.set_page_config(page_title="RPG Character Management", layout="wide")
 init_database()
 
 # Create tabs
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["Character Editors", "Spell Editor", "Location Editor", "Database Editor", "Server Message"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    "Character Editors", 
+    "Spell Editor", 
+    "Location Editor", 
+    "Database Editor", 
+    "Server Message"
+])
 
 with tab1:
     # Create subtabs for different editors
