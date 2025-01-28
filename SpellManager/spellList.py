@@ -18,8 +18,7 @@ def render_spell_list():
                 
         with col2:
             if st.button("Copy Selected Spell"):
-                selected_rows = [i for i, row in st.session_state.spell_table.get('edited_rows', {}).items() 
-                               if row.get('Select', False)]
+                selected_rows = list(st.session_state.spell_table.get('edited_rows', {}).keys())
                 if selected_rows:
                     spell_to_copy = spells[selected_rows[0]]
                     copied_spell = spell_to_copy.copy()
@@ -44,11 +43,9 @@ def render_spell_list():
                     st.warning("Please select a spell to delete")
         
         df = pd.DataFrame(spells)
-        df['Select'] = False
         
-        display_columns = ['Select', 'id', 'name', 'tier_name', 'mp_cost', 'damage_base', 'healing_base']
+        display_columns = ['id', 'name', 'tier_name', 'mp_cost', 'damage_base', 'healing_base']
         display_names = {
-            'Select': 'Select',
             'id': 'ID',
             'name': 'Name',
             'tier_name': 'Tier',
@@ -62,14 +59,7 @@ def render_spell_list():
         edited_df = st.data_editor(
             display_df,
             hide_index=True,
-            column_config={
-                "Select": st.column_config.CheckboxColumn(
-                    "Select",
-                    help="Select spell to edit",
-                    required=True
-                )
-            },
-            disabled=["ID", "Name", "Tier", "MP Cost", "Base Damage", "Base Healing"],
+            disabled=display_columns,
             key="spell_table"
         )
         
