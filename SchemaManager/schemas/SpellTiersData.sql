@@ -1,3 +1,5 @@
+-- ./SchemaManager/schemas/SpellTiersData.sql
+
 INSERT INTO spell_tiers (id, tier_name, tier_number, description, min_level, max_slots) VALUES (1, 'Cantrip', 0, 'Basic magical effects requiring minimal power', 0, 17);
 INSERT INTO spell_tiers (id, tier_name, tier_number, description, min_level, max_slots) VALUES (2, 'Tier 1', 1, 'Foundational spells accessible to novice spellcasters', 7, 15);
 INSERT INTO spell_tiers (id, tier_name, tier_number, description, min_level, max_slots) VALUES (3, 'Tier 2', 2, 'Intermediate spells with increased complexity and power', 14, 14);

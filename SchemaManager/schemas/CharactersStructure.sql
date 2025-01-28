@@ -1,4 +1,6 @@
-CREATE TABLE IF NOT EXISTS characters (
+-- ./SchemaManager/schemas/CharactersStructure.sql
+
+CREATE TABLE characters (
     id INTEGER PRIMARY KEY,
     first_name TEXT NOT NULL,
     middle_name TEXT,
@@ -13,4 +15,7 @@ CREATE TABLE IF NOT EXISTS characters (
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+,
+    FOREIGN KEY (race_category_id) REFERENCES class_categories(id) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (race_category_id) REFERENCES class_categories(id) ON DELETE NO ACTION ON UPDATE NO ACTION
 );

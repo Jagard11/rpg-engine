@@ -1,4 +1,6 @@
-CREATE TABLE IF NOT EXISTS class_spell_levels (
+-- ./SchemaManager/schemas/ClassSpellLevelsStructure.sql
+
+CREATE TABLE class_spell_levels (
     id INTEGER PRIMARY KEY,
     character_id INTEGER NOT NULL,
     class_id INTEGER NOT NULL,
@@ -12,4 +14,9 @@ CREATE TABLE IF NOT EXISTS class_spell_levels (
     spell_selection_6 INTEGER,
     unlocked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+,
+    FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE NO ACTION ON UPDATE NO ACTION
 );

@@ -1,4 +1,6 @@
-CREATE TABLE IF NOT EXISTS class_categories (
+-- ./SchemaManager/schemas/ClassCategoriesStructure.sql
+
+CREATE TABLE class_categories (
     id INTEGER PRIMARY KEY,
     name TEXT NOT NULL,
     is_racial BOOLEAN NOT NULL DEFAULT FALSE,

@@ -1,6 +1,38 @@
-ALTER TABLE classes ADD CONSTRAINT fk_classes_class_type_class_types FOREIGN KEY (class_type) REFERENCES class_types(id) ON DELETE NO ACTION ON UPDATE NO ACTION;
-ALTER TABLE classes ADD CONSTRAINT fk_classes_category_id_class_categories FOREIGN KEY (category_id) REFERENCES class_categories(id) ON DELETE NO ACTION ON UPDATE NO ACTION;
-ALTER TABLE classes ADD CONSTRAINT fk_classes_subcategory_id_class_subcategories FOREIGN KEY (subcategory_id) REFERENCES class_subcategories(id) ON DELETE NO ACTION ON UPDATE NO ACTION;
-ALTER TABLE classes ADD CONSTRAINT fk_classes_class_type_class_types FOREIGN KEY (class_type) REFERENCES class_types(id) ON DELETE NO ACTION ON UPDATE NO ACTION;
-ALTER TABLE classes ADD CONSTRAINT fk_classes_category_id_class_categories FOREIGN KEY (category_id) REFERENCES class_categories(id) ON DELETE NO ACTION ON UPDATE NO ACTION;
-ALTER TABLE classes ADD CONSTRAINT fk_classes_subcategory_id_class_subcategories FOREIGN KEY (subcategory_id) REFERENCES class_subcategories(id) ON DELETE NO ACTION ON UPDATE NO ACTION;
+-- ./SchemaManager/schemas/ClassesForeignKeys.sql
+
+CREATE TABLE classes (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT,
+    class_type INTEGER NOT NULL,
+    is_racial BOOLEAN DEFAULT FALSE,
+    category_id INTEGER NOT NULL,
+    subcategory_id INTEGER NOT NULL,
+    base_hp INTEGER NOT NULL DEFAULT 0,
+    base_mp INTEGER NOT NULL DEFAULT 0,
+    base_physical_attack INTEGER NOT NULL DEFAULT 0,
+    base_physical_defense INTEGER NOT NULL DEFAULT 0,
+    base_agility INTEGER NOT NULL DEFAULT 0,
+    base_magical_attack INTEGER NOT NULL DEFAULT 0,
+    base_magical_defense INTEGER NOT NULL DEFAULT 0,
+    base_resistance INTEGER NOT NULL DEFAULT 0,
+    base_special INTEGER NOT NULL DEFAULT 0,
+    hp_per_level INTEGER NOT NULL DEFAULT 0,
+    mp_per_level INTEGER NOT NULL DEFAULT 0,
+    physical_attack_per_level INTEGER NOT NULL DEFAULT 0,
+    physical_defense_per_level INTEGER NOT NULL DEFAULT 0,
+    agility_per_level INTEGER NOT NULL DEFAULT 0,
+    magical_attack_per_level INTEGER NOT NULL DEFAULT 0,
+    magical_defense_per_level INTEGER NOT NULL DEFAULT 0,
+    resistance_per_level INTEGER NOT NULL DEFAULT 0,
+    special_per_level INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+,
+    FOREIGN KEY (class_type) REFERENCES class_types(id) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (category_id) REFERENCES class_categories(id) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (subcategory_id) REFERENCES class_subcategories(id) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (class_type) REFERENCES class_types(id) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (category_id) REFERENCES class_categories(id) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (subcategory_id) REFERENCES class_subcategories(id) ON DELETE NO ACTION ON UPDATE NO ACTION
+);

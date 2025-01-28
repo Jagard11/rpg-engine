@@ -1,4 +1,6 @@
-CREATE TABLE IF NOT EXISTS spells (
+-- ./SchemaManager/schemas/SpellsStructure.sql
+
+CREATE TABLE spells (
     id INTEGER PRIMARY KEY,
     name TEXT NOT NULL,
     description TEXT,
