@@ -1,24 +1,44 @@
 # ./SpellManager/spellEditor.py
 
 import streamlit as st
-from .database import load_spell_tiers, load_spell_type, save_spell
+import json
+from .database import load_spell_tiers, load_spell_type, save_spell, load_spells_with_query
 
 def render_spell_editor():
     """Interface for editing individual spells"""
     spell_data = st.session_state.get('editing_spell', {})
     
     with st.form("spell_editor_component_form"):
-        name = st.text_input("Spell Name", value=spell_data.get('name', ''))
+        # Create columns for ID and name
+        col_id, col_name = st.columns([1, 4])
         
-        spell_type = load_spell_type()
-        spell_type_options = {st['id']: st['name'] for st in spell_type}
-        spell_type_id = st.selectbox(
-            "Spell Type",
-            options=list(spell_type_options.keys()),
-            format_func=lambda x: spell_type_options[x],
-            index=0 if not spell_data.get('spell_type_id') else 
-                  list(spell_type_options.keys()).index(spell_data['spell_type_id'])
-        )
+        with col_id:
+            # Display current record or "0" if creating new
+            if spell_data.get('id'):
+                query = """
+                    SELECT 
+                        s.*,
+                        st.tier_name
+                    FROM spells s
+                    LEFT JOIN spell_tiers st ON s.spell_tier = st.id
+                    WHERE s.id = {}
+                """.format(spell_data['id'])
+                current_record = load_spells_with_query(query)
+                if current_record:
+                    formatted_record = str(current_record[0]["id"])
+                else:
+                    formatted_record = "Error"
+            else:
+                formatted_record = "0"
+                
+            st.text_input(
+                "Record ID",
+                value=formatted_record,
+                disabled=True
+            )
+            
+        with col_name:
+            name = st.text_input("Spell Name", value=spell_data.get('name', ''))
         
         spell_tiers = load_spell_tiers()
         tier_options = {tier['id']: f"{tier['name']} - {tier['description']}" for tier in spell_tiers}
@@ -67,7 +87,6 @@ def render_spell_editor():
             spell_data = {
                 'id': spell_data.get('id'),
                 'name': name,
-                'spell_type_id': spell_type_id,
                 'description': description,
                 'spell_tier': spell_tier,
                 'mp_cost': mp_cost,
