@@ -11,6 +11,7 @@ from CharacterManagement import (
     render_spell_editor
 )
 from SpellManager import render_spell_manager
+from ClassManager import render_class_manager
 from SpellManager.spellEffects import init_effects_tables
 from ServerMessage import render_server_tab
 from LocationManager import render_location_editor_tab
@@ -31,9 +32,10 @@ st.set_page_config(page_title="RPG Character Management", layout="wide")
 init_database()
 
 # Create tabs
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
     "Character Editors", 
-    "Spell Editor", 
+    "Spell Editor",
+    "Class Editor",
     "Location Editor", 
     "Database Editor", 
     "Server Message"
@@ -64,10 +66,26 @@ with tab2:
     render_spell_manager()
 
 with tab3:
-    render_location_editor_tab()
+    class_list_tab, class_editor_tab, class_spell_tab = st.tabs([
+        "Class List",
+        "Class Editor",
+        "Class Spell List"
+    ])
+    
+    with class_list_tab:
+        render_class_manager("list")
+        
+    with class_editor_tab:
+        render_class_manager("editor")
+        
+    with class_spell_tab:
+        render_class_manager("spells")
 
 with tab4:
+    render_location_editor_tab()
+
+with tab5:
     render_db_inspector_tab()
     
-with tab5:
+with tab6:
     render_server_tab()
