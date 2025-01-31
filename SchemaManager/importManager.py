@@ -20,6 +20,8 @@ class SchemaManager:
         
         self.conn = None
         self.cursor = None
+        # Track schema creation attempts
+        self.schema_creation_attempts = {}
         self.setup_logging()
 
     def setup_logging(self):
@@ -165,15 +167,17 @@ class SchemaManager:
             self.logger.error(f"Error checking table existence: {e}")
             return False
 
-    def create_table(self, create_stmt: str) -> bool:
+    def create_table(self, create_stmt: str, filename: str) -> bool:
         """Execute CREATE TABLE statement."""
         try:
             self.cursor.execute(create_stmt)
             self.conn.commit()
+            self.schema_creation_attempts[filename] = True
             return True
         except sqlite3.Error as e:
             self.logger.error(f"Error creating table: {e}")
             self.conn.rollback()
+            self.schema_creation_attempts[filename] = False
             return False
 
     def parse_sql_file(self, file_path: str) -> List[Dict]:
@@ -192,12 +196,13 @@ class SchemaManager:
             if table_name:
                 self.logger.info(f"Creating table: {table_name}")
                 if not self.table_exists(table_name):
-                    if self.create_table(create_stmt):
+                    if self.create_table(create_stmt, os.path.basename(file_path)):
                         self.logger.info(f"Successfully created table: {table_name}")
                     else:
                         self.logger.error(f"Failed to create table: {table_name}")
                 else:
                     self.logger.info(f"Table {table_name} already exists")
+                    self.schema_creation_attempts[os.path.basename(file_path)] = False
 
         # First clean up the content
         content = re.sub(r'/\*.*?\*/', '', content, flags=re.DOTALL)  # Remove /* */ comments
@@ -331,10 +336,15 @@ class SchemaManager:
             
             # Log final statistics
             self.logger.info("\nImport process completed")
-            self.logger.info(f"Total records processed: {total_processed}")
-            self.logger.info(f"Successfully inserted: {total_success}")
-            self.logger.info(f"Duplicates skipped: {total_duplicates}")
-            self.logger.info(f"Errors encountered: {total_errors}")
+            self.logger.info("Schema Operations:")
+            self.logger.info(f"  Schema files processed: {len(sql_files)}")
+            self.logger.info(f"  Tables created: {sum(1 for f in self.schema_creation_attempts if self.schema_creation_attempts[f])}")
+            self.logger.info(f"  Tables already existed: {sum(1 for f in self.schema_creation_attempts if not self.schema_creation_attempts[f])}")
+            self.logger.info("\nData Import Operations:")
+            self.logger.info(f"  Total records processed: {total_processed}")
+            self.logger.info(f"  Successfully inserted: {total_success}")
+            self.logger.info(f"  Duplicates skipped: {total_duplicates}")
+            self.logger.info(f"  Errors encountered: {total_errors}")
                         
         except Exception as e:
             self.logger.error(f"Import failed with error: {str(e)}")
