@@ -35,14 +35,22 @@ class SchemaManager:
         self.logger = logging.getLogger(__name__)
 
     def verify_database_path(self):
-        """Verify the database file exists"""
+        """Verify the database file exists or create it if it doesn't"""
         if not os.path.exists(self.db_path):
-            self.logger.error(f"Database file not found: {self.db_path}")
-            self.logger.info(f"Current working directory: {os.getcwd()}")
-            self.logger.info(f"Looking for database in: {os.path.abspath(self.db_path)}")
-            raise FileNotFoundError(f"Database file not found: {self.db_path}")
+            self.logger.warning(f"Database file not found: {self.db_path}")
+            self.logger.info("Creating new database file")
+            try:
+                # Create the directory if it doesn't exist
+                os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+                # Create an empty database file
+                conn = sqlite3.connect(self.db_path)
+                conn.close()
+                self.logger.info(f"Created new database at: {self.db_path}")
+            except Exception as e:
+                self.logger.error(f"Failed to create database: {e}")
+                raise
         else:
-            self.logger.info(f"Found database at: {self.db_path}")
+            self.logger.info(f"Found existing database at: {self.db_path}")
 
     def connect_db(self):
         """Connect to the database and verify connection"""
@@ -125,6 +133,49 @@ class SchemaManager:
             return None
         return value
 
+    def extract_create_table_statement(self, content: str) -> Optional[str]:
+        """Extract CREATE TABLE statement from SQL content."""
+        # Remove comments and normalize whitespace
+        content = re.sub(r'/\*.*?\*/', '', content, flags=re.DOTALL)  # Remove /* */ comments
+        content = re.sub(r'--.*$', '', content, flags=re.MULTILINE)   # Remove -- comments
+        content = content.strip()
+
+        # Look for CREATE TABLE statement
+        create_match = re.search(r'CREATE\s+TABLE\s+.*?;', content, re.DOTALL | re.IGNORECASE)
+        if create_match:
+            return create_match.group(0)
+        return None
+
+    def get_table_name_from_create(self, create_stmt: str) -> Optional[str]:
+        """Extract table name from CREATE TABLE statement."""
+        match = re.search(r'CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([^\s(]+)', create_stmt, re.IGNORECASE)
+        if match:
+            return match.group(1)
+        return None
+
+    def table_exists(self, table_name: str) -> bool:
+        """Check if a table already exists in the database."""
+        try:
+            self.cursor.execute("""
+                SELECT name FROM sqlite_master 
+                WHERE type='table' AND name=?
+            """, (table_name,))
+            return self.cursor.fetchone() is not None
+        except sqlite3.Error as e:
+            self.logger.error(f"Error checking table existence: {e}")
+            return False
+
+    def create_table(self, create_stmt: str) -> bool:
+        """Execute CREATE TABLE statement."""
+        try:
+            self.cursor.execute(create_stmt)
+            self.conn.commit()
+            return True
+        except sqlite3.Error as e:
+            self.logger.error(f"Error creating table: {e}")
+            self.conn.rollback()
+            return False
+
     def parse_sql_file(self, file_path: str) -> List[Dict]:
         """Parse SQL INSERT statements into structured data."""
         self.logger.info(f"Beginning to parse SQL file: {file_path}")
@@ -133,15 +184,30 @@ class SchemaManager:
             content = f.read()
             self.logger.info(f"File read successfully, content length: {len(content)} characters")
 
+        # Check for CREATE TABLE statement first
+        create_stmt = self.extract_create_table_statement(content)
+        if create_stmt:
+            self.logger.info("Found CREATE TABLE statement")
+            table_name = self.get_table_name_from_create(create_stmt)
+            if table_name:
+                self.logger.info(f"Creating table: {table_name}")
+                if not self.table_exists(table_name):
+                    if self.create_table(create_stmt):
+                        self.logger.info(f"Successfully created table: {table_name}")
+                    else:
+                        self.logger.error(f"Failed to create table: {table_name}")
+                else:
+                    self.logger.info(f"Table {table_name} already exists")
+
         # First clean up the content
         content = re.sub(r'/\*.*?\*/', '', content, flags=re.DOTALL)  # Remove /* */ comments
         content = re.sub(r'--.*$', '', content, flags=re.MULTILINE)   # Remove -- comments
         content = re.sub(r'\s+', ' ', content)                        # Normalize whitespace
         
-        # Extract table name and columns
+        # Extract INSERT statements
         insert_match = re.search(r'INSERT\s+INTO\s+(\w+)\s*\(([\s\S]*?)\)\s*VALUES?\s*', content, re.IGNORECASE)
         if not insert_match:
-            self.logger.error(f"No valid INSERT statement found in {file_path}")
+            self.logger.info(f"No INSERT statements found in {file_path}")
             return []
 
         table_name = insert_match.group(1)
@@ -154,7 +220,7 @@ class SchemaManager:
         # Find the VALUES section
         values_match = re.search(r'VALUES?\s*([\s\S]*);', content, re.IGNORECASE)
         if not values_match:
-            self.logger.error("No VALUES clause found")
+            self.logger.info("No VALUES clause found")
             return []
             
         values_section = values_match.group(1)
@@ -209,30 +275,34 @@ class SchemaManager:
                 self.logger.info(f"\nProcessing file: {filename}")
                 
                 records = self.parse_sql_file(file_path)
+                if not records:
+                    self.logger.info(f"No INSERT records found in {filename} (may contain only CREATE TABLE)")
+                    continue
+                    
                 self.logger.info(f"Found {len(records)} records to import from {filename}")
                 
                 for record in records:
                     total_processed += 1
                     table = record['table']
                     
-                    # Get name value from record
+                    # Get name value from record if it exists
                     try:
                         name_index = record['columns'].index('name')
                         name_value = record['values'][name_index]
+                        
+                        # Check for duplicates only if there's a name field
+                        if self.check_duplicate(table, name_value):
+                            self.logger.info(
+                                f"Skipping duplicate record:\n"
+                                f"Table: {table}\n"
+                                f"Name: {name_value}"
+                            )
+                            total_duplicates += 1
+                            continue
                     except ValueError:
-                        self.logger.error("No 'name' column found in record")
-                        total_errors += 1
-                        continue
-                    
-                    # Check for duplicates
-                    if self.check_duplicate(table, name_value):
-                        self.logger.info(
-                            f"Skipping duplicate record:\n"
-                            f"Table: {table}\n"
-                            f"Name: {name_value}"
-                        )
-                        total_duplicates += 1
-                        continue
+                        # No name column, proceed without duplicate check
+                        self.logger.info("No 'name' column found in record, skipping duplicate check")
+                        pass
                     
                     # Insert new record
                     placeholders = ','.join(['?' for _ in record['values']])
