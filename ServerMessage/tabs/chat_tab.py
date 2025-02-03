@@ -232,4 +232,4 @@ def _handle_successful_response(response: requests.Response, server_message: str
         json.dump(st.session_state.chat_history, f)
     
     st.success("Message sent successfully")
-    st.experimental_rerun()
+    st.rerun()
