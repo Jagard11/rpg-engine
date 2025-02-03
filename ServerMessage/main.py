@@ -77,32 +77,26 @@ with chat_tab:
     # When the user clicks "Send Message", send an API call.
     if st.button("Send Message", key="send_msg_btn"):
         with st.spinner("Sending message to server..."):
-            # Create a properly formatted messages array
-            messages = []
+            # Construct the prompt by combining instructions and message
+            full_prompt = ""
             if instructions:
-                messages.append({
-                    "role": "system",
-                    "content": instructions
-                })
-            
-            messages.append({
-                "role": "user",
-                "content": server_message
-            })
+                full_prompt = f"Instructions: {instructions}\n\n"
+            full_prompt += server_message
 
-            # Add chat history
-            for msg in st.session_state.chat_history:
-                if msg["is_user"]:
-                    messages.append({"role": "user", "content": msg["content"]})
-                else:
-                    messages.append({"role": "assistant", "content": msg["content"]})
+            # Add previous context from chat history
+            if st.session_state.chat_history:
+                context = "\nPrevious conversation:\n"
+                for msg in st.session_state.chat_history:
+                    prefix = "User:" if msg["is_user"] else "Assistant:"
+                    context += f"{prefix} {msg['content']}\n"
+                full_prompt = context + "\nCurrent message:\n" + full_prompt
 
             # Construct the payload
             payload = {
-                "messages": messages,
+                "prompt": full_prompt,
                 "max_tokens": max_tokens,
                 "temperature": temperature,
-                "stream": False  # Explicitly set stream to False
+                "stream": False
             }
             
             # Debug information
@@ -117,9 +111,9 @@ with chat_tab:
                 
                 # Make the request
                 response = requests.post(
-                    f"{base_url}/completions",  # Using completions instead of chat/completions
+                    f"{base_url}/completions",
                     headers=headers,
-                    data=json.dumps(payload, ensure_ascii=False),  # Manually serialize JSON
+                    json=payload,  # Let requests handle serialization
                     verify=False  # Only if needed for local development
                 )
                 
