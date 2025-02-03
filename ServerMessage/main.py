@@ -9,7 +9,7 @@ import time
 
 # Determine the directory of this script (./ServerMessage)
 script_dir = os.path.dirname(os.path.abspath(__file__))
-# Assume the repository root is one level up
+# Assume the repository root is one level up from the script directory.
 repo_root = os.path.abspath(os.path.join(script_dir, ".."))
 
 st.title("Oobabooga API Client (ServerMessage)")
@@ -51,7 +51,7 @@ if st.button("Update and Restart"):
         # Run "git pull" in the repository root directory.
         git_proc = subprocess.run(
             ["git", "pull"],
-            cwd=repo_root,  # Change directory to the repository root
+            cwd=repo_root,  # change directory to repository root
             capture_output=True,
             text=True
         )
@@ -63,7 +63,12 @@ if st.button("Update and Restart"):
     
     st.info("Restarting Streamlit app to pick up changes...")
     time.sleep(1)
-    # Reset working directory to the script's directory (./ServerMessage)
+    # Change the working directory to the script's directory (./ServerMessage)
     os.chdir(script_dir)
-    # Restart the current process (reloading the updated code)
-    os.execv(sys.executable, [sys.executable] + sys.argv)
+    # Explicitly define the absolute path to the script.
+    new_script = os.path.join(script_dir, "main.py")
+    # Restart using "python -m streamlit run ..." so that Streamlit sets up its context.
+    os.execv(
+        sys.executable,
+        [sys.executable, "-m", "streamlit", "run", new_script] + sys.argv[1:]
+    )
