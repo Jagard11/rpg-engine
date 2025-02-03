@@ -7,6 +7,7 @@ import sys
 import os
 import time
 from typing import List, Dict
+import json
 
 # Initialize session state for chat history if it doesn't exist
 if 'chat_history' not in st.session_state:
@@ -93,64 +94,92 @@ with chat_tab:
 
     # When the user clicks "Send Message", send an API call.
     if st.button("Send Message", key="send_msg_btn"):
-        # Prepare the messages array
-        messages = []
-        
-        # Add system instruction if provided
-        if instructions:
+        with st.spinner("Sending message to server..."):
+            # Convert chat history to proper format
+            formatted_history = []
+            for msg in st.session_state.chat_history:
+                formatted_history.append({
+                    "role": "user" if msg["is_user"] else "assistant",
+                    "content": msg["content"]
+                })
+
+            # Construct the messages list
+            messages = []
+            if instructions:
+                messages.append({
+                    "role": "system",
+                    "content": instructions
+                })
+            
+            # Add chat history (ensuring we maintain conversation flow)
+            messages.extend(formatted_history)
+            
+            # Add the current message
             messages.append({
-                "role": "system",
-                "content": instructions
-            })
-        
-        # Add the current message
-        messages.append({
-            "role": "user",
-            "content": server_message
-        })
-        
-        # Add chat history
-        for msg in st.session_state.chat_history:
-            messages.append({
-                "role": "user" if msg["is_user"] else "assistant",
-                "content": msg["content"]
+                "role": "user",
+                "content": server_message
             })
 
-        # Construct the payload
-        payload = {
-            "messages": messages,
-            "mode": mode,
-            "instruction_template": instruction_template,
-            "max_tokens": max_tokens,
-            "temperature": temperature,
-        }
-        
-        if termination:
-            payload["stop"] = [termination]
-        
-        try:
-            # Use the chat completions endpoint
-            response = requests.post(f"{base_url}/chat/completions", json=payload)
-            if response.status_code == 200:
-                response_data = response.json()
+            # Construct the payload
+            payload = {
+                "messages": messages,
+                "mode": mode,
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+                "instruction_template": instruction_template if mode == "instruct" else None
+            }
+            
+            if termination:
+                payload["stop"] = [termination]
+            
+            # Debug information
+            st.write("Debug: Sending the following payload:")
+            st.json(payload)
+            
+            try:
+                # Set headers explicitly
+                headers = {
+                    "Content-Type": "application/json",
+                }
                 
-                # Extract the response content
-                assistant_message = response_data['choices'][0]['message']['content']
+                # Use the chat completions endpoint
+                response = requests.post(
+                    f"{base_url}/chat/completions",
+                    headers=headers,
+                    json=payload,
+                    verify=False  # Only if needed for local development
+                )
                 
-                # Add messages to chat history
-                st.session_state.chat_history.extend([
-                    {"content": server_message, "is_user": True},
-                    {"content": assistant_message, "is_user": False}
-                ])
+                # Debug information
+                st.write(f"Debug: Server response status code: {response.status_code}")
                 
-                st.success("Received response from server:")
-                st.write(assistant_message)
-                st.divider()
-                st.json(response_data)
-            else:
-                st.error(f"Server error: {response.status_code}\n{response.text}")
-        except Exception as e:
-            st.error(f"Exception occurred: {e}")
+                if response.status_code == 200:
+                    response_data = response.json()
+                    
+                    # Extract the response content
+                    assistant_message = response_data['choices'][0]['message']['content']
+                    
+                    # Add messages to chat history
+                    st.session_state.chat_history.extend([
+                        {"content": server_message, "is_user": True},
+                        {"content": assistant_message, "is_user": False}
+                    ])
+                    
+                    st.success("Received response from server:")
+                    st.write(assistant_message)
+                    st.divider()
+                    st.json(response_data)
+                else:
+                    st.error(f"Server error: {response.status_code}")
+                    st.write("Response content:")
+                    try:
+                        st.json(response.json())
+                    except:
+                        st.write(response.text)
+            except Exception as e:
+                st.error(f"Exception occurred: {str(e)}")
+                import traceback
+                st.code(traceback.format_exc())
 
 with history_tab:
     st.header("Chat History")
