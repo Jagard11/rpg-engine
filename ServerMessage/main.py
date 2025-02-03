@@ -11,11 +11,17 @@ from tabs.player_summary_tab import render_player_summary_tab
 from tabs.combat_tab import render_combat_tab
 from tabs.debug_tab import render_debug_tab
 
-# Initialize session states
+# Initialize session states and load settings
 if 'git_output' not in st.session_state:
     st.session_state.git_output = None
 if 'show_git_results' not in st.session_state:
     st.session_state.show_git_results = False
+if 'context_length' not in st.session_state:
+    st.session_state.context_length = 2048
+if 'temperature' not in st.session_state:
+    st.session_state.temperature = 0.7
+if 'max_tokens' not in st.session_state:
+    st.session_state.max_tokens = 200
 
 # Load chat history from local storage
 if 'chat_history' not in st.session_state:
