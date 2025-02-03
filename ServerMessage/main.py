@@ -74,8 +74,16 @@ with params_tab:
         value=200,
         key="max_tokens_input_params"
     )
+    context_length = st.number_input(
+        "Context Length",
+        min_value=1,
+        max_value=8192,
+        value=2048,
+        key="context_length_input_params"
+    )
     st.session_state.temperature = temperature
     st.session_state.max_tokens = max_tokens
+    st.session_state.context_length = context_length
 
 with history_tab:
     render_history_tab()

@@ -55,18 +55,15 @@ def render_chat_tab(base_url: str):
         )
         st.session_state.npc_status = npc_status
 
-    # Display chat history
+    # Display combined chat history
     st.subheader("Chat History")
     chat_container = st.container()
     with chat_container:
+        combined_chat = ""
         for msg in st.session_state.chat_history:
-            with st.container():
-                if msg["is_user"]:
-                    st.markdown("**User:**")
-                else:
-                    st.markdown("**Assistant:**")
-                st.write(msg["content"])
-                st.divider()
+            role = "User" if msg["is_user"] else "Assistant"
+            combined_chat += f"{role}: {msg['content']}\n\n"
+        st.text_area("Combined History", value=combined_chat, height=300, key="combined_history")
 
     # Input fields
     st.subheader("New Message")
@@ -97,14 +94,16 @@ def render_chat_tab(base_url: str):
             base_url=base_url,
             instructions=instructions,
             server_message=server_message,
-            termination=termination
+            termination=termination,
+            mode=mode
         )
 
 def _handle_message_submission(
     base_url: str,
     instructions: str,
     server_message: str,
-    termination: str
+    termination: str,
+    mode: str
 ) -> None:
     """Handle the submission of a message to the server"""
     messages = []
@@ -116,12 +115,18 @@ def _handle_message_submission(
             "content": instructions
         })
     
-    # Add chat history
-    for msg in st.session_state.chat_history:
-        messages.append({
-            "role": "user" if msg["is_user"] else "assistant",
-            "content": msg["content"]
-        })
+    # Add chat history based on context length
+    if mode == "Chat":
+        total_length = 0
+        for msg in reversed(st.session_state.chat_history):
+            msg_length = len(msg["content"])
+            if total_length + msg_length > st.session_state.context_length:
+                break
+            messages.insert(0, {
+                "role": "user" if msg["is_user"] else "assistant",
+                "content": msg["content"]
+            })
+            total_length += msg_length
     
     # Add the current message
     messages.append({
@@ -152,19 +157,37 @@ def _handle_message_submission(
 
 def _send_request_to_server(base_url: str, payload: Dict[str, Any], server_message: str) -> None:
     """Send the request to the server and handle the response"""
-    response = requests.post(
-        f"{base_url}/chat/completions",
-        json=payload,
-        headers={"Content-Type": "application/json"}
-    )
+    try:
+        # Test connection first
+        requests.get(f"{base_url}/models", timeout=5)
+        
+        response = requests.post(
+            f"{base_url}/chat/completions",
+            json=payload,
+            headers={"Content-Type": "application/json"},
+            timeout=30
+        )
 
-    # Store response in session state for debug
-    st.session_state.last_response = response.json() if response.status_code == 200 else {"error": response.text}
+        # Store response in session state for debug
+        st.session_state.last_response = response.json() if response.status_code == 200 else {"error": response.text}
 
-    if response.status_code == 200:
-        _handle_successful_response(response, server_message)
-    else:
-        st.error(f"Server error: {response.status_code}\n{response.text}")
+        if response.status_code == 200:
+            _handle_successful_response(response, server_message)
+        else:
+            st.error(f"Server error: {response.status_code}\n{response.text}")
+            
+    except requests.exceptions.ConnectionError:
+        st.error("Cannot connect to server. Please check:\n" +
+                "1. Server is running\n" +
+                "2. IP and port are correct\n" +
+                "3. No firewall blocking connection")
+    except requests.exceptions.Timeout:
+        st.error("Server request timed out. The model may be busy.")
+    except Exception as e:
+        st.error(f"Unexpected error: {str(e)}")
+        if st.session_state.get('debug_mode', False):
+            import traceback
+            st.code(traceback.format_exc())
 
 def _handle_successful_response(response: requests.Response, server_message: str) -> None:
     """Handle a successful response from the server"""
