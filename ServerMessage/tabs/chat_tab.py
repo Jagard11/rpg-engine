@@ -5,7 +5,7 @@ import requests
 import json
 from typing import Dict, Any
 
-def show_chat_interface(base_url: str):
+def render_chat_tab(base_url: str):
     """Handle the chat interface tab functionality"""
     st.header("Character Communication")
 
