@@ -1,17 +1,11 @@
-# ./ServerMessage/tabs/chat_tab.py
+# ./ServerMessage/tabs/chat_interface.py
 
 import streamlit as st
 import requests
 import json
-import traceback
 
-def render_chat_tab(base_url: str):
-    """
-    Render the chat interface tab
-    
-    Args:
-        base_url (str): The base URL for the Oobabooga API
-    """
+def show_chat_interface(base_url: str):
+    """Handle the chat interface tab functionality"""
     st.header("Character Communication")
 
     # Instructions field
@@ -50,69 +44,92 @@ def render_chat_tab(base_url: str):
         )
 
     if st.button("Send Message", key="send_msg_btn"):
-        with st.spinner("Sending message to server..."):
-            # Construct the prompt
-            full_prompt = ""
-            if instructions:
-                full_prompt = f"Instructions: {instructions}\n\n"
-            full_prompt += server_message
+        _handle_message_submission(base_url, instructions, server_message, temperature, max_tokens)
 
-            # Add previous context from chat history
-            if st.session_state.chat_history:
-                context = "\nPrevious conversation:\n"
-                for msg in st.session_state.chat_history:
-                    prefix = "User:" if msg["is_user"] else "Assistant:"
-                    context += f"{prefix} {msg['content']}\n"
-                full_prompt = context + "\nCurrent message:\n" + full_prompt
+def _handle_message_submission(base_url: str, instructions: str, server_message: str, 
+                             temperature: float, max_tokens: int):
+    """Handle the submission of a message to the server"""
+    with st.spinner("Sending message to server..."):
+        # Construct the prompt by combining instructions and message
+        full_prompt = ""
+        if instructions:
+            full_prompt = f"Instructions: {instructions}\n\n"
+        full_prompt += server_message
 
-            # Construct the payload
-            payload = {
-                "prompt": full_prompt,
-                "max_tokens": max_tokens,
-                "temperature": temperature,
-                "stream": False
+        # Add previous context from chat history
+        if st.session_state.chat_history:
+            context = "\nPrevious conversation:\n"
+            for msg in st.session_state.chat_history:
+                prefix = "User:" if msg["is_user"] else "Assistant:"
+                context += f"{prefix} {msg['content']}\n"
+            full_prompt = context + "\nCurrent message:\n" + full_prompt
+
+        # Construct the payload
+        payload = {
+            "prompt": full_prompt,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+            "stream": False
+        }
+        
+        # Debug information
+        st.write("Debug: Sending the following payload:")
+        st.json(payload)
+        
+        try:
+            # Set headers explicitly
+            headers = {
+                "Content-Type": "application/json"
             }
             
-            # Debug information
-            st.write("Debug: Sending the following payload:")
-            st.json(payload)
+            # Make the request
+            response = requests.post(
+                f"{base_url}/completions",
+                headers=headers,
+                json=payload,
+                verify=False
+            )
             
-            try:
-                headers = {
-                    "Content-Type": "application/json"
-                }
-                
-                response = requests.post(
-                    f"{base_url}/completions",
-                    headers=headers,
-                    json=payload,
-                    verify=False
-                )
-                
-                st.write(f"Debug: Response status code: {response.status_code}")
-                st.write("Debug: Response headers:", dict(response.headers))
-                
-                if response.status_code == 200:
-                    response_data = response.json()
-                    assistant_message = response_data['choices'][0]['text']
-                    
-                    # Add messages to chat history
-                    st.session_state.chat_history.extend([
-                        {"content": server_message, "is_user": True},
-                        {"content": assistant_message, "is_user": False}
-                    ])
-                    
-                    st.success("Received response from server:")
-                    st.write(assistant_message)
-                    st.divider()
-                    st.json(response_data)
-                else:
-                    st.error(f"Server error: {response.status_code}")
-                    st.write("Response content:")
-                    try:
-                        st.json(response.json())
-                    except:
-                        st.write(response.text)
-            except Exception as e:
-                st.error(f"Exception occurred: {str(e)}")
-                st.code(traceback.format_exc())
+            # Log response information
+            st.write(f"Debug: Response status code: {response.status_code}")
+            st.write("Debug: Response headers:", dict(response.headers))
+            
+            if response.status_code == 200:
+                _handle_successful_response(response, server_message)
+            else:
+                _handle_error_response(response)
+        except Exception as e:
+            _handle_exception(e)
+
+def _handle_successful_response(response, server_message):
+    """Handle a successful response from the server"""
+    response_data = response.json()
+    
+    # Extract the response content
+    assistant_message = response_data['choices'][0]['text']
+    
+    # Add messages to chat history
+    st.session_state.chat_history.extend([
+        {"content": server_message, "is_user": True},
+        {"content": assistant_message, "is_user": False}
+    ])
+    
+    st.success("Received response from server:")
+    st.write(assistant_message)
+    st.divider()
+    st.json(response_data)
+
+def _handle_error_response(response):
+    """Handle an error response from the server"""
+    st.error(f"Server error: {response.status_code}")
+    st.write("Response content:")
+    try:
+        st.json(response.json())
+    except:
+        st.write(response.text)
+
+def _handle_exception(e):
+    """Handle exceptions during the request"""
+    st.error(f"Exception occurred: {str(e)}")
+    import traceback
+    st.code(traceback.format_exc())
