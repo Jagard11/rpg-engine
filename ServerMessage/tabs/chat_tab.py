@@ -3,6 +3,7 @@
 import streamlit as st
 import requests
 import json
+from typing import Dict, Any
 
 def show_chat_interface(base_url: str):
     """Handle the chat interface tab functionality"""
@@ -25,8 +26,30 @@ def show_chat_interface(base_url: str):
         key="message_content"
     )
 
+    # Termination instructions
+    termination = st.text_area(
+        "Termination Instructions",
+        help="Specify conditions or instructions for ending the response",
+        height=100,
+        key="termination_instructions"
+    )
+
     # Advanced settings in an expander
     with st.expander("Advanced Settings"):
+        mode = st.radio(
+            "Chat Mode",
+            options=["chat", "instruct"],
+            index=1,
+            key="chat_mode"
+        )
+        
+        instruction_template = st.text_input(
+            "Instruction Template",
+            value="Alpaca",
+            help="Template to use for instruction formatting (e.g., Alpaca, Vicuna, etc.)",
+            key="instruction_template"
+        )
+        
         temperature = st.slider(
             "Temperature",
             min_value=0.1,
@@ -44,69 +67,91 @@ def show_chat_interface(base_url: str):
         )
 
     if st.button("Send Message", key="send_msg_btn"):
-        _handle_message_submission(base_url, instructions, server_message, temperature, max_tokens)
+        _handle_message_submission(
+            base_url=base_url,
+            instructions=instructions,
+            server_message=server_message,
+            termination=termination,
+            mode=mode,
+            instruction_template=instruction_template,
+            temperature=temperature,
+            max_tokens=max_tokens
+        )
 
-def _handle_message_submission(base_url: str, instructions: str, server_message: str, 
-                             temperature: float, max_tokens: int):
+def _handle_message_submission(
+    base_url: str,
+    instructions: str,
+    server_message: str,
+    termination: str,
+    mode: str,
+    instruction_template: str,
+    temperature: float,
+    max_tokens: int
+) -> None:
     """Handle the submission of a message to the server"""
-    with st.spinner("Sending message to server..."):
-        # Construct the prompt by combining instructions and message
-        full_prompt = ""
-        if instructions:
-            full_prompt = f"Instructions: {instructions}\n\n"
-        full_prompt += server_message
+    messages = []
+    
+    # Add system instruction if provided
+    if instructions:
+        messages.append({
+            "role": "system",
+            "content": instructions
+        })
+    
+    # Add the current message
+    messages.append({
+        "role": "user",
+        "content": server_message
+    })
+    
+    # Add chat history
+    for msg in st.session_state.chat_history:
+        messages.append({
+            "role": "user" if msg["is_user"] else "assistant",
+            "content": msg["content"]
+        })
 
-        # Add previous context from chat history
-        if st.session_state.chat_history:
-            context = "\nPrevious conversation:\n"
-            for msg in st.session_state.chat_history:
-                prefix = "User:" if msg["is_user"] else "Assistant:"
-                context += f"{prefix} {msg['content']}\n"
-            full_prompt = context + "\nCurrent message:\n" + full_prompt
+    # Construct the payload
+    payload = {
+        "messages": messages,
+        "mode": mode,
+        "instruction_template": instruction_template,
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+    }
+    
+    if termination:
+        payload["stop"] = [termination]
+    
+    try:
+        _send_request_to_server(base_url, payload, server_message)
+    except Exception as e:
+        st.error(f"Exception occurred: {e}")
+        import traceback
+        st.code(traceback.format_exc())
 
-        # Construct the payload
-        payload = {
-            "prompt": full_prompt,
-            "max_tokens": max_tokens,
-            "temperature": temperature,
-            "stream": False
-        }
-        
-        # Debug information
-        st.write("Debug: Sending the following payload:")
-        st.json(payload)
-        
-        try:
-            # Set headers explicitly
-            headers = {
-                "Content-Type": "application/json"
-            }
-            
-            # Make the request
-            response = requests.post(
-                f"{base_url}/completions",
-                headers=headers,
-                json=payload,
-                verify=False
-            )
-            
-            # Log response information
-            st.write(f"Debug: Response status code: {response.status_code}")
-            st.write("Debug: Response headers:", dict(response.headers))
-            
-            if response.status_code == 200:
-                _handle_successful_response(response, server_message)
-            else:
-                _handle_error_response(response)
-        except Exception as e:
-            _handle_exception(e)
+def _send_request_to_server(base_url: str, payload: Dict[str, Any], server_message: str) -> None:
+    """Send the request to the server and handle the response"""
+    # Debug information
+    st.write("Debug: Sending the following payload:")
+    st.json(payload)
+    
+    response = requests.post(
+        f"{base_url}/chat/completions",
+        json=payload
+    )
 
-def _handle_successful_response(response, server_message):
+    if response.status_code == 200:
+        _handle_successful_response(response, server_message)
+    else:
+        st.error(f"Server error: {response.status_code}\n{response.text}")
+
+def _handle_successful_response(response: requests.Response, server_message: str) -> None:
     """Handle a successful response from the server"""
     response_data = response.json()
     
     # Extract the response content
-    assistant_message = response_data['choices'][0]['text']
+    assistant_message = response_data['choices'][0]['message']['content']
     
     # Add messages to chat history
     st.session_state.chat_history.extend([
@@ -118,18 +163,3 @@ def _handle_successful_response(response, server_message):
     st.write(assistant_message)
     st.divider()
     st.json(response_data)
-
-def _handle_error_response(response):
-    """Handle an error response from the server"""
-    st.error(f"Server error: {response.status_code}")
-    st.write("Response content:")
-    try:
-        st.json(response.json())
-    except:
-        st.write(response.text)
-
-def _handle_exception(e):
-    """Handle exceptions during the request"""
-    st.error(f"Exception occurred: {str(e)}")
-    import traceback
-    st.code(traceback.format_exc())
