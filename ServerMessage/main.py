@@ -28,7 +28,7 @@ with st.sidebar:
     st.write("Using API Base URL:", base_url)
 
 # Create tabs for different functionalities
-chat_tab, history_tab = st.tabs(["Chat Interface", "Chat History"])
+chat_tab, history_tab, git_tab = st.tabs(["Chat Interface", "Chat History", "Git Updates"])
 
 with chat_tab:
     # --- Character Communication Settings ---
@@ -168,33 +168,33 @@ with history_tab:
             st.write(message["content"])
             st.divider()
 
-# --- Git update and restart ---
-st.markdown("---")
-st.subheader("Update Project and Restart App")
-
-if st.button("Update and Restart", key="update_restart_btn"):
-    with st.spinner("Pulling latest code from git (repository root)..."):
-        # Run "git pull" in the repository root directory.
-        git_proc = subprocess.run(
-            ["git", "pull"],
-            cwd=repo_root,  # change directory to repository root
-            capture_output=True,
-            text=True
-        )
-        st.text("Git pull stdout:")
-        st.text(git_proc.stdout)
-        st.text("Git pull stderr:")
-        st.text(git_proc.stderr)
-        st.success("Git update complete.")
+with git_tab:
+    st.header("Update Project")
+    st.write("Update the project code from the git repository and restart the application.")
     
-    st.info("Restarting Streamlit app to pick up changes...")
-    time.sleep(1)
-    # Change the working directory to the script's directory (./ServerMessage)
-    os.chdir(script_dir)
-    # Explicitly define the absolute path to the script.
-    new_script = os.path.join(script_dir, "main.py")
-    # Restart using "python -m streamlit run ..." so that Streamlit sets up its context.
-    os.execv(
-        sys.executable,
-        [sys.executable, "-m", "streamlit", "run", new_script] + sys.argv[1:]
-    )
+    if st.button("Update and Restart", key="update_restart_btn"):
+        with st.spinner("Pulling latest code from git (repository root)..."):
+            # Run "git pull" in the repository root directory.
+            git_proc = subprocess.run(
+                ["git", "pull"],
+                cwd=repo_root,  # change directory to repository root
+                capture_output=True,
+                text=True
+            )
+            st.text("Git pull stdout:")
+            st.text(git_proc.stdout)
+            st.text("Git pull stderr:")
+            st.text(git_proc.stderr)
+            st.success("Git update complete.")
+        
+        st.info("Restarting Streamlit app to pick up changes...")
+        time.sleep(1)
+        # Change the working directory to the script's directory (./ServerMessage)
+        os.chdir(script_dir)
+        # Explicitly define the absolute path to the script.
+        new_script = os.path.join(script_dir, "main.py")
+        # Restart using "python -m streamlit run ..." so that Streamlit sets up its context.
+        os.execv(
+            sys.executable,
+            [sys.executable, "-m", "streamlit", "run", new_script] + sys.argv[1:]
+        )
