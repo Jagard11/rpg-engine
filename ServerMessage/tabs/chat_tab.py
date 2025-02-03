@@ -1,27 +1,27 @@
-# ./ServerMessage/tabs/chat_interface.py
+# ./ServerMessage/tabs/chat_tab.py
 
 import streamlit as st
 import requests
 import json
 from typing import Dict, Any
 
-def show_chat_interface(base_url: str):
+def render_chat_tab(base_url: str):
     """Handle the chat interface tab functionality"""
     st.header("Character Communication")
 
     # Instructions field
     instructions = st.text_area(
-        "Character Instructions",
-        help="Specify instructions for how the character should behave and respond",
+        "System Instructions",
+        help="Specify instructions for how the model should behave and respond",
         height=100,
-        key="char_instructions"
+        key="sys_instructions"
     )
 
     # Main message field
     server_message = st.text_area(
         "Message Content", 
         value="Hello!",
-        help="The main message to send to the character",
+        help="The main message to send to the model",
         height=150,
         key="message_content"
     )
@@ -35,21 +35,7 @@ def show_chat_interface(base_url: str):
     )
 
     # Advanced settings in an expander
-    with st.expander("Advanced Settings"):
-        mode = st.radio(
-            "Chat Mode",
-            options=["chat", "instruct"],
-            index=1,
-            key="chat_mode"
-        )
-        
-        instruction_template = st.text_input(
-            "Instruction Template",
-            value="Alpaca",
-            help="Template to use for instruction formatting (e.g., Alpaca, Vicuna, etc.)",
-            key="instruction_template"
-        )
-        
+    with st.expander("Advanced Settings"):        
         temperature = st.slider(
             "Temperature",
             min_value=0.1,
@@ -72,8 +58,6 @@ def show_chat_interface(base_url: str):
             instructions=instructions,
             server_message=server_message,
             termination=termination,
-            mode=mode,
-            instruction_template=instruction_template,
             temperature=temperature,
             max_tokens=max_tokens
         )
@@ -83,8 +67,6 @@ def _handle_message_submission(
     instructions: str,
     server_message: str,
     termination: str,
-    mode: str,
-    instruction_template: str,
     temperature: float,
     max_tokens: int
 ) -> None:
@@ -98,24 +80,23 @@ def _handle_message_submission(
             "content": instructions
         })
     
-    # Add the current message
-    messages.append({
-        "role": "user",
-        "content": server_message
-    })
-    
     # Add chat history
     for msg in st.session_state.chat_history:
         messages.append({
             "role": "user" if msg["is_user"] else "assistant",
             "content": msg["content"]
         })
+    
+    # Add the current message
+    messages.append({
+        "role": "user",
+        "content": server_message
+    })
 
-    # Construct the payload
+    # Construct the payload - force instruction mode
     payload = {
         "messages": messages,
-        "mode": mode,
-        "instruction_template": instruction_template,
+        "mode": "instruct",  # Always use instruct mode
         "max_tokens": max_tokens,
         "temperature": temperature,
     }
@@ -138,7 +119,8 @@ def _send_request_to_server(base_url: str, payload: Dict[str, Any], server_messa
     
     response = requests.post(
         f"{base_url}/chat/completions",
-        json=payload
+        json=payload,
+        headers={"Content-Type": "application/json"}
     )
 
     if response.status_code == 200:

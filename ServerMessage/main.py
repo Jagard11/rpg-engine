@@ -5,6 +5,9 @@ import os
 from tabs.chat_tab import render_chat_tab
 from tabs.history_tab import render_history_tab
 from tabs.git_tab import render_git_tab
+from tabs.npc_summary_tab import render_npc_summary_tab
+from tabs.player_summary_tab import render_player_summary_tab
+from tabs.combat_tab import render_combat_tab
 
 # Initialize session states
 if 'chat_history' not in st.session_state:
@@ -39,7 +42,13 @@ with st.sidebar:
     st.write("Using API Base URL:", base_url)
 
 # Create tabs for different functionalities
-chat_tab, history_tab, git_tab = st.tabs(["Chat Interface", "Chat History", "Git Updates"])
+chat_tab, history_tab, char_tab, combat_tab, git_tab = st.tabs([
+    "Chat Interface", 
+    "Chat History", 
+    "Character Summary",
+    "Combat",
+    "Git Updates"
+])
 
 # Render each tab
 with chat_tab:
@@ -47,6 +56,19 @@ with chat_tab:
 
 with history_tab:
     render_history_tab()
+
+with char_tab:
+    # Create subtabs for NPC and Player character summaries
+    npc_tab, player_tab = st.tabs(["NPC", "Player Character"])
+    
+    with npc_tab:
+        render_npc_summary_tab()
+    
+    with player_tab:
+        render_player_summary_tab()
+
+with combat_tab:
+    render_combat_tab()
 
 with git_tab:
     render_git_tab(script_dir, repo_root)
