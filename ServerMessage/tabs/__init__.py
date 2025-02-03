@@ -6,6 +6,7 @@ from .git_tab import render_git_tab
 from .npc_summary_tab import render_npc_summary_tab
 from .player_summary_tab import render_player_summary_tab
 from .combat_tab import render_combat_tab
+from .debug_tab import render_debug_tab
 
 __all__ = [
     'render_chat_tab',
@@ -13,5 +14,7 @@ __all__ = [
     'render_git_tab',
     'render_npc_summary_tab',
     'render_player_summary_tab',
-    'render_combat_tab'
+    'render_combat_tab',
+    'render_debug_tab'
+    
 ]

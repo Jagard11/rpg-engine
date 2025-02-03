@@ -9,7 +9,67 @@ def render_chat_tab(base_url: str):
     """Handle the chat interface tab functionality"""
     st.header("Character Communication")
 
-    # Instructions field
+    # Add mode selection
+    mode = st.radio(
+        "Communication Mode",
+        ["Chat", "Combat"],
+        key="comm_mode",
+        horizontal=True
+    )
+
+    # Character Status Display
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.subheader("Player Character")
+        if 'pc_status' not in st.session_state:
+            st.session_state.pc_status = "standing"
+        pc_status = st.selectbox(
+            "Status",
+            ["standing", "prone", "flying", "swimming"],
+            key="pc_status_select",
+            index=["standing", "prone", "flying", "swimming"].index(st.session_state.pc_status)
+        )
+        st.session_state.pc_status = pc_status
+
+    with col2:
+        st.subheader("Distance")
+        if 'char_distance' not in st.session_state:
+            st.session_state.char_distance = 30
+        distance = st.number_input(
+            "Feet",
+            min_value=0,
+            value=st.session_state.char_distance,
+            key="distance_input"
+        )
+        st.session_state.char_distance = distance
+
+    with col3:
+        st.subheader("NPC")
+        if 'npc_status' not in st.session_state:
+            st.session_state.npc_status = "standing"
+        npc_status = st.selectbox(
+            "Status",
+            ["standing", "prone", "flying", "swimming"],
+            key="npc_status_select",
+            index=["standing", "prone", "flying", "swimming"].index(st.session_state.npc_status)
+        )
+        st.session_state.npc_status = npc_status
+
+    # Display chat history
+    st.subheader("Chat History")
+    chat_container = st.container()
+    with chat_container:
+        for msg in st.session_state.chat_history:
+            with st.container():
+                if msg["is_user"]:
+                    st.markdown("**User:**")
+                else:
+                    st.markdown("**Assistant:**")
+                st.write(msg["content"])
+                st.divider()
+
+    # Input fields
+    st.subheader("New Message")
     instructions = st.text_area(
         "System Instructions",
         help="Specify instructions for how the model should behave and respond",
@@ -17,7 +77,6 @@ def render_chat_tab(base_url: str):
         key="sys_instructions"
     )
 
-    # Main message field
     server_message = st.text_area(
         "Message Content", 
         value="Hello!",
@@ -26,7 +85,6 @@ def render_chat_tab(base_url: str):
         key="message_content"
     )
 
-    # Termination instructions
     termination = st.text_area(
         "Termination Instructions",
         help="Specify conditions or instructions for ending the response",
@@ -103,6 +161,9 @@ def _handle_message_submission(
     
     if termination:
         payload["stop"] = [termination]
+
+    # Store payload in session state for debug
+    st.session_state.last_payload = payload
     
     try:
         _send_request_to_server(base_url, payload, server_message)
@@ -113,15 +174,14 @@ def _handle_message_submission(
 
 def _send_request_to_server(base_url: str, payload: Dict[str, Any], server_message: str) -> None:
     """Send the request to the server and handle the response"""
-    # Debug information
-    st.write("Debug: Sending the following payload:")
-    st.json(payload)
-    
     response = requests.post(
         f"{base_url}/chat/completions",
         json=payload,
         headers={"Content-Type": "application/json"}
     )
+
+    # Store response in session state for debug
+    st.session_state.last_response = response.json() if response.status_code == 200 else {"error": response.text}
 
     if response.status_code == 200:
         _handle_successful_response(response, server_message)
@@ -141,7 +201,4 @@ def _handle_successful_response(response: requests.Response, server_message: str
         {"content": assistant_message, "is_user": False}
     ])
     
-    st.success("Received response from server:")
-    st.write(assistant_message)
-    st.divider()
-    st.json(response_data)
+    st.success("Message sent successfully")
