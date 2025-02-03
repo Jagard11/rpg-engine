@@ -43,8 +43,9 @@ with st.sidebar:
     st.write("Using API Base URL:", base_url)
 
 # Create tabs for different functionalities
-chat_tab, history_tab, char_tab, combat_tab, debug_tab, git_tab = st.tabs([
-    "Chat Interface", 
+chat_tab, params_tab, history_tab, char_tab, combat_tab, debug_tab, git_tab = st.tabs([
+    "Chat Interface",
+    "Parameters", 
     "Chat History", 
     "Character Summary",
     "Combat",
@@ -55,6 +56,26 @@ chat_tab, history_tab, char_tab, combat_tab, debug_tab, git_tab = st.tabs([
 # Render each tab
 with chat_tab:
     render_chat_tab(base_url)
+
+with params_tab:
+    st.header("Model Parameters")
+    temperature = st.slider(
+        "Temperature",
+        min_value=0.1,
+        max_value=2.0,
+        value=0.7,
+        step=0.1,
+        key="temp_slider_params"
+    )
+    max_tokens = st.number_input(
+        "Max Tokens",
+        min_value=1,
+        max_value=2048,
+        value=200,
+        key="max_tokens_input_params"
+    )
+    st.session_state.temperature = temperature
+    st.session_state.max_tokens = max_tokens
 
 with history_tab:
     render_history_tab()

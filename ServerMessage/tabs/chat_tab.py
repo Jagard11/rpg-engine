@@ -92,41 +92,19 @@ def render_chat_tab(base_url: str):
         key="termination_instructions"
     )
 
-    # Advanced settings in an expander
-    with st.expander("Advanced Settings"):        
-        temperature = st.slider(
-            "Temperature",
-            min_value=0.1,
-            max_value=2.0,
-            value=0.7,
-            step=0.1,
-            key="temp_slider"
-        )
-        max_tokens = st.number_input(
-            "Max Tokens",
-            min_value=1,
-            max_value=2048,
-            value=200,
-            key="max_tokens_input"
-        )
-
     if st.button("Send Message", key="send_msg_btn"):
         _handle_message_submission(
             base_url=base_url,
             instructions=instructions,
             server_message=server_message,
-            termination=termination,
-            temperature=temperature,
-            max_tokens=max_tokens
+            termination=termination
         )
 
 def _handle_message_submission(
     base_url: str,
     instructions: str,
     server_message: str,
-    termination: str,
-    temperature: float,
-    max_tokens: int
+    termination: str
 ) -> None:
     """Handle the submission of a message to the server"""
     messages = []
@@ -155,8 +133,8 @@ def _handle_message_submission(
     payload = {
         "messages": messages,
         "mode": "instruct",  # Always use instruct mode
-        "max_tokens": max_tokens,
-        "temperature": temperature,
+        "max_tokens": st.session_state.max_tokens,
+        "temperature": st.session_state.temperature,
     }
     
     if termination:
