@@ -65,16 +65,17 @@ with chat_tab:
         mode = st.radio(
             "Chat Mode",
             options=["chat", "instruct"],
-            index=1,
+            index=0,  # Default to chat mode
             key="chat_mode"
         )
         
-        instruction_template = st.text_input(
-            "Instruction Template",
-            value="Alpaca",
-            help="Template to use for instruction formatting (e.g., Alpaca, Vicuna, etc.)",
-            key="instruction_template"
-        )
+        if mode == "instruct":
+            instruction_template = st.text_input(
+                "Instruction Template",
+                value="Alpaca",
+                help="Template to use for instruction formatting (e.g., Alpaca, Vicuna, etc.)",
+                key="instruction_template"
+            )
         
         temperature = st.slider(
             "Temperature",
@@ -95,24 +96,15 @@ with chat_tab:
     # When the user clicks "Send Message", send an API call.
     if st.button("Send Message", key="send_msg_btn"):
         with st.spinner("Sending message to server..."):
-            # Convert chat history to proper format
-            formatted_history = []
-            for msg in st.session_state.chat_history:
-                formatted_history.append({
-                    "role": "user" if msg["is_user"] else "assistant",
-                    "content": msg["content"]
-                })
-
-            # Construct the messages list
+            # Prepare the messages array
             messages = []
+            
+            # Add system instruction if provided
             if instructions:
                 messages.append({
                     "role": "system",
                     "content": instructions
                 })
-            
-            # Add chat history (ensuring we maintain conversation flow)
-            messages.extend(formatted_history)
             
             # Add the current message
             messages.append({
@@ -125,9 +117,12 @@ with chat_tab:
                 "messages": messages,
                 "mode": mode,
                 "temperature": temperature,
-                "max_tokens": max_tokens,
-                "instruction_template": instruction_template if mode == "instruct" else None
+                "max_tokens": max_tokens
             }
+
+            # Only add instruction template if in instruct mode
+            if mode == "instruct":
+                payload["instruction_template"] = instruction_template
             
             if termination:
                 payload["stop"] = [termination]
@@ -139,19 +134,21 @@ with chat_tab:
             try:
                 # Set headers explicitly
                 headers = {
-                    "Content-Type": "application/json",
+                    "Content-Type": "application/json"
                 }
                 
-                # Use the chat completions endpoint
+                # Make the request with logging
+                st.write(f"Debug: Sending POST request to: {base_url}/chat/completions")
+                
                 response = requests.post(
                     f"{base_url}/chat/completions",
                     headers=headers,
-                    json=payload,
-                    verify=False  # Only if needed for local development
+                    json=payload  # requests will handle JSON serialization
                 )
                 
-                # Debug information
-                st.write(f"Debug: Server response status code: {response.status_code}")
+                # Log the raw response
+                st.write(f"Debug: Response status code: {response.status_code}")
+                st.write("Debug: Response headers:", dict(response.headers))
                 
                 if response.status_code == 200:
                     response_data = response.json()
@@ -176,6 +173,7 @@ with chat_tab:
                         st.json(response.json())
                     except:
                         st.write(response.text)
+                    st.write("Full response object:", response.__dict__)
             except Exception as e:
                 st.error(f"Exception occurred: {str(e)}")
                 import traceback
