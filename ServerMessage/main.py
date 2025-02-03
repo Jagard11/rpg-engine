@@ -9,9 +9,13 @@ import time
 from typing import List, Dict
 import json
 
-# Initialize session state for chat history if it doesn't exist
+# Initialize session state for chat history and git output if they don't exist
 if 'chat_history' not in st.session_state:
     st.session_state.chat_history = []
+if 'git_output' not in st.session_state:
+    st.session_state.git_output = None
+if 'show_git_results' not in st.session_state:
+    st.session_state.show_git_results = False
 
 # Determine the directory of this script (./ServerMessage)
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -52,31 +56,8 @@ with chat_tab:
         key="message_content"
     )
 
-    # Termination instructions
-    termination = st.text_area(
-        "Termination Instructions",
-        help="Specify conditions or instructions for ending the response",
-        height=100,
-        key="termination_instructions"
-    )
-
     # Advanced settings in an expander
     with st.expander("Advanced Settings"):
-        mode = st.radio(
-            "Chat Mode",
-            options=["chat", "instruct"],
-            index=0,  # Default to chat mode
-            key="chat_mode"
-        )
-        
-        if mode == "instruct":
-            instruction_template = st.text_input(
-                "Instruction Template",
-                value="Alpaca",
-                help="Template to use for instruction formatting (e.g., Alpaca, Vicuna, etc.)",
-                key="instruction_template"
-            )
-        
         temperature = st.slider(
             "Temperature",
             min_value=0.1,
@@ -96,36 +77,33 @@ with chat_tab:
     # When the user clicks "Send Message", send an API call.
     if st.button("Send Message", key="send_msg_btn"):
         with st.spinner("Sending message to server..."):
-            # Prepare the messages array
+            # Create a properly formatted messages array
             messages = []
-            
-            # Add system instruction if provided
             if instructions:
                 messages.append({
                     "role": "system",
                     "content": instructions
                 })
             
-            # Add the current message
             messages.append({
                 "role": "user",
                 "content": server_message
             })
 
+            # Add chat history
+            for msg in st.session_state.chat_history:
+                if msg["is_user"]:
+                    messages.append({"role": "user", "content": msg["content"]})
+                else:
+                    messages.append({"role": "assistant", "content": msg["content"]})
+
             # Construct the payload
             payload = {
                 "messages": messages,
-                "mode": mode,
+                "max_tokens": max_tokens,
                 "temperature": temperature,
-                "max_tokens": max_tokens
+                "stream": False  # Explicitly set stream to False
             }
-
-            # Only add instruction template if in instruct mode
-            if mode == "instruct":
-                payload["instruction_template"] = instruction_template
-            
-            if termination:
-                payload["stop"] = [termination]
             
             # Debug information
             st.write("Debug: Sending the following payload:")
@@ -137,16 +115,15 @@ with chat_tab:
                     "Content-Type": "application/json"
                 }
                 
-                # Make the request with logging
-                st.write(f"Debug: Sending POST request to: {base_url}/chat/completions")
-                
+                # Make the request
                 response = requests.post(
-                    f"{base_url}/chat/completions",
+                    f"{base_url}/completions",  # Using completions instead of chat/completions
                     headers=headers,
-                    json=payload  # requests will handle JSON serialization
+                    data=json.dumps(payload, ensure_ascii=False),  # Manually serialize JSON
+                    verify=False  # Only if needed for local development
                 )
                 
-                # Log the raw response
+                # Log response information
                 st.write(f"Debug: Response status code: {response.status_code}")
                 st.write("Debug: Response headers:", dict(response.headers))
                 
@@ -154,7 +131,7 @@ with chat_tab:
                     response_data = response.json()
                     
                     # Extract the response content
-                    assistant_message = response_data['choices'][0]['message']['content']
+                    assistant_message = response_data['choices'][0]['text']
                     
                     # Add messages to chat history
                     st.session_state.chat_history.extend([
@@ -173,7 +150,6 @@ with chat_tab:
                         st.json(response.json())
                     except:
                         st.write(response.text)
-                    st.write("Full response object:", response.__dict__)
             except Exception as e:
                 st.error(f"Exception occurred: {str(e)}")
                 import traceback
@@ -198,6 +174,14 @@ with history_tab:
 with git_tab:
     st.header("Update Project")
     st.write("Update the project code from the git repository and restart the application.")
+
+    # Show previous git results if they exist
+    if st.session_state.show_git_results and st.session_state.git_output:
+        st.success("Previous Git Update Results:")
+        st.text("Git pull stdout:")
+        st.text(st.session_state.git_output["stdout"])
+        st.text("Git pull stderr:")
+        st.text(st.session_state.git_output["stderr"])
     
     if st.button("Update and Restart", key="update_restart_btn"):
         with st.spinner("Pulling latest code from git (repository root)..."):
@@ -208,20 +192,31 @@ with git_tab:
                 capture_output=True,
                 text=True
             )
+            
+            # Store the output in session state
+            st.session_state.git_output = {
+                "stdout": git_proc.stdout,
+                "stderr": git_proc.stderr
+            }
+            st.session_state.show_git_results = True
+            
+            # Display the current results
+            st.success("Git Update Results:")
             st.text("Git pull stdout:")
             st.text(git_proc.stdout)
             st.text("Git pull stderr:")
             st.text(git_proc.stderr)
+            
             st.success("Git update complete.")
-        
-        st.info("Restarting Streamlit app to pick up changes...")
-        time.sleep(1)
-        # Change the working directory to the script's directory (./ServerMessage)
-        os.chdir(script_dir)
-        # Explicitly define the absolute path to the script.
-        new_script = os.path.join(script_dir, "main.py")
-        # Restart using "python -m streamlit run ..." so that Streamlit sets up its context.
-        os.execv(
-            sys.executable,
-            [sys.executable, "-m", "streamlit", "run", new_script] + sys.argv[1:]
-        )
+            st.info("The application will restart in 5 seconds...")
+            time.sleep(5)  # Give time to read the output
+            
+            # Change the working directory to the script's directory (./ServerMessage)
+            os.chdir(script_dir)
+            # Explicitly define the absolute path to the script.
+            new_script = os.path.join(script_dir, "main.py")
+            # Restart using "python -m streamlit run ..." so that Streamlit sets up its context.
+            os.execv(
+                sys.executable,
+                [sys.executable, "-m", "streamlit", "run", new_script] + sys.argv[1:]
+            )
