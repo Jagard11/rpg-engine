@@ -227,4 +227,9 @@ def _handle_successful_response(response: requests.Response, server_message: str
         {"content": assistant_message, "is_user": False}
     ])
     
+    # Save chat history to local storage
+    with open('chat_history.json', 'w') as f:
+        json.dump(st.session_state.chat_history, f)
+    
     st.success("Message sent successfully")
+    st.experimental_rerun()

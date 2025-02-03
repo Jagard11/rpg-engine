@@ -2,6 +2,7 @@
 
 import streamlit as st
 import os
+import json
 from tabs.chat_tab import render_chat_tab
 from tabs.history_tab import render_history_tab
 from tabs.git_tab import render_git_tab
@@ -11,12 +12,18 @@ from tabs.combat_tab import render_combat_tab
 from tabs.debug_tab import render_debug_tab
 
 # Initialize session states
-if 'chat_history' not in st.session_state:
-    st.session_state.chat_history = []
 if 'git_output' not in st.session_state:
     st.session_state.git_output = None
 if 'show_git_results' not in st.session_state:
     st.session_state.show_git_results = False
+
+# Load chat history from local storage
+if 'chat_history' not in st.session_state:
+    try:
+        with open('chat_history.json', 'r') as f:
+            st.session_state.chat_history = json.load(f)
+    except FileNotFoundError:
+        st.session_state.chat_history = []
 
 # Determine the directory of this script (./ServerMessage)
 script_dir = os.path.dirname(os.path.abspath(__file__))
