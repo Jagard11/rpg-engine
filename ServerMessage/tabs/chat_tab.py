@@ -55,15 +55,40 @@ def render_chat_tab(base_url: str):
         )
         st.session_state.npc_status = npc_status
 
-    # Display combined chat history
-    st.subheader("Chat History")
-    chat_container = st.container()
-    with chat_container:
+    # Display full chat history for reference
+    st.subheader("Conversation History")
+    for msg in st.session_state.chat_history:
+        with st.container():
+            if msg["is_user"]:
+                st.markdown("**User:**")
+            else:
+                st.markdown("**Assistant:**")
+            st.write(msg["content"])
+            st.divider()
+
+    # Display combined chat history for context tracking
+    if mode == "Chat":
+        st.subheader("Combined Context")
         combined_chat = ""
-        for msg in st.session_state.chat_history:
+        total_length = 0
+        
+        for msg in reversed(st.session_state.chat_history):
+            msg_length = len(msg["content"])
+            if total_length + msg_length > st.session_state.context_length:
+                break
+                
             role = "User" if msg["is_user"] else "Assistant"
-            combined_chat += f"{role}: {msg['content']}\n\n"
-        st.text_area("Combined History", value=combined_chat, height=300, key="combined_history")
+            new_content = f"{role}: {msg['content']}\n\n"
+            combined_chat = new_content + combined_chat
+            total_length += msg_length
+            
+        st.text_area(
+            "Current Context Window",
+            value=combined_chat,
+            height=200,
+            key="context_window",
+            disabled=True
+        )
 
     # Input fields
     st.subheader("New Message")
