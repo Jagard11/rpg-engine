@@ -1,0 +1,50 @@
+Race classes:
+Demigod - Choushin - 5/5 - One of the Choushin Goddesses is your parent.
+Masu - 5/5 - Non-violent beings with limited shapeshifting, the ability to alter their density, and a powerful defense mechanism.
+
+Job Classes:
+Space Pirate - 10/10 - There's mountains of treasure to be found in the stars for those bold enough to take it.
+Swashbuckler - 10/10 - You feel comfortable with a sword in one hand and a single shot weapon in the other.
+Pilot - Ryo-ohki - 5/5 - Ryo-Ohki is a formidible vessel, but with a steady han to guide her, she can dance circles around entire fleets.
+Undominated - 5/5 - Freed after spending a prolonged period of time under the effects of domination, you gain resistance to domination at the cost of flying into a murderous rage should someone make the attempt.
+Aerial Duelist - 10/10 - Most who fly are there merely to visit, but for you, combat in the sky is second nature.
+Battle Teleporter - 5/5 - Teleport rapidly, and with great accuracy. You are like a ghost vanishing and appearing elsewhere at will.
+Energy Warrior - 10/10 - Be it up close or afar, your skill with energy attacks adds finesse to the raw power of your energy attacks.
+Berserker - 10/10 - It is easy for you to lose yourself to your rage greatly reducing your evasion in favor of increased strength.
+Devastator - 5/5 - Woe unto your foes who are foolish enough to stand close to each other. 
+Brawler - 10/10 - Who needs weapons when you have your fists, teeth, and whatever isn't bolted down.
+Grand Smasher- 5/5 - Fixed fortifications are a testament to the stupidity of man, and you've got everything you need to prove it.
+
+Demigod - Choushin:
+# Level 1
+## Able to use Washu's gems
+## No need for food
+## No need for water
+# Level 2
+## Energy Blasts
+## Energy blades
+# Level 3
+## Flight
+## Summon Spirit
+## Dominate Spirit
+# Level 4
+## Teleportation
+## Create artificial gem
+# Level 5
+## Light Hawk Wings
+
+Masu:
+# Level 1
+## Telepathy with ryo-oki
+## No need for air
+# Level 2
+## Clone creation
+# Level 3
+## Manipulate Body (regenerate, cure poison, manipulate clothes)
+# Level 4
+## Can merge with and control physical objects
+# Level 5
+## Intangibility
+
+Pilot - Ryo-Ohki
+# Level 1
