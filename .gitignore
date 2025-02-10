@@ -52,3 +52,6 @@ rpg_data.db.backup
 SchemaManager/exports/schemas*
 SchemaManager/exports/data*
 SchemaManager/exports/foreign_keys*
+
+# Import log
+import_log.txt
