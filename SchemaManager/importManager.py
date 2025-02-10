@@ -6,9 +6,10 @@ from typing import Dict, List, Optional, Set, Tuple, Any
 import logging
 import re
 from datetime import datetime
+import argparse
 
 class SchemaManager:
-    def __init__(self, db_path: str, schema_dir: str, import_dir: str):
+    def __init__(self, db_path: str, schema_dir: str, import_dir: str, overwrite: bool = False):
         # Get the project root directory
         current_dir = os.path.dirname(os.path.abspath(__file__))
         project_root = os.path.dirname(current_dir)
@@ -17,6 +18,7 @@ class SchemaManager:
         self.db_path = os.path.join(project_root, db_path)
         self.schema_dir = os.path.join(project_root, schema_dir)
         self.import_dir = os.path.join(project_root, import_dir)
+        self.overwrite = overwrite
         
         self.conn = None
         self.cursor = None
@@ -152,7 +154,7 @@ class SchemaManager:
         """Extract table name from CREATE TABLE statement."""
         match = re.search(r'CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([^\s(]+)', create_stmt, re.IGNORECASE)
         if match:
-            return match.group(1)
+            return match.group(1).strip('"')  # Remove any quotes around table name
         return None
 
     def table_exists(self, table_name: str) -> bool:
@@ -167,9 +169,34 @@ class SchemaManager:
             self.logger.error(f"Error checking table existence: {e}")
             return False
 
+    def drop_table(self, table_name: str) -> bool:
+        """Drop an existing table."""
+        try:
+            self.cursor.execute(f"DROP TABLE IF EXISTS {table_name}")
+            self.conn.commit()
+            return True
+        except sqlite3.Error as e:
+            self.logger.error(f"Error dropping table {table_name}: {e}")
+            return False
+
     def create_table(self, create_stmt: str, filename: str) -> bool:
         """Execute CREATE TABLE statement."""
+        table_name = self.get_table_name_from_create(create_stmt)
+        if not table_name:
+            self.logger.error("Could not extract table name from CREATE statement")
+            return False
+
         try:
+            if self.table_exists(table_name):
+                if self.overwrite:
+                    self.logger.info(f"Table {table_name} exists - dropping due to overwrite flag")
+                    if not self.drop_table(table_name):
+                        return False
+                else:
+                    self.logger.info(f"Table {table_name} already exists - skipping creation")
+                    self.schema_creation_attempts[filename] = False
+                    return False
+
             self.cursor.execute(create_stmt)
             self.conn.commit()
             self.schema_creation_attempts[filename] = True
@@ -195,14 +222,10 @@ class SchemaManager:
             table_name = self.get_table_name_from_create(create_stmt)
             if table_name:
                 self.logger.info(f"Creating table: {table_name}")
-                if not self.table_exists(table_name):
-                    if self.create_table(create_stmt, os.path.basename(file_path)):
-                        self.logger.info(f"Successfully created table: {table_name}")
-                    else:
-                        self.logger.error(f"Failed to create table: {table_name}")
+                if self.create_table(create_stmt, os.path.basename(file_path)):
+                    self.logger.info(f"Successfully created table: {table_name}")
                 else:
-                    self.logger.info(f"Table {table_name} already exists")
-                    self.schema_creation_attempts[os.path.basename(file_path)] = False
+                    self.logger.error(f"Failed to create table: {table_name}")
 
         # First clean up the content
         content = re.sub(r'/\*.*?\*/', '', content, flags=re.DOTALL)  # Remove /* */ comments
@@ -332,6 +355,12 @@ class SchemaManager:
                             f"Values: {dict(zip(record['columns'], record['values']))}\n"
                             f"Error: {e}"
                         )
+                        self.logger.error(
+                            f"Error inserting record:\n"
+                            f"Table: {table}\n"
+                            f"Values: {dict(zip(record['columns'], record['values']))}\n"
+                            f"Error: {e}"
+                        )
                         self.conn.rollback()
             
             # Log final statistics
@@ -353,9 +382,14 @@ class SchemaManager:
             self.close_db()
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Import schema and data into SQLite database')
+    parser.add_argument('--overwrite', action='store_true', help='Overwrite existing tables')
+    args = parser.parse_args()
+
     manager = SchemaManager(
         db_path="rpg_data.db",
         schema_dir="./SchemaManager/schemas",
-        import_dir="./SchemaManager/imports"
+        import_dir="./SchemaManager/imports",
+        overwrite=args.overwrite
     )
     manager.import_data()
