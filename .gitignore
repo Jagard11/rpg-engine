@@ -47,3 +47,8 @@ Thumbs.db
 
 # Database File 
 rpg_data.db.backup
+
+# Exports folder
+SchemaManager/exports/schemas*
+SchemaManager/exports/data*
+SchemaManager/exports/foreign_keys*
