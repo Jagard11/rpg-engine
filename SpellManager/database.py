@@ -29,7 +29,7 @@ def load_spells() -> List[Dict]:
     finally:
         conn.close()
 
-def save_spell(spell_data: Dict) -> bool:
+def save_spell(spell_data: Dict) -> Optional[int]:
     """Save spell to database"""
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -38,61 +38,60 @@ def save_spell(spell_data: Dict) -> bool:
         if spell_data.get('id'):
             cursor.execute("""
                 UPDATE spells 
-                SET name=?, spell_type_id=?, description=?, spell_tier=?, mp_cost=?,
-                    casting_time=?, range=?, area_of_effect=?, duration=?,
+                SET name=?, description=?, spell_tier=?, is_super_tier=?,
+                    mp_cost=?, casting_time=?, range=?, area_of_effect=?,
                     damage_base=?, damage_scaling=?, healing_base=?, healing_scaling=?,
-                    status_effects=?, updated_at=CURRENT_TIMESTAMP
+                    status_effects=?, duration=?
                 WHERE id=?
             """, (
                 spell_data['name'], 
-                spell_data.get('spell_type_id'), 
                 spell_data['description'],
-                spell_data['spell_tier'], 
-                spell_data['mp_cost'], 
+                spell_data['spell_tier'],
+                spell_data.get('is_super_tier', False),
+                spell_data['mp_cost'],
                 spell_data['casting_time'],
-                spell_data['range'], 
-                spell_data['area_of_effect'], 
-                spell_data['duration'],
+                spell_data['range'],
+                spell_data['area_of_effect'],
                 spell_data.get('damage_base', 0),
                 spell_data.get('damage_scaling', ''),
                 spell_data.get('healing_base', 0),
                 spell_data.get('healing_scaling', ''),
                 spell_data.get('status_effects', ''),
+                spell_data['duration'],
                 spell_data['id']
             ))
         else:
             cursor.execute("""
                 INSERT INTO spells (
-                    name, spell_type_id, description, spell_tier, mp_cost,
-                    casting_time, range, area_of_effect, duration,
+                    name, description, spell_tier, is_super_tier,
+                    mp_cost, casting_time, range, area_of_effect,
                     damage_base, damage_scaling, healing_base, healing_scaling,
-                    status_effects
+                    status_effects, duration
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 spell_data['name'], 
-                spell_data.get('spell_type_id'), 
                 spell_data['description'],
-                spell_data['spell_tier'], 
-                spell_data['mp_cost'], 
+                spell_data['spell_tier'],
+                spell_data.get('is_super_tier', False),
+                spell_data['mp_cost'],
                 spell_data['casting_time'],
-                spell_data['range'], 
-                spell_data['area_of_effect'], 
-                spell_data['duration'],
+                spell_data['range'],
+                spell_data['area_of_effect'],
                 spell_data.get('damage_base', 0),
                 spell_data.get('damage_scaling', ''),
                 spell_data.get('healing_base', 0),
                 spell_data.get('healing_scaling', ''),
-                spell_data.get('status_effects', '')
+                spell_data.get('status_effects', ''),
+                spell_data['duration']
             ))
             
         conn.commit()
-        return True
+        return cursor.lastrowid if not spell_data.get('id') else spell_data['id']
     except Exception as e:
         print(f"Error saving spell: {str(e)}")
-        return False
+        return None
     finally:
         conn.close()
-
 def delete_spell(spell_id: int) -> bool:
     """Delete spell from database"""
     conn = get_db_connection()
