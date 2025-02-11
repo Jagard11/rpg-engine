@@ -35,7 +35,7 @@ def render_target_selection(spell_id: int):
     """Interface for configuring target selection"""
     st.subheader("Target Selection")
     
-    targeting_data = load_spell_targeting(spell_id)
+    targeting_data = load_spell_targeting(spell_id) or {}
     
     with st.form("target_selection_form"):
         target_type = st.selectbox(
@@ -49,7 +49,7 @@ def render_target_selection(spell_id: int):
                 "area",
                 "ground"
             ],
-            index=0 if not targeting_data else 
+            index=0 if not targeting_data or 'target_type' not in targeting_data else 
                   ["single_target", "multi_target", "self", "ally", "enemy", "area", "ground"].index(targeting_data.get('target_type', 'single_target'))
         )
         
@@ -107,7 +107,7 @@ def render_range_configuration(spell_id: int):
     """Interface for configuring spell range"""
     st.subheader("Range Configuration")
     
-    targeting_data = load_spell_targeting(spell_id)
+    targeting_data = load_spell_targeting(spell_id) or {}
     
     with st.form("range_config_form"):
         col1, col2 = st.columns(2)
@@ -176,7 +176,7 @@ def render_area_definition(spell_id: int):
     """Interface for configuring area of effect"""
     st.subheader("Area Definition")
     
-    targeting_data = load_spell_targeting(spell_id)
+    targeting_data = load_spell_targeting(spell_id) or {}
     
     with st.form("area_definition_form"):
         area_type = st.selectbox(
