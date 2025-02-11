@@ -38,48 +38,101 @@ def render_effect_selection(spell_id: int):
     """Interface for selecting and creating effects"""
     st.subheader("Select Effects")
     
-    # Load available effects
-    available_effects = load_effects()
+    # Load registered effects and current spell effects
+    registered_effects = load_effects()
     current_effects = load_spell_effects(spell_id)
-    
-    # Filter out already selected effects
-    if current_effects:
-        current_effect_ids = {e['id'] for e in current_effects}
-        available_effects = [e for e in available_effects if e['id'] not in current_effect_ids]
     
     # Display current effects
     if current_effects:
         st.write("Current Effects:")
-        for effect in current_effects:
-            with st.expander(f"{effect['name']} ({effect['type_name']})"):
+        for idx, effect in enumerate(current_effects):
+            with st.expander(f"{effect['effect_type']} Effect"):
                 st.write(f"Base Value: {effect['base_value']}")
-                st.write(f"Scaling: {effect['value_scaling']}")
-                if st.button("Remove Effect", key=f"remove_effect_{effect['id']}"):
+                st.write(f"Duration: {effect.get('duration', 0)} turns")
+                st.write(f"Proc Chance: {effect.get('proc_chance', 1.0)}")
+                if st.button("Remove Effect", key=f"remove_effect_{idx}"):
                     current_effects.remove(effect)
                     save_spell_effects(spell_id, current_effects)
                     st.rerun()
     
-    # Add existing effect
-    if available_effects:
-        with st.form("add_effect_form"):
+    # Add registered effect
+    if registered_effects:
+        with st.form("add_registered_effect_form"):
             st.write("Add Existing Effect:")
+            
+            # Create effect options, including the effect type name
             effect_options = {str(e['id']): f"{e['name']} ({e['type_name']})" 
-                            for e in available_effects}
+                            for e in registered_effects}
             
             selected_effect = st.selectbox(
                 "Select Effect",
                 options=list(effect_options.keys()),
-                format_func=lambda x: effect_options[x]
+                format_func=lambda x: effect_options[x],
+                key="registered_effect_select"
             )
             
+            # Get the selected effect data
+            effect_data = next(e for e in registered_effects 
+                             if str(e['id']) == selected_effect)
+            
+            # Additional effect parameters
+            col1, col2 = st.columns(2)
+            with col1:
+                base_value = st.number_input(
+                    "Base Value",
+                    value=effect_data.get('base_value', 0),
+                    key="effect_base_value"
+                )
+                duration = st.number_input(
+                    "Duration (turns)",
+                    min_value=0,
+                    value=effect_data.get('duration', 0),
+                    key="effect_duration"
+                )
+            
+            with col2:
+                target_stat = st.selectbox(
+                    "Target Stat",
+                    options=["hp", "mp", "physical_attack", "magical_attack", "defense"],
+                    key="effect_target_stat"
+                )
+                proc_chance = st.slider(
+                    "Proc Chance",
+                    min_value=0.0,
+                    max_value=1.0,
+                    value=1.0,
+                    key="effect_proc_chance"
+                )
+            
             if st.form_submit_button("Add Effect"):
-                effect = next(e for e in available_effects 
-                            if str(e['id']) == selected_effect)
+                # Create new effect entry
+                new_effect = {
+                    'effect_type': effect_data['type_name'],
+                    'base_value': base_value,
+                    'duration': duration,
+                    'target_stat_id': 1,  # This will be mapped based on target_stat selection
+                    'proc_chance': proc_chance,
+                    'tick_rate': 1,
+                    'scaling_formula': '',
+                    'scaling_stat_id': None  # Initialize with no scaling stat
+                }
+                
+                # Debug print
+                print(f"Adding new effect: {new_effect}")
+                
                 if current_effects is None:
                     current_effects = []
-                current_effects.append(effect)
-                save_spell_effects(spell_id, current_effects)
-                st.rerun()
+                current_effects.append(new_effect)
+                
+                try:
+                    if save_spell_effects(spell_id, current_effects):
+                        st.success("Effect added successfully!")
+                        st.rerun()
+                    else:
+                        st.error("Failed to add effect.")
+                except Exception as e:
+                    st.error(f"Error adding effect: {str(e)}")
+                    print(f"Error details: {str(e)}")
     
     # Create new effect
     if st.button("Create New Effect", key="create_new_effect_btn"):
@@ -97,44 +150,50 @@ def render_effect_parameters(spell_id: int):
         st.info("Add effects first to configure parameters")
         return
     
-    for effect in current_effects:
-        with st.expander(f"Configure {effect['name']}"):
-            with st.form(f"effect_params_{effect['id']}"):
+    for idx, effect in enumerate(current_effects):
+        with st.expander(f"Configure {effect['effect_type']} Effect"):
+            with st.form(f"effect_params_{idx}"):
                 col1, col2 = st.columns(2)
                 
                 with col1:
                     base_value = st.number_input(
                         "Base Value",
-                        value=effect['base_value']
+                        value=effect['base_value'],
+                        key=f"param_base_{idx}"
                     )
                     
                     scaling_formula = st.text_input(
                         "Scaling Formula",
-                        value=effect['value_scaling']
+                        value=effect.get('scaling_formula', ''),
+                        key=f"param_scaling_{idx}"
                     )
                 
                 with col2:
                     duration = st.number_input(
-                        "Duration (seconds)",
+                        "Duration (turns)",
                         min_value=0,
-                        value=effect.get('duration', 0)
+                        value=effect.get('duration', 0),
+                        key=f"param_duration_{idx}"
                     )
                     
                     tick_rate = st.number_input(
-                        "Tick Rate (seconds)",
-                        min_value=0.0,
-                        value=effect.get('tick_rate', 1.0)
+                        "Tick Rate (turns)",
+                        min_value=1,
+                        value=effect.get('tick_rate', 1),
+                        key=f"param_tick_{idx}"
                     )
                 
                 if st.form_submit_button("Update Parameters"):
                     effect.update({
                         'base_value': base_value,
-                        'value_scaling': scaling_formula,
+                        'scaling_formula': scaling_formula,
                         'duration': duration,
                         'tick_rate': tick_rate
                     })
-                    save_spell_effects(spell_id, current_effects)
-                    st.success("Parameters updated!")
+                    if save_spell_effects(spell_id, current_effects):
+                        st.success("Parameters updated!")
+                    else:
+                        st.error("Failed to update parameters.")
 
 def render_effect_chaining(spell_id: int):
     """Interface for chaining multiple effects"""
@@ -148,42 +207,23 @@ def render_effect_chaining(spell_id: int):
     st.write("Drag effects to reorder the chain:")
     
     # Display effects in order with up/down buttons
-    for i, effect in enumerate(current_effects):
+    for idx, effect in enumerate(current_effects):
         col1, col2, col3 = st.columns([3, 1, 1])
         
         with col1:
-            st.write(f"{i+1}. {effect['name']}")
+            st.write(f"{idx+1}. {effect['effect_type']} Effect")
         
         with col2:
-            if i > 0 and st.button("↑", key=f"move_up_{effect['id']}"):
-                current_effects[i], current_effects[i-1] = current_effects[i-1], current_effects[i]
-                save_spell_effects(spell_id, current_effects)
-                st.rerun()
+            if idx > 0 and st.button("↑", key=f"move_up_{idx}"):
+                current_effects[idx], current_effects[idx-1] = current_effects[idx-1], current_effects[idx]
+                if save_spell_effects(spell_id, current_effects):
+                    st.rerun()
         
         with col3:
-            if i < len(current_effects)-1 and st.button("↓", key=f"move_down_{effect['id']}"):
-                current_effects[i], current_effects[i+1] = current_effects[i+1], current_effects[i]
-                save_spell_effects(spell_id, current_effects)
-                st.rerun()
-    
-    # Chain conditions
-    st.write("---")
-    st.write("Chain Conditions")
-    
-    with st.form("chain_conditions"):
-        require_all_effects = st.checkbox(
-            "Require All Effects",
-            help="All effects must successfully apply for any to take effect"
-        )
-        
-        stop_on_failure = st.checkbox(
-            "Stop on Failure",
-            help="Stop applying effects if one fails"
-        )
-        
-        if st.form_submit_button("Save Chain Settings"):
-            # Save chain settings
-            pass
+            if idx < len(current_effects)-1 and st.button("↓", key=f"move_down_{idx}"):
+                current_effects[idx], current_effects[idx+1] = current_effects[idx+1], current_effects[idx]
+                if save_spell_effects(spell_id, current_effects):
+                    st.rerun()
 
 def render_new_effect_form(spell_id: int):
     """Form for creating a new effect"""
@@ -192,36 +232,48 @@ def render_new_effect_form(spell_id: int):
     with st.form("new_effect_form"):
         st.write("Create New Effect")
         
-        name = st.text_input("Effect Name")
+        name = st.text_input("Effect Name", key="new_effect_name")
         
-        # Use the actual effect type IDs from the database
         type_options = {str(t['id']): t['name'] for t in effect_types}
         selected_type = st.selectbox(
             "Effect Type",
             options=list(type_options.keys()),
-            format_func=lambda x: type_options[x]
+            format_func=lambda x: type_options[x],
+            key="new_effect_type"
         )
         
-        description = st.text_area("Description")
+        description = st.text_area("Description", key="new_effect_desc")
         
         col1, col2 = st.columns(2)
         
         with col1:
-            base_value = st.number_input("Base Value", value=0)
-            duration = st.number_input("Duration (seconds)", min_value=0, value=0)
+            base_value = st.number_input(
+                "Base Value",
+                value=0,
+                key="new_effect_base"
+            )
+            duration = st.number_input(
+                "Duration (turns)",
+                min_value=0,
+                value=0,
+                key="new_effect_duration"
+            )
         
         with col2:
-            scaling_formula = st.text_input("Scaling Formula", value="")
+            scaling_formula = st.text_input(
+                "Scaling Formula",
+                value="",
+                key="new_effect_scaling"
+            )
             tick_type = st.selectbox(
                 "Tick Type",
                 options=['immediate', 'start_of_turn', 'end_of_turn'],
-                index=0
+                index=0,
+                key="new_effect_tick"
             )
         
         if st.form_submit_button("Create Effect"):
-            # Debug output before creating effect
             effect_type_id = int(selected_type)
-            st.write(f"Debug - Selected Type ID: {effect_type_id}")
             
             new_effect = {
                 'name': name,
@@ -232,9 +284,6 @@ def render_new_effect_form(spell_id: int):
                 'duration': duration,
                 'tick_type': tick_type
             }
-            
-            # Debug output of the complete effect data
-            st.write("Debug - New Effect Data:", new_effect)
             
             result = save_effect(new_effect)
             if result:

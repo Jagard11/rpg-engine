@@ -267,29 +267,44 @@ def load_spell_effects(spell_id: int) -> List[Dict]:
         conn.close()
 
 def save_spell_effects(spell_id: int, effects: List[Dict]) -> bool:
-    """Save effects for a spell"""
+    """Save spell-effect relationships"""
     conn = get_db_connection()
     cursor = conn.cursor()
     
     try:
+        # Delete existing relationships
         cursor.execute("DELETE FROM spell_effects WHERE spell_id = ?", (spell_id,))
         
-        for idx, effect in enumerate(effects):
+        # Insert new relationships
+        for idx, effect in enumerate(effects, start=1):
+            # Print debug information
+            print(f"Saving effect {idx}: {effect}")
+            
             cursor.execute("""
                 INSERT INTO spell_effects (
-                    spell_id, effect_id, effect_order, probability
-                ) VALUES (?, ?, ?, ?)
+                    spell_id, effect_type, base_value,
+                    target_stat_id, scaling_stat_id, scaling_formula, 
+                    duration, tick_rate, proc_chance, effect_order
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 spell_id,
-                effect['id'],
-                idx,
-                effect.get('probability', 1.0)
+                effect.get('effect_type', 'unknown'),
+                effect.get('base_value', 0),
+                effect.get('target_stat_id', 1),  # Default to first stat type
+                effect.get('scaling_stat_id'),
+                effect.get('scaling_formula', ''),
+                effect.get('duration', 0),
+                effect.get('tick_rate', 1),
+                effect.get('proc_chance', 1.0),
+                idx
             ))
         
         conn.commit()
         return True
     except Exception as e:
         print(f"Error saving spell effects: {str(e)}")
+        print(f"Effect data: {effects}")
+        conn.rollback()
         return False
     finally:
         conn.close()
