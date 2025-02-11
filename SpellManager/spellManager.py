@@ -3,8 +3,9 @@
 import streamlit as st
 from .database import load_spells
 from .spellList import render_spell_list
-from .spellEditor import render_spell_editor
-from .spellEffectsManager import render_spell_effects_manager
+from .spellTriggerEditor import render_trigger_editor
+from .spellEffectEditor import render_effect_editor
+from .spellTargetingEditor import render_targeting_editor
 
 def render_spell_manager():
     """Main wrapper for the spell management interface"""
@@ -31,13 +32,21 @@ def render_spell_manager():
         st.session_state.spell_manager_tab = "Spell List"
     
     # Create subtabs
-    list_tab, editor_tab, effects_tab = st.tabs(["Spell List", "Spell Editor", "Effects Manager"])
+    list_tab, trigger_tab, effect_tab, targeting_tab = st.tabs([
+        "Spell List", 
+        "Trigger Configuration", 
+        "Effect Selection",
+        "Targeting System"
+    ])
     
     with list_tab:
         render_spell_list()
     
-    with editor_tab:
-        render_spell_editor()
+    with trigger_tab:
+        render_trigger_editor(selected_spell_id if selected_spell_id else None)
         
-    with effects_tab:
-        render_spell_effects_manager()
+    with effect_tab:
+        render_effect_editor(selected_spell_id if selected_spell_id else None)
+        
+    with targeting_tab:
+        render_targeting_editor(selected_spell_id if selected_spell_id else None)
