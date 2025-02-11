@@ -6,7 +6,8 @@ from .database import (
     load_effects,
     save_effect,
     load_spell_effects,
-    save_spell_effects
+    save_spell_effects,
+    load_effect_types
 )
 
 def render_effect_editor(spell_id: Optional[int] = None):
@@ -81,7 +82,7 @@ def render_effect_selection(spell_id: int):
                 st.rerun()
     
     # Create new effect
-    if st.button("Create New Effect", key="create_new_effect"):
+    if st.button("Create New Effect", key="create_new_effect_btn"):
         st.session_state.creating_new_effect = True
         
     if st.session_state.get('creating_new_effect'):
@@ -154,13 +155,13 @@ def render_effect_chaining(spell_id: int):
             st.write(f"{i+1}. {effect['name']}")
         
         with col2:
-            if i > 0 and st.button("↑", key=f"up_{effect['id']}"):
+            if i > 0 and st.button("↑", key=f"move_up_{effect['id']}"):
                 current_effects[i], current_effects[i-1] = current_effects[i-1], current_effects[i]
                 save_spell_effects(spell_id, current_effects)
                 st.rerun()
         
         with col3:
-            if i < len(current_effects)-1 and st.button("↓", key=f"down_{effect['id']}"):
+            if i < len(current_effects)-1 and st.button("↓", key=f"move_down_{effect['id']}"):
                 current_effects[i], current_effects[i+1] = current_effects[i+1], current_effects[i]
                 save_spell_effects(spell_id, current_effects)
                 st.rerun()
@@ -186,14 +187,19 @@ def render_effect_chaining(spell_id: int):
 
 def render_new_effect_form(spell_id: int):
     """Form for creating a new effect"""
+    effect_types = load_effect_types()
+    
     with st.form("new_effect_form"):
         st.write("Create New Effect")
         
         name = st.text_input("Effect Name")
         
-        effect_type = st.selectbox(
+        # Use the actual effect type IDs from the database
+        type_options = {str(t['id']): t['name'] for t in effect_types}
+        selected_type = st.selectbox(
             "Effect Type",
-            options=['damage', 'healing', 'buff', 'debuff', 'control', 'utility']
+            options=list(type_options.keys()),
+            format_func=lambda x: type_options[x]
         )
         
         description = st.text_area("Description")
@@ -201,25 +207,39 @@ def render_new_effect_form(spell_id: int):
         col1, col2 = st.columns(2)
         
         with col1:
-            base_value = st.number_input("Base Value")
-            duration = st.number_input("Duration (seconds)", min_value=0)
+            base_value = st.number_input("Base Value", value=0)
+            duration = st.number_input("Duration (seconds)", min_value=0, value=0)
         
         with col2:
-            scaling_formula = st.text_input("Scaling Formula")
-            tick_rate = st.number_input("Tick Rate (seconds)", min_value=0.0, value=1.0)
+            scaling_formula = st.text_input("Scaling Formula", value="")
+            tick_type = st.selectbox(
+                "Tick Type",
+                options=['immediate', 'start_of_turn', 'end_of_turn'],
+                index=0
+            )
         
         if st.form_submit_button("Create Effect"):
+            # Debug output before creating effect
+            effect_type_id = int(selected_type)
+            st.write(f"Debug - Selected Type ID: {effect_type_id}")
+            
             new_effect = {
                 'name': name,
-                'effect_type': effect_type,
+                'effect_type_id': effect_type_id,
                 'description': description,
                 'base_value': base_value,
                 'value_scaling': scaling_formula,
                 'duration': duration,
-                'tick_rate': tick_rate
+                'tick_type': tick_type
             }
             
-            if save_effect(new_effect):
+            # Debug output of the complete effect data
+            st.write("Debug - New Effect Data:", new_effect)
+            
+            result = save_effect(new_effect)
+            if result:
                 st.session_state.creating_new_effect = False
                 st.success("Effect created successfully!")
                 st.rerun()
+            else:
+                st.error("Failed to create effect. Please check all fields are filled correctly.")

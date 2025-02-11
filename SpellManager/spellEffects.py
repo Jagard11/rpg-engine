@@ -106,8 +106,9 @@ def load_spell_effects(spell_id: int) -> List[Dict]:
     cursor = conn.cursor()
     
     cursor.execute("""
-        SELECT e.*, se.effect_order, se.probability 
+        SELECT e.*, et.name as type_name
         FROM effects e
+        JOIN effect_types et ON e.effect_type_id = et.id
         JOIN spell_effects se ON e.id = se.effect_id
         WHERE se.spell_id = ?
         ORDER BY se.effect_order
@@ -125,42 +126,56 @@ def save_effect(effect_data: Dict) -> Optional[int]:
     cursor = conn.cursor()
     
     try:
+        # Print the effect data for debugging
+        print(f"Saving effect data: {effect_data}")
+        
         if effect_data.get('id'):
+            # Update existing effect
             cursor.execute("""
                 UPDATE effects 
                 SET name=?, effect_type_id=?, base_value=?, value_scaling=?,
                     duration=?, tick_type=?, description=?
                 WHERE id=?
             """, (
-                effect_data['name'], effect_data['effect_type_id'],
-                effect_data['base_value'], effect_data['value_scaling'],
-                effect_data['duration'], effect_data['tick_type'],
-                effect_data['description'], effect_data['id']
+                effect_data['name'],
+                effect_data['effect_type_id'],
+                effect_data['base_value'],
+                effect_data['value_scaling'],
+                effect_data['duration'],
+                effect_data['tick_type'],
+                effect_data['description'],
+                effect_data['id']
             ))
             effect_id = effect_data['id']
         else:
+            # Insert new effect
             cursor.execute("""
                 INSERT INTO effects (
                     name, effect_type_id, base_value, value_scaling,
                     duration, tick_type, description
                 ) VALUES (?, ?, ?, ?, ?, ?, ?)
             """, (
-                effect_data['name'], effect_data['effect_type_id'],
-                effect_data['base_value'], effect_data['value_scaling'],
-                effect_data['duration'], effect_data['tick_type'],
+                effect_data['name'],
+                effect_data['effect_type_id'],
+                effect_data['base_value'],
+                effect_data['value_scaling'],
+                effect_data['duration'],
+                effect_data['tick_type'],
                 effect_data['description']
             ))
             effect_id = cursor.lastrowid
-            
+        
         conn.commit()
         return effect_id
     except Exception as e:
         print(f"Error saving effect: {str(e)}")
+        # Print more detailed error information
+        print(f"Effect data: {effect_data}")
         return None
     finally:
         conn.close()
 
-def save_spell_effects(spell_id: int, effect_ids: List[Dict]) -> bool:
+def save_spell_effects(spell_id: int, effects: List[Dict]) -> bool:
     """Save spell-effect relationships"""
     conn = sqlite3.connect('rpg_data.db')
     cursor = conn.cursor()
@@ -170,13 +185,13 @@ def save_spell_effects(spell_id: int, effect_ids: List[Dict]) -> bool:
         cursor.execute("DELETE FROM spell_effects WHERE spell_id = ?", (spell_id,))
         
         # Insert new relationships
-        for idx, effect in enumerate(effect_ids):
+        for idx, effect in enumerate(effects):
             cursor.execute("""
                 INSERT INTO spell_effects (
                     spell_id, effect_id, effect_order, probability
                 ) VALUES (?, ?, ?, ?)
             """, (spell_id, effect['id'], idx, effect.get('probability', 1.0)))
-            
+        
         conn.commit()
         return True
     except Exception as e:
