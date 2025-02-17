@@ -155,7 +155,32 @@ running = True
 
 log('INFO', "Starting initial world generation")
 screen.fill((0, 0, 0))
-renderer.render_world(screen)
+
+# Progressive world generation
+total_chunks = (2 * CHUNK_RENDER_RADIUS + 1) ** 2
+chunks_generated = 0
+for chunk_x in range(-CHUNK_RENDER_RADIUS, CHUNK_RENDER_RADIUS + 1):
+    for chunk_y in range(-CHUNK_RENDER_RADIUS, CHUNK_RENDER_RADIUS + 1):
+        renderer.render_chunk(screen, chunk_x, chunk_y)
+        chunks_generated += 1
+        
+        # Update progress
+        progress = chunks_generated / total_chunks
+        loading_text = f"Generating world... {int(progress * 100)}%"
+        font = pygame.font.Font(None, 36)
+        text_surface = font.render(loading_text, True, (255, 255, 255))
+        text_rect = text_surface.get_rect(center=(WIDTH // 2, HEIGHT // 2))
+        
+        screen.fill((0, 0, 0))
+        screen.blit(text_surface, text_rect)
+        pygame.display.flip()
+        
+        # Handle events to keep the window responsive
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                exit()
+
 pygame.display.flip()
 log('INFO', "Initial world generation complete")
 
