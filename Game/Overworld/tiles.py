@@ -1,4 +1,4 @@
-# tiles.py
+# ./Game/Overworld/tiles.py
 
 from enum import Enum
 from typing import Tuple

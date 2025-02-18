@@ -1,8 +1,10 @@
+# ./Game/Overworld/custom_logging.py
+
 import logging
 import sys
 
 # Logging toggle
-LOGGING_ENABLED = True
+LOGGING_ENABLED = False
 
 # Logging setup
 if LOGGING_ENABLED:

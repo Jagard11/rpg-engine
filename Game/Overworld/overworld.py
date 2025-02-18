@@ -1,8 +1,10 @@
+# ./Game/Overworld/overworld.py
+
 import pygame
 import numpy as np
 from numpy.random import default_rng
 import opensimplex
-from math import sin, cos, pi
+from math import sin, cos, pi, ceil
 from datetime import datetime, timedelta
 from tiles import get_tile_for_biome, Tile
 from custom_logging import log, log_function_call, log_object_creation, log_method_call
@@ -10,26 +12,40 @@ from custom_logging import log, log_function_call, log_object_creation, log_meth
 # Initialize core systems
 log('INFO', "Initializing Pygame")
 pygame.init()
-clock = pygame.time.Clock()
 
-# Configuration
-WIDTH, HEIGHT = 640, 365
+# Window/Viewport Configuration
+WINDOW_WIDTH = 640
+WINDOW_HEIGHT = 365
+
+# World Configuration
+WORLD_WIDTH = 2048  # Much larger than window
+WORLD_HEIGHT = 1024  # Much larger than window
+CHUNK_SIZE = 32
 PLANET_RADIUS = 1000
+
+# Calculate total chunks in world
+WORLD_CHUNKS_X = ceil(WORLD_WIDTH / CHUNK_SIZE)
+WORLD_CHUNKS_Y = ceil(WORLD_HEIGHT / CHUNK_SIZE)
+
+# Initial view configuration
+VIEWPORT_SCALE = 1.0  # Will be used for zoom later
+VIEWPORT_X = 0  # Viewport's top-left position in world coordinates
+VIEWPORT_Y = 0
+
+# RNG setup
 rng = default_rng()
 SEED = rng.integers(2**32)
-TIME_SCALE = 1  # 1 real second = 1000 game seconds
-CHUNK_RENDER_RADIUS = 2  # This will render a 5x5 grid of chunks
-CHUNK_SIZE = 32  # Reduced from 64 to 32
 
-log('INFO', f"Configuration set: WIDTH={WIDTH}, HEIGHT={HEIGHT}, SEED={SEED}")
+# Debug color
+PLACEHOLDER_COLOR = (255, 0, 255)  # Bright pink RGB
+
+log('INFO', f"Configuration set: Window={WINDOW_WIDTH}x{WINDOW_HEIGHT}, World={WORLD_WIDTH}x{WORLD_HEIGHT}")
 
 class PlanetGenerator:
     def __init__(self, seed):
         log_object_creation('PlanetGenerator', seed=seed)
         self.noise = opensimplex.OpenSimplex(seed)
-        self.biome_map = {}
         self.chunk_cache = {}
-        
         self.biome_params = {
             'ocean': (0.2, 0.8, 0.1),
             'forest': (0.5, 0.6, 0.4),
@@ -38,179 +54,191 @@ class PlanetGenerator:
             'mountain': (0.4, 0.5, 0.9)
         }
 
+    def normalize_coordinates(self, x, y):
+        """Convert world coordinates to normalized spherical coordinates."""
+        lon = (x / WORLD_WIDTH) * 2 * pi
+        lat = (y / WORLD_HEIGHT) * pi
+        lon = lon % (2 * pi)
+        lat = max(min(lat, pi/2), -pi/2)
+        return lon, lat
+
     def generate_chunk(self, chunk_x, chunk_y):
         log_method_call('PlanetGenerator', 'generate_chunk', chunk_x=chunk_x, chunk_y=chunk_y)
-        chunk_key = (chunk_x, chunk_y)
-        if chunk_key in self.chunk_cache:
-            return self.chunk_cache[chunk_key]
+        key = (chunk_x, chunk_y)
+        if key in self.chunk_cache:
+            return self.chunk_cache[key]
 
         chunk = []
         for y in range(CHUNK_SIZE):
             for x in range(CHUNK_SIZE):
-                nx = (chunk_x * CHUNK_SIZE + x) / PLANET_RADIUS
-                ny = (chunk_y * CHUNK_SIZE + y) / PLANET_RADIUS
+                world_x = chunk_x * CHUNK_SIZE + x
+                world_y = chunk_y * CHUNK_SIZE + y
+                
+                # Wrap coordinates for seamless world
+                world_x = world_x % WORLD_WIDTH
+                world_y = world_y % WORLD_HEIGHT
+                
+                lon, lat = self.normalize_coordinates(world_x, world_y)
+                nx = cos(lat) * cos(lon)
+                ny = cos(lat) * sin(lon)
+                nz = sin(lat)
                 
                 elevation = (
-                    0.5 * self.noise.noise2(1 * nx, 1 * ny) +
-                    0.25 * self.noise.noise2(2 * nx, 2 * ny) +
-                    0.125 * self.noise.noise2(4 * nx, 4 * ny)
+                    0.5 * self.noise.noise3(nx, ny, nz) +
+                    0.25 * self.noise.noise3(2*nx, 2*ny, 2*nz) +
+                    0.125 * self.noise.noise3(4*nx, 4*ny, 4*nz)
                 )
                 
-                temp = self.noise.noise2(nx + 1000, ny + 1000)
-                humidity = self.noise.noise2(nx + 2000, ny + 2000)
+                temp = cos(lat) + 0.3 * self.noise.noise2(lon + 1000, lat + 1000)
+                humidity = 0.5 * (
+                    self.noise.noise2(lon + 2000, lat + 2000) +
+                    self.noise.noise2(lon + 3000, lat + 3000)
+                )
                 
                 biome = self._determine_biome(elevation, temp, humidity)
-                chunk.append(get_tile_for_biome(biome))
+                tile = get_tile_for_biome(biome)
+                chunk.append(tile)
         
-        self.chunk_cache[chunk_key] = chunk
+        self.chunk_cache[key] = chunk
         return chunk
 
     def _determine_biome(self, elevation, temp, humidity):
-        log_method_call('PlanetGenerator', '_determine_biome', elevation=elevation, temp=temp, humidity=humidity)
         best_biome = 'plains'
         min_dist = float('inf')
-        
         for biome, params in self.biome_params.items():
-            dist = abs(params[0]-temp) + abs(params[1]-humidity) + abs(params[2]-elevation)
+            dist = abs(params[0] - temp) + abs(params[1] - humidity) + abs(params[2] - elevation)
             if dist < min_dist:
                 min_dist = dist
                 best_biome = biome
-        log('DEBUG', f"Determined biome: {best_biome}")
         return best_biome
 
-class TimeSystem:
-    def __init__(self):
-        log_object_creation('TimeSystem')
-        self.start_time = datetime.now()
-        self.game_time = self.start_time
-        self.season_progress = 0  # 0-365 days
-        
-        self.axial_tilt = 23.4  # Degrees
-        self.day_length = 24    # Hours
-        self.year_length = 365  # Days
-
-    def update(self, dt):
-        log_method_call('TimeSystem', 'update', dt=dt)
-        self.game_time += timedelta(seconds=dt*TIME_SCALE)
-        self.season_progress = (self.season_progress + dt/TIME_SCALE) % 365
-        
-        season_angle = 2*pi * self.season_progress/365
-        self.sun_altitude = sin(season_angle) * np.deg2rad(self.axial_tilt)
-        self.sun_azimuth = (self.game_time.hour/24) * 2*pi
-        log('DEBUG', f"Updated time: {self.game_time}, Season progress: {self.season_progress:.2f}")
-
-    def get_light_level(self):
-        light_level = max(0, sin(self.sun_altitude))
-        log('DEBUG', f"Current light level: {light_level:.2f}")
-        return light_level
-
-    def get_season(self):
-        season = 'winter'
-        if 79 <= self.season_progress < 172: season = 'spring'
-        elif 172 <= self.season_progress < 265: season = 'summer'
-        elif 265 <= self.season_progress < 355: season = 'autumn'
-        log('DEBUG', f"Current season: {season}")
-        return season
-
-class PlanetRenderer:
+class WorldRenderer:
     def __init__(self, planet_gen):
-        log_object_creation('PlanetRenderer', planet_gen=planet_gen)
+        log_object_creation('WorldRenderer', planet_gen=planet_gen)
         self.planet_gen = planet_gen
-        self.loaded_chunks = {}
+        
+        # Calculate visible chunks based on viewport
+        self.visible_chunks_x = ceil(WINDOW_WIDTH / CHUNK_SIZE) + 1
+        self.visible_chunks_y = ceil(WINDOW_HEIGHT / CHUNK_SIZE) + 1
+        
+        log('DEBUG', f"Visible chunks: {self.visible_chunks_x}x{self.visible_chunks_y}")
+
+    def world_to_screen(self, world_x, world_y):
+        """Convert world coordinates to screen coordinates."""
+        screen_x = (world_x - VIEWPORT_X) * VIEWPORT_SCALE
+        screen_y = (world_y - VIEWPORT_Y) * VIEWPORT_SCALE
+        return int(screen_x), int(screen_y)
 
     def render_chunk(self, surface, chunk_x, chunk_y):
-        log_method_call('PlanetRenderer', 'render_chunk', chunk_x=chunk_x, chunk_y=chunk_y)
-        chunk_key = (chunk_x, chunk_y)
-        if chunk_key not in self.loaded_chunks:
-            log('DEBUG', f"Generating new chunk at {chunk_key}")
-            self.loaded_chunks[chunk_key] = self.planet_gen.generate_chunk(chunk_x, chunk_y)
+        try:
+            chunk = self.planet_gen.generate_chunk(chunk_x, chunk_y)
+            world_base_x = chunk_x * CHUNK_SIZE
+            world_base_y = chunk_y * CHUNK_SIZE
             
-        chunk_data = self.loaded_chunks[chunk_key]
-        for y in range(CHUNK_SIZE):
-            for x in range(CHUNK_SIZE):
-                tile = chunk_data[y * CHUNK_SIZE + x]
-                color = tile.color
-                pixel_x = (chunk_x * CHUNK_SIZE + x) % WIDTH
-                pixel_y = (chunk_y * CHUNK_SIZE + y) % HEIGHT
-                surface.set_at((pixel_x, pixel_y), color)
-        log('DEBUG', f"Chunk {chunk_key} rendered")
+            for y in range(CHUNK_SIZE):
+                world_y = world_base_y + y
+                
+                for x in range(CHUNK_SIZE):
+                    world_x = world_base_x + x
+                    screen_x, screen_y = self.world_to_screen(world_x, world_y)
+                    
+                    if 0 <= screen_x < WINDOW_WIDTH and 0 <= screen_y < WINDOW_HEIGHT:
+                        tile = chunk[y * CHUNK_SIZE + x]
+                        surface.set_at((screen_x, screen_y), tile.color)
+            
+            return True
+        except Exception as e:
+            log('ERROR', f"Error rendering chunk: {str(e)}")
+            return False
 
-    def render_world(self, surface):
-        log_method_call('PlanetRenderer', 'render_world')
-        for chunk_x in range(-CHUNK_RENDER_RADIUS, CHUNK_RENDER_RADIUS + 1):
-            for chunk_y in range(-CHUNK_RENDER_RADIUS, CHUNK_RENDER_RADIUS + 1):
-                self.render_chunk(surface, chunk_x, chunk_y)
-        log('INFO', "World rendering complete")
-
-# Initialize systems
-log('INFO', "Initializing game systems")
-planet_gen = PlanetGenerator(SEED)
-time_system = TimeSystem()
-renderer = PlanetRenderer(planet_gen)
-
-# Main game loop
-log('INFO', "Setting up display")
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
-running = True
-
-log('INFO', "Starting initial world generation")
-screen.fill((0, 0, 0))
-
-# Progressive world generation
-total_chunks = (2 * CHUNK_RENDER_RADIUS + 1) ** 2
-chunks_generated = 0
-for chunk_x in range(-CHUNK_RENDER_RADIUS, CHUNK_RENDER_RADIUS + 1):
-    for chunk_y in range(-CHUNK_RENDER_RADIUS, CHUNK_RENDER_RADIUS + 1):
-        renderer.render_chunk(screen, chunk_x, chunk_y)
-        chunks_generated += 1
+    def render_world(self, screen):
+        log('INFO', "Starting world rendering")
         
-        # Update progress
-        progress = chunks_generated / total_chunks
-        loading_text = f"Generating world... {int(progress * 100)}%"
-        font = pygame.font.Font(None, 36)
-        text_surface = font.render(loading_text, True, (255, 255, 255))
-        text_rect = text_surface.get_rect(center=(WIDTH // 2, HEIGHT // 2))
-        
+        # Initial loading screen
         screen.fill((0, 0, 0))
-        screen.blit(text_surface, text_rect)
+        font = pygame.font.Font(None, 36)
+        loading_text = font.render("Preparing to generate world...", True, (255, 255, 255))
+        text_rect = loading_text.get_rect(center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT // 2))
+        screen.blit(loading_text, text_rect)
         pygame.display.flip()
         
-        # Handle events to keep the window responsive
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                exit()
+        # Create world surface
+        world_surface = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT))
+        world_surface.fill(PLACEHOLDER_COLOR)
+        
+        # Calculate visible chunk range
+        start_chunk_x = VIEWPORT_X // CHUNK_SIZE
+        start_chunk_y = VIEWPORT_Y // CHUNK_SIZE
+        chunks_x = ceil(WINDOW_WIDTH / (CHUNK_SIZE * VIEWPORT_SCALE))
+        chunks_y = ceil(WINDOW_HEIGHT / (CHUNK_SIZE * VIEWPORT_SCALE))
+        
+        total_chunks = chunks_x * chunks_y
+        chunks_generated = 0
+        
+        try:
+            for cy in range(int(start_chunk_y), int(start_chunk_y + chunks_y + 1)):
+                for cx in range(int(start_chunk_x), int(start_chunk_x + chunks_x + 1)):
+                    chunks_generated += 1
+                    progress = chunks_generated / total_chunks
+                    
+                    # Render chunk
+                    success = self.render_chunk(world_surface, cx, cy)
+                    if not success:
+                        log('ERROR', f"Failed to render chunk at ({cx}, {cy})")
+                        continue
+                    
+                    # Update progress display
+                    screen.fill((0, 0, 0))
+                    progress_text = f"Generating world... {int(progress * 100)}%"
+                    text_surface = font.render(progress_text, True, (255, 255, 255))
+                    text_rect = text_surface.get_rect(center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT // 2))
+                    screen.blit(text_surface, text_rect)
+                    pygame.display.flip()
+                    
+                    # Handle events
+                    for event in pygame.event.get():
+                        if event.type == pygame.QUIT:
+                            return False
+            
+            # Final render
+            log('INFO', "World generation complete, displaying final render")
+            screen.blit(world_surface, (0, 0))
+            pygame.display.flip()
+            return True
+            
+        except Exception as e:
+            log('ERROR', f"Error during world rendering: {str(e)}")
+            return False
 
-pygame.display.flip()
-log('INFO', "Initial world generation complete")
+def main():
+    try:
+        # Setup display
+        log('INFO', "Setting up display")
+        screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
+        pygame.display.set_caption("World Generator")
 
-log('INFO', "Entering main game loop")
-frame_count = 0
-while running:
-    dt = clock.tick(60)/1000
-    
-    time_system.update(dt)
-    
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
-            log('INFO', "Quit event received")
-    
-    # Redraw the world every 60 frames (about 1 second)
-    if frame_count % 60 == 0:
-        screen.fill((0, 0, 0))  # Clear the screen
-        renderer.render_world(screen)
-    
-    # Apply lighting
-    light_level = time_system.get_light_level()
-    darken = pygame.Surface((WIDTH, HEIGHT))
-    darken.fill((0, 0, 0))
-    darken.set_alpha(255 - int(255 * light_level))
-    screen.blit(darken, (0,0))
-    
-    pygame.display.flip()
-    frame_count += 1
-    log('DEBUG', f"Frame {frame_count} rendered")
+        # Initialize systems
+        planet_gen = PlanetGenerator(SEED)
+        renderer = WorldRenderer(planet_gen)
 
-log('INFO', "Game loop ended, quitting Pygame")
-pygame.quit()
+        # Generate and display world
+        success = renderer.render_world(screen)
+        if not success:
+            log('ERROR', "World generation failed")
+            return
+
+        # Keep window open
+        running = True
+        while running:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    running = False
+
+        pygame.quit()
+        
+    except Exception as e:
+        log('CRITICAL', f"Fatal error in main: {str(e)}")
+        pygame.quit()
+
+if __name__ == "__main__":
+    main()
