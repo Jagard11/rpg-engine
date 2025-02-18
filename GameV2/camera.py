@@ -3,7 +3,7 @@
 
 import pygame
 from logger import info, error
-from biome_types import BIOME_TYPES  # Import for color lookup
+from biome_types import BIOME_TYPES
 
 class Camera:
     def __init__(self, map_width, map_height, tile_size, screen_width, screen_height):
@@ -33,7 +33,6 @@ class Camera:
         self.max_y = max(0, self.map_height * self.tile_size - self.screen_height)
 
     def center_map(self):
-        # Center the camera on the map
         self.x = (self.map_width * self.tile_size - self.screen_width) / 2
         self.y = (self.map_height * self.tile_size - self.screen_height) / 2
         self.x = max(0, min(self.x, self.max_x))
@@ -52,7 +51,7 @@ class Camera:
             zoom_factor = self.tile_size / old_tile_size
             self.x = center_world_x * zoom_factor - center_screen_x
             self.y = center_world_y * zoom_factor - center_screen_y
-            self.x = max(0, min(self.x, self.max_x))
+            self.x = self.x % (self.map_width * self.tile_size)
             self.y = max(0, min(self.y, self.max_y))
 
     def update(self, keys, events):
@@ -79,7 +78,7 @@ class Camera:
 
         self.x += self.vx
         self.y += self.vy
-        self.x = max(0, min(self.x, self.max_x))
+        self.x = self.x % (self.map_width * self.tile_size)
         self.y = max(0, min(self.y, self.max_y))
 
         for event in events:
@@ -89,7 +88,7 @@ class Camera:
                 elif event.y < 0:
                     self.zoom(-self.zoom_step)
 
-    def render(self, screen, tiles, debug_seam=False):
+    def render(self, screen, tiles, debug_seam=False, terrain_enabled=True, day_night_enabled=False, seasons_enabled=False, day_night_pos=0, seasonal_pos=0, day_night_gradient=None, seasonal_gradient=None):
         screen.fill((0, 0, 0))
         cam_tile_x = int(self.x // self.tile_size)
         cam_tile_y = int(self.y // self.tile_size)
@@ -97,14 +96,37 @@ class Camera:
         tiles_h = (self.screen_height // self.tile_size) + 2
 
         for y in range(max(0, cam_tile_y - 1), min(self.map_height, cam_tile_y + tiles_h + 1)):
-            for x in range(max(0, cam_tile_x - 1), min(self.map_width, cam_tile_x + tiles_w + 1)):
-                tile = tiles[y][x]
-                biome = tile.biome if tile.biome else "GRASSLAND"  # Fallback if None
-                tile_color = BIOME_TYPES[biome]["color"]
-                screen_x = (x * self.tile_size) - self.x
+            for x_offset in range(-tiles_w, tiles_w):
+                map_x = (cam_tile_x + x_offset) % self.map_width
+                screen_x = (x_offset - (self.x / self.tile_size - cam_tile_x)) * self.tile_size
                 screen_y = (y * self.tile_size) - self.y
                 if 0 <= screen_x < self.screen_width and 0 <= screen_y < self.screen_height:
-                    pygame.draw.rect(screen, tile_color, (screen_x, screen_y, self.tile_size, self.tile_size))
+                    tile = tiles[y][map_x]
+                    if terrain_enabled:
+                        biome = tile.biome if tile.biome else "GRASSLAND"
+                        tile_color = list(BIOME_TYPES[biome]["color"])
+                    else:
+                        tile_color = [0, 0, 0]
+
+                    # Always-on day-night darkening
+                    if day_night_gradient:
+                        day_x = (map_x + day_night_pos) % self.map_width
+                        light_value = day_night_gradient.get_at((day_x, 0))[0]  # 0–255
+                        day_factor = light_value / 255.0  # 0 (night) to 1 (day)
+                        for i in range(3):
+                            tile_color[i] = int(tile_color[i] * (0.4 + 0.6 * day_factor))  # 0.4–1.0
+
+                    pygame.draw.rect(screen, tuple(tile_color), (screen_x, screen_y, self.tile_size, self.tile_size))
+
+                    # Debug gradient overlays
+                    if day_night_enabled and day_night_gradient:
+                        day_x = (map_x + day_night_pos) % self.map_width
+                        gradient_color = day_night_gradient.get_at((day_x, 0))
+                        pygame.draw.rect(screen, gradient_color, (screen_x, screen_y, self.tile_size, self.tile_size), 1)  # Outline for visibility
+                    if seasons_enabled and seasonal_gradient:
+                        season_y = (y + seasonal_pos) % self.map_height
+                        gradient_color = seasonal_gradient.get_at((0, season_y))
+                        pygame.draw.rect(screen, gradient_color, (screen_x, screen_y, self.tile_size, self.tile_size), 1)
 
         if debug_seam:
             seam_color = (255, 255, 0)

@@ -50,6 +50,7 @@ class MapGenerator:
                     repeaty=self.height, base=self.seed + 3
                 )
 
+        # Restore east-west stitching
         offset = self.width // 2
         shifted_continent = [[0 for _ in range(self.width)] for _ in range(self.height)]
         shifted_elevation = [[0 for _ in range(self.width)] for _ in range(self.height)]
@@ -58,12 +59,13 @@ class MapGenerator:
 
         for y in range(self.height):
             for x in range(self.width):
-                new_x = (x + offset) % self.width
+                new_x = (x + offset) % self.width  # Wrap around east-west
                 shifted_continent[y][x] = continent_noise[y][new_x]
                 shifted_elevation[y][x] = elevation[y][new_x]
                 shifted_moisture[y][x] = moisture[y][new_x]
                 shifted_temperature[y][x] = temperature_noise[y][new_x]
 
+        # Blend seams for smoothness
         seam_center = offset - 1
         blend_start = seam_center - 1
         blend_end = seam_center + 2
@@ -119,7 +121,7 @@ class MapGenerator:
         for y in range(self.height):
             for x in range(self.width):
                 tile = self.tiles[y][x]
-                tile.biome = assign_biome(tile.continent, tile.elevation, tile.current_moisture, tile.current_temp)  # Fixed typo here
+                tile.biome = assign_biome(tile.continent, tile.elevation, tile.current_moisture, tile.current_temp)
 
         info("World map generation complete")
         return self.tiles
