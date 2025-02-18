@@ -8,18 +8,20 @@ from math import sin, cos, pi, ceil
 from datetime import datetime, timedelta
 from tiles import get_tile_for_biome, Tile
 from custom_logging import log, log_function_call, log_object_creation, log_method_call
+from camera_controls import CameraController, CameraState
 
 # Initialize core systems
 log('INFO', "Initializing Pygame")
 pygame.init()
+clock = pygame.time.Clock()
 
 # Window/Viewport Configuration
 WINDOW_WIDTH = 640
 WINDOW_HEIGHT = 365
 
 # World Configuration
-WORLD_WIDTH = 2048  # Much larger than window
-WORLD_HEIGHT = 1024  # Much larger than window
+WORLD_WIDTH = 2048
+WORLD_HEIGHT = 1024
 CHUNK_SIZE = 32
 PLANET_RADIUS = 1000
 
@@ -27,19 +29,12 @@ PLANET_RADIUS = 1000
 WORLD_CHUNKS_X = ceil(WORLD_WIDTH / CHUNK_SIZE)
 WORLD_CHUNKS_Y = ceil(WORLD_HEIGHT / CHUNK_SIZE)
 
-# Initial view configuration
-VIEWPORT_SCALE = 1.0  # Will be used for zoom later
-VIEWPORT_X = 0  # Viewport's top-left position in world coordinates
-VIEWPORT_Y = 0
-
 # RNG setup
 rng = default_rng()
 SEED = rng.integers(2**32)
 
 # Debug color
-PLACEHOLDER_COLOR = (255, 0, 255)  # Bright pink RGB
-
-log('INFO', f"Configuration set: Window={WINDOW_WIDTH}x{WINDOW_HEIGHT}, World={WORLD_WIDTH}x{WORLD_HEIGHT}")
+PLACEHOLDER_COLOR = (255, 0, 255)
 
 class PlanetGenerator:
     def __init__(self, seed):
@@ -55,7 +50,6 @@ class PlanetGenerator:
         }
 
     def normalize_coordinates(self, x, y):
-        """Convert world coordinates to normalized spherical coordinates."""
         lon = (x / WORLD_WIDTH) * 2 * pi
         lat = (y / WORLD_HEIGHT) * pi
         lon = lon % (2 * pi)
@@ -63,7 +57,6 @@ class PlanetGenerator:
         return lon, lat
 
     def generate_chunk(self, chunk_x, chunk_y):
-        log_method_call('PlanetGenerator', 'generate_chunk', chunk_x=chunk_x, chunk_y=chunk_y)
         key = (chunk_x, chunk_y)
         if key in self.chunk_cache:
             return self.chunk_cache[key]
@@ -74,7 +67,7 @@ class PlanetGenerator:
                 world_x = chunk_x * CHUNK_SIZE + x
                 world_y = chunk_y * CHUNK_SIZE + y
                 
-                # Wrap coordinates for seamless world
+                # Wrap coordinates
                 world_x = world_x % WORLD_WIDTH
                 world_y = world_y % WORLD_HEIGHT
                 
@@ -113,20 +106,27 @@ class PlanetGenerator:
         return best_biome
 
 class WorldRenderer:
-    def __init__(self, planet_gen):
+    def __init__(self, planet_gen, camera_controller):
         log_object_creation('WorldRenderer', planet_gen=planet_gen)
         self.planet_gen = planet_gen
+        self.camera_controller = camera_controller
         
         # Calculate visible chunks based on viewport
-        self.visible_chunks_x = ceil(WINDOW_WIDTH / CHUNK_SIZE) + 1
-        self.visible_chunks_y = ceil(WINDOW_HEIGHT / CHUNK_SIZE) + 1
+        self.update_visible_chunks()
         
-        log('DEBUG', f"Visible chunks: {self.visible_chunks_x}x{self.visible_chunks_y}")
+        log('DEBUG', f"Initial visible chunks: {self.visible_chunks_x}x{self.visible_chunks_y}")
+
+    def update_visible_chunks(self):
+        """Update the number of visible chunks based on current camera state"""
+        camera = self.camera_controller.get_state()
+        self.visible_chunks_x = ceil(WINDOW_WIDTH / (CHUNK_SIZE * camera.scale)) + 1
+        self.visible_chunks_y = ceil(WINDOW_HEIGHT / (CHUNK_SIZE * camera.scale)) + 1
 
     def world_to_screen(self, world_x, world_y):
-        """Convert world coordinates to screen coordinates."""
-        screen_x = (world_x - VIEWPORT_X) * VIEWPORT_SCALE
-        screen_y = (world_y - VIEWPORT_Y) * VIEWPORT_SCALE
+        """Convert world coordinates to screen coordinates using camera state"""
+        camera = self.camera_controller.get_state()
+        screen_x = (world_x - camera.x) * camera.scale
+        screen_y = (world_y - camera.y) * camera.scale
         return int(screen_x), int(screen_y)
 
     def render_chunk(self, surface, chunk_x, chunk_y):
@@ -134,6 +134,15 @@ class WorldRenderer:
             chunk = self.planet_gen.generate_chunk(chunk_x, chunk_y)
             world_base_x = chunk_x * CHUNK_SIZE
             world_base_y = chunk_y * CHUNK_SIZE
+            
+            camera = self.camera_controller.get_state()
+            chunk_pixel_size = int(CHUNK_SIZE * camera.scale)
+            
+            # Skip chunk if it's completely outside the viewport
+            screen_x, screen_y = self.world_to_screen(world_base_x, world_base_y)
+            if (screen_x + chunk_pixel_size < 0 or screen_x >= WINDOW_WIDTH or
+                screen_y + chunk_pixel_size < 0 or screen_y >= WINDOW_HEIGHT):
+                return True
             
             for y in range(CHUNK_SIZE):
                 world_y = world_base_y + y
@@ -152,9 +161,10 @@ class WorldRenderer:
             return False
 
     def render_world(self, screen):
+        """Initial world generation and rendering"""
         log('INFO', "Starting world rendering")
         
-        # Initial loading screen
+        # Show loading screen
         screen.fill((0, 0, 0))
         font = pygame.font.Font(None, 36)
         loading_text = font.render("Preparing to generate world...", True, (255, 255, 255))
@@ -166,25 +176,21 @@ class WorldRenderer:
         world_surface = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT))
         world_surface.fill(PLACEHOLDER_COLOR)
         
-        # Calculate visible chunk range
-        start_chunk_x = VIEWPORT_X // CHUNK_SIZE
-        start_chunk_y = VIEWPORT_Y // CHUNK_SIZE
-        chunks_x = ceil(WINDOW_WIDTH / (CHUNK_SIZE * VIEWPORT_SCALE))
-        chunks_y = ceil(WINDOW_HEIGHT / (CHUNK_SIZE * VIEWPORT_SCALE))
+        camera = self.camera_controller.get_state()
+        start_chunk_x = int(camera.x // CHUNK_SIZE)
+        start_chunk_y = int(camera.y // CHUNK_SIZE)
         
-        total_chunks = chunks_x * chunks_y
+        total_chunks = self.visible_chunks_x * self.visible_chunks_y
         chunks_generated = 0
         
         try:
-            for cy in range(int(start_chunk_y), int(start_chunk_y + chunks_y + 1)):
-                for cx in range(int(start_chunk_x), int(start_chunk_x + chunks_x + 1)):
+            for cy in range(start_chunk_y, start_chunk_y + self.visible_chunks_y):
+                for cx in range(start_chunk_x, start_chunk_x + self.visible_chunks_x):
                     chunks_generated += 1
                     progress = chunks_generated / total_chunks
                     
-                    # Render chunk
                     success = self.render_chunk(world_surface, cx, cy)
                     if not success:
-                        log('ERROR', f"Failed to render chunk at ({cx}, {cy})")
                         continue
                     
                     # Update progress display
@@ -195,13 +201,10 @@ class WorldRenderer:
                     screen.blit(text_surface, text_rect)
                     pygame.display.flip()
                     
-                    # Handle events
                     for event in pygame.event.get():
                         if event.type == pygame.QUIT:
                             return False
             
-            # Final render
-            log('INFO', "World generation complete, displaying final render")
             screen.blit(world_surface, (0, 0))
             pygame.display.flip()
             return True
@@ -209,6 +212,21 @@ class WorldRenderer:
         except Exception as e:
             log('ERROR', f"Error during world rendering: {str(e)}")
             return False
+
+    def update_display(self, screen):
+        """Update the display based on current camera state"""
+        self.update_visible_chunks()
+        screen.fill((0, 0, 0))
+        
+        camera = self.camera_controller.get_state()
+        start_chunk_x = int(camera.x // CHUNK_SIZE)
+        start_chunk_y = int(camera.y // CHUNK_SIZE)
+        
+        for cy in range(start_chunk_y, start_chunk_y + self.visible_chunks_y):
+            for cx in range(start_chunk_x, start_chunk_x + self.visible_chunks_x):
+                self.render_chunk(screen, cx, cy)
+        
+        pygame.display.flip()
 
 def main():
     try:
@@ -218,21 +236,29 @@ def main():
         pygame.display.set_caption("World Generator")
 
         # Initialize systems
+        initial_camera = CameraState()
+        camera_controller = CameraController(initial_camera)
         planet_gen = PlanetGenerator(SEED)
-        renderer = WorldRenderer(planet_gen)
+        renderer = WorldRenderer(planet_gen, camera_controller)
 
-        # Generate and display world
+        # Generate initial world view
         success = renderer.render_world(screen)
         if not success:
             log('ERROR', "World generation failed")
             return
 
-        # Keep window open
+        # Main game loop with camera controls
         running = True
         while running:
+            dt = clock.tick(60) / 1000.0  # Get delta time in seconds
+            
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
+            
+            # Handle camera movement and update display
+            camera_controller.handle_input(dt)
+            renderer.update_display(screen)
 
         pygame.quit()
         
@@ -242,3 +268,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
+
