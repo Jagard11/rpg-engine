@@ -1,11 +1,12 @@
 # ./GameV2/world_display.py
-# Displays the game world with camera controls and debug features
+# Displays the game world with camera controls and debug features, now with generation UI
 
 import pygame
 from biome_types import BIOME_TYPES
 from logger import info, error, load_config, show_seam
 from camera import Camera
 from map_generator import MapGenerator
+from generation_ui import GenerationUI  # New import
 
 # Pygame setup
 pygame.init()
@@ -14,10 +15,8 @@ pygame.init()
 SCREEN_WIDTH = 640  # Pixels
 SCREEN_HEIGHT = 480  # Pixels
 
-# Map constants (independent of screen)
+# Default map constants (overridden by UI)
 TILE_SIZE = 32  # Base size of each tile in pixels
-MAP_WIDTH = 400  # Number of tiles wide
-MAP_HEIGHT = 200  # Number of tiles tall
 
 # Set up the display
 try:
@@ -29,12 +28,11 @@ except Exception as e:
     pygame.quit()
     exit()
 
-# Generate the world
-map_gen = MapGenerator(MAP_WIDTH, MAP_HEIGHT, seed=42)
-tiles = map_gen.generate()
-
-# Initialize camera
-camera = Camera(MAP_WIDTH, MAP_HEIGHT, TILE_SIZE, SCREEN_WIDTH, SCREEN_HEIGHT)
+# Initialize UI
+ui = GenerationUI(SCREEN_WIDTH, SCREEN_HEIGHT)
+state = "UI"  # Start in UI mode
+camera = None
+tiles = None
 
 # Main loop
 running = True
@@ -46,15 +44,31 @@ while running:
         if event.type == pygame.QUIT:
             running = False
 
-    # Reload config each frame to reflect changes
-    load_config()
+    if state == "UI":
+        # Handle UI events and rendering
+        for event in events:
+            ui.handle_event(event)
+        ui.render(screen)
+        
+        if ui.is_done():
+            # Generate map with user settings
+            seed, map_width, map_height = ui.get_settings()
+            map_gen = MapGenerator(map_width, map_height, seed=seed)
+            tiles = map_gen.generate()
+            camera = Camera(map_width, map_height, TILE_SIZE, SCREEN_WIDTH, SCREEN_HEIGHT)
+            state = "WORLD"
+            info(f"Switched to WORLD state with seed={seed}, map={map_width}x{map_height}")
 
-    # Update camera based on input
-    keys = pygame.key.get_pressed()
-    camera.update(keys, events)
+    elif state == "WORLD":
+        # Reload config each frame to reflect changes
+        load_config()
 
-    # Render the world through the camera
-    camera.render(screen, tiles, debug_seam=show_seam())
+        # Update camera based on input
+        keys = pygame.key.get_pressed()
+        camera.update(keys, events)
+
+        # Render the world through the camera
+        camera.render(screen, tiles, debug_seam=show_seam())
 
     # Update display
     pygame.display.flip()
