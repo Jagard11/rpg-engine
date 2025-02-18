@@ -4,7 +4,7 @@ import logging
 import sys
 
 # Logging toggle
-LOGGING_ENABLED = False
+LOGGING_ENABLED = True
 
 # Logging setup
 if LOGGING_ENABLED:

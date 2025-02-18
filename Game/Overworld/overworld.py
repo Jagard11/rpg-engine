@@ -215,18 +215,27 @@ class WorldRenderer:
 
     def update_display(self, screen):
         """Update the display based on current camera state"""
-        self.update_visible_chunks()
-        screen.fill((0, 0, 0))
-        
-        camera = self.camera_controller.get_state()
-        start_chunk_x = int(camera.x // CHUNK_SIZE)
-        start_chunk_y = int(camera.y // CHUNK_SIZE)
-        
-        for cy in range(start_chunk_y, start_chunk_y + self.visible_chunks_y):
-            for cx in range(start_chunk_x, start_chunk_x + self.visible_chunks_x):
-                self.render_chunk(screen, cx, cy)
-        
-        pygame.display.flip()
+        try:
+            self.update_visible_chunks()
+            screen.fill(PLACEHOLDER_COLOR)  # Use placeholder color to see full viewport
+            
+            camera = self.camera_controller.get_state()
+            start_chunk_x = int(camera.x // CHUNK_SIZE)
+            start_chunk_y = int(camera.y // CHUNK_SIZE)
+            
+            log('DEBUG', f"Rendering chunks from ({start_chunk_x}, {start_chunk_y}) "
+                        f"for {self.visible_chunks_x}x{self.visible_chunks_y} chunks "
+                        f"at scale {camera.scale}")
+            
+            for cy in range(start_chunk_y, start_chunk_y + self.visible_chunks_y):
+                for cx in range(start_chunk_x, start_chunk_x + self.visible_chunks_x):
+                    self.render_chunk(screen, cx, cy)
+            
+            pygame.display.flip()
+            return True
+        except Exception as e:
+            log('ERROR', f"Error in update_display: {str(e)}")
+            return False
 
 def main():
     try:
@@ -249,17 +258,84 @@ def main():
 
         # Main game loop with camera controls
         running = True
+        frame_count = 0
+        
         while running:
             dt = clock.tick(60) / 1000.0  # Get delta time in seconds
+            frame_count += 1
             
+            # Handle events
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
             
-            # Handle camera movement and update display
-            camera_controller.handle_input(dt)
-            renderer.update_display(screen)
+            # Handle camera movement
+            camera_moved = camera_controller.handle_input(dt)
+            
+            # Only update display if camera moved or every 60 frames
+            if camera_moved or frame_count % 60 == 0:
+                log('DEBUG', f"Updating display on frame {frame_count}")
+                renderer.update_display(screen)
+                frame_count = 0  # Reset counter after update
 
+        pygame.quit()
+        
+    except Exception as e:
+        log('CRITICAL', f"Fatal error in main: {str(e)}")
+        pygame.quit()
+
+def main():
+    try:
+        # Setup display
+        log('INFO', "Setting up display")
+        screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
+        pygame.display.set_caption("World Generator")
+
+        # Initialize systems
+        initial_camera = CameraState()
+        camera_controller = CameraController(initial_camera)
+        planet_gen = PlanetGenerator(SEED)
+        renderer = WorldRenderer(planet_gen, camera_controller)
+
+        # Generate initial world view
+        success = renderer.render_world(screen)
+        if not success:
+            log('ERROR', "World generation failed")
+            return
+
+        # Main game loop with camera controls
+        running = True
+        clock = pygame.time.Clock()
+        FPS = 60
+        
+        while running:
+            # Limit frame rate
+            clock.tick(FPS)
+            
+            # Process events
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    running = False
+                    break
+                
+                # Add specific event handling here if needed
+                # e.g., mouse events, keyboard events that aren't continuous
+            
+            try:
+                # Handle continuous input (movement)
+                dt = 1/FPS  # Fixed time step
+                camera_moved = camera_controller.handle_input(dt)
+                
+                # Update display if camera moved
+                if camera_moved:
+                    log('DEBUG', f"Camera moved, updating display")
+                    renderer.update_display(screen)
+                
+            except Exception as e:
+                log('ERROR', f"Error in game loop: {str(e)}")
+                continue
+
+        log('INFO', "Game loop ended, shutting down")
         pygame.quit()
         
     except Exception as e:
