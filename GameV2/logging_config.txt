@@ -1,9 +1,9 @@
 # ./GameV2/logging_config.txt
 # Set to 1 to enable, 0 to disable
-ENABLE_LOGGING=1
-LOG_LEVEL=DEBUG  # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
+ENABLE_LOGGING=0
+LOG_LEVEL=INFO  # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
 LOG_TO_FILE=0    # Set to 1 to log to a file (logs/output.log)
 MAP_GEN_LOGS=0   # Enable logs specific to map generation
 CREATURE_LOGS=0  # Enable logs specific to creature spawning/behavior
 
-SHOW_SEAM=1      # Show map seam lines (1 = show, 0 = hide)
+SHOW_SEAM=0     # Show map seam lines (1 = show, 0 = hide)
