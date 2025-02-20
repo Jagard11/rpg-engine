@@ -5,7 +5,7 @@ import os
 def compile_project_files(root_dir, file_extension='.py'):
     """
     Compiles all files with the specified extension in each subdirectory into separate output files,
-    named Compiled_<subdirectoryname>.txt.
+    named Compiled_<subdirectoryname>.txt, placed within their respective subdirectories.
 
     Args:
         root_dir (str): The root directory of the project.
@@ -15,11 +15,11 @@ def compile_project_files(root_dir, file_extension='.py'):
     for subdirectory in os.listdir(root_dir):
         subdir_path = os.path.join(root_dir, subdirectory)
         if os.path.isdir(subdir_path):
-            # Define output file name for this subdirectory
+            # Define output file name and path within the subdirectory
             output_file = f"Compiled_{subdirectory}.txt"
-            output_path = os.path.join(root_dir, output_file)
+            output_path = os.path.join(subdir_path, output_file)
             
-            # Open the output file for writing
+            # Open the output file for writing within the subdirectory
             with open(output_path, 'w', encoding='utf-8') as outfile:
                 # Walk through this subdirectory only
                 for dirpath, _, filenames in os.walk(subdir_path):
@@ -42,7 +42,7 @@ def compile_project_files(root_dir, file_extension='.py'):
             if os.path.exists(output_path) and os.path.getsize(output_path) == 0:
                 os.remove(output_path)
             else:
-                print(f"Compiled files from {subdirectory} into {output_file}")
+                print(f"Compiled files from {subdirectory} into {os.path.relpath(output_path, root_dir)}")
 
 if __name__ == "__main__":
     # Set the root directory to the current working directory (project root)
@@ -51,4 +51,4 @@ if __name__ == "__main__":
     # Compile all .py files
     compile_project_files(root_directory)
     
-    print("Compilation complete. Check the root directory for Compiled_<subdirectoryname>.txt files.")
+    print("Compilation complete. Check each subdirectory for Compiled_<subdirectoryname>.txt files.")
