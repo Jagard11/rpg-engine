@@ -34,10 +34,11 @@ def get_spell_wrappers() -> List[Dict]:
         conn.close()
 
 def get_spell_wrapper_details(wrapper_id: int) -> Optional[Dict]:
-    """Fetch details of a specific spell wrapper"""
+    """Fetch details of a specific spell wrapper, including associated effects"""
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
+        # Get wrapper basics
         cursor.execute("""
             SELECT 
                 sc.id, 
@@ -51,10 +52,23 @@ def get_spell_wrapper_details(wrapper_id: int) -> Optional[Dict]:
             WHERE sc.id = ?
         """, (wrapper_id,))
         result = cursor.fetchone()
-        if result:
-            columns = ['id', 'spell_name', 'spell_description', 'spell_id', 'resource_id', 'cost_amount']
-            return dict(zip(columns, result))
-        return None
+        if not result:
+            return None
+        columns = ['id', 'spell_name', 'spell_description', 'spell_id', 'resource_id', 'cost_amount']
+        wrapper_data = dict(zip(columns, result))
+
+        # Get associated spell effects
+        cursor.execute("""
+            SELECT se.id, se.name
+            FROM spell_has_effects she
+            JOIN spell_effects se ON she.spell_effect_id = se.id
+            WHERE she.spell_id = ?
+            ORDER BY she.effect_order
+        """, (wrapper_data['spell_id'],))
+        effects = [{'id': row[0], 'name': row[1]} for row in cursor.fetchall()]
+        wrapper_data['effect_ids'] = [e['id'] for e in effects]
+        wrapper_data['effect_names'] = [e['name'] for e in effects]
+        return wrapper_data
     except sqlite3.Error as e:
         st.error(f"Database error fetching wrapper details: {e}")
         return None
@@ -62,7 +76,7 @@ def get_spell_wrapper_details(wrapper_id: int) -> Optional[Dict]:
         conn.close()
 
 def save_spell_wrapper(data: Dict) -> Tuple[bool, str]:
-    """Save or update a spell wrapper, handling nullable resource_id"""
+    """Save or update a spell wrapper, including effect associations"""
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
@@ -93,7 +107,7 @@ def save_spell_wrapper(data: Dict) -> Tuple[bool, str]:
                     VALUES (?, ?)
                 """, (data['resource_name'], ''))
                 resource_id = cursor.lastrowid
-        elif data.get('resource_id') is not None:  # Use existing resource_id if provided
+        elif data.get('resource_id') is not None:
             resource_id = data['resource_id']
 
         # Save or update spell_costs
@@ -103,12 +117,22 @@ def save_spell_wrapper(data: Dict) -> Tuple[bool, str]:
                 SET spell_id = ?, resource_id = ?, cost_amount = ?
                 WHERE id = ?
             """, (spell_id, resource_id, data['cost_amount'], data['id']))
+            wrapper_id = data['id']
         else:
             cursor.execute("""
                 INSERT INTO spell_costs (spell_id, resource_id, cost_amount)
                 VALUES (?, ?, ?)
             """, (spell_id, resource_id, data['cost_amount']))
-            data['id'] = cursor.lastrowid
+            wrapper_id = cursor.lastrowid
+
+        # Update spell_has_effects
+        cursor.execute("DELETE FROM spell_has_effects WHERE spell_id = ?", (spell_id,))
+        if data.get('effect_ids'):
+            for order, effect_id in enumerate(data['effect_ids'], 1):
+                cursor.execute("""
+                    INSERT INTO spell_has_effects (spell_id, spell_effect_id, effect_order)
+                    VALUES (?, ?, ?)
+                """, (spell_id, effect_id, order))
 
         conn.commit()
         return True, f"Spell Wrapper {'updated' if data.get('id') else 'created'} successfully!"
@@ -138,6 +162,16 @@ def get_resources() -> List[Dict]:
     finally:
         conn.close()
 
+def get_spell_effects() -> List[Dict]:
+    """Fetch available spell effects"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT id, name FROM spell_effects ORDER BY name")
+        return [{'id': row[0], 'name': row[1]} for row in cursor.fetchall()]
+    finally:
+        conn.close()
+
 def render_spell_wrappers():
     """Render the spell wrappers editor"""
     st.header("Spell Wrappers Editor")
@@ -159,7 +193,7 @@ def render_spell_wrappers():
         wrapper_data = get_spell_wrapper_details(st.session_state.get('selected_wrapper_id')) if st.session_state.get('selected_wrapper_id') else {}
         
         with st.form(key="spell_wrapper_form"):
-            # Spells input: dropdown if records exist, text input if not
+            # Spells input
             spells = get_spells()
             if spells:
                 spell_id = st.selectbox(
@@ -173,7 +207,7 @@ def render_spell_wrappers():
                 st.warning("No spells found. Enter a new spell name below.")
                 spell_name = st.text_input("New Spell Name", value=wrapper_data.get('spell_name', ''))
 
-            # Resources input: dropdown with "None" option, or text input for new resource
+            # Resources input (optional)
             resources = get_resources()
             if resources:
                 resource_options = [{'id': None, 'name': 'None'}] + resources
@@ -191,19 +225,34 @@ def render_spell_wrappers():
             cost_amount = st.number_input("Cost Amount", min_value=0, value=wrapper_data.get('cost_amount', 0))
             spell_description = st.text_area("Spell Description (optional)", value=wrapper_data.get('spell_description', ''))
 
+            # Spell Effects multi-select
+            effects = get_spell_effects()
+            if effects:
+                effect_ids = st.multiselect(
+                    "Spell Effects",
+                    options=[e['id'] for e in effects],
+                    format_func=lambda x: next(e['name'] for e in effects if e['id'] == x),
+                    default=wrapper_data.get('effect_ids', []),
+                    help="Select one or more effects this spell will trigger."
+                )
+            else:
+                st.info("No spell effects found. Create effects in the Spell Effect Editor first.")
+                effect_ids = []
+
             submitted = st.form_submit_button(label="Save")
             if submitted:
                 if not spell_name:
                     st.error("Spell name is required!")
-                elif resource_name == '':
-                    resource_name = None  # Explicitly set to None if empty
                 else:
+                    if resource_name == '':
+                        resource_name = None
                     data = {
                         'id': wrapper_data.get('id'),
                         'spell_name': spell_name,
                         'spell_description': spell_description,
                         'resource_name': resource_name,
-                        'cost_amount': cost_amount
+                        'cost_amount': cost_amount,
+                        'effect_ids': effect_ids
                     }
                     if spells and 'spell_id' in locals():
                         data['spell_id'] = spell_id
