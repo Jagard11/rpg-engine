@@ -1,4 +1,4 @@
-# ./CharacterManagement/RaceEditor/forms.py
+# ./CharacterManagement/CharacterEditor/forms.py
 
 import sqlite3
 import streamlit as st

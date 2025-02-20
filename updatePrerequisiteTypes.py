@@ -1,3 +1,4 @@
+# ./updatePrerequisiteTypes.py
 # updatePrerequisiteTypes.py
 
 import sqlite3

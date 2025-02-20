@@ -7,5 +7,6 @@ from .RaceEditor.interface import render_race_editor
 __all__ = [
     'render_character_editor',
     'render_job_editor',
-    'render_race_editor'
+    'render_race_editor',
+    'render_spell_editor'
 ]
