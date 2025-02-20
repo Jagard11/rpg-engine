@@ -55,3 +55,6 @@ SchemaManager/exports/foreign_keys*
 
 # Import log
 import_log.txt
+
+# Ignore Compiled files for ai assistants.
+**/Compiled*.txt
