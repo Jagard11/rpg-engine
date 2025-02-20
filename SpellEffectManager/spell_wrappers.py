@@ -38,7 +38,6 @@ def get_spell_wrapper_details(wrapper_id: int) -> Optional[Dict]:
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        # Get wrapper basics
         cursor.execute("""
             SELECT 
                 sc.id, 
@@ -57,7 +56,6 @@ def get_spell_wrapper_details(wrapper_id: int) -> Optional[Dict]:
         columns = ['id', 'spell_name', 'spell_description', 'spell_id', 'resource_id', 'cost_amount']
         wrapper_data = dict(zip(columns, result))
 
-        # Get associated spell effects
         cursor.execute("""
             SELECT se.id, se.name
             FROM spell_has_effects she
@@ -76,7 +74,7 @@ def get_spell_wrapper_details(wrapper_id: int) -> Optional[Dict]:
         conn.close()
 
 def save_spell_wrapper(data: Dict) -> Tuple[bool, str]:
-    """Save or update a spell wrapper, including effect associations"""
+    """Save or update a spell wrapper, handling nullable resource_id"""
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
@@ -193,21 +191,14 @@ def render_spell_wrappers():
         wrapper_data = get_spell_wrapper_details(st.session_state.get('selected_wrapper_id')) if st.session_state.get('selected_wrapper_id') else {}
         
         with st.form(key="spell_wrapper_form"):
-            # Spells input
-            spells = get_spells()
-            if spells:
-                spell_id = st.selectbox(
-                    "Spell",
-                    options=[s['id'] for s in spells],
-                    format_func=lambda x: next(s['name'] for s in spells if s['id'] == x),
-                    index=next((i for i, s in enumerate(spells) if s['id'] == wrapper_data.get('spell_id')), 0) if wrapper_data.get('spell_id') else 0
-                )
-                spell_name = next(s['name'] for s in spells if s['id'] == spell_id)
-            else:
-                st.warning("No spells found. Enter a new spell name below.")
-                spell_name = st.text_input("New Spell Name", value=wrapper_data.get('spell_name', ''))
+            # Single mandatory spell name field
+            spell_name = st.text_input(
+                "Spell Name",
+                value=wrapper_data.get('spell_name', ''),
+                help="Enter the name of the spell (required)."
+            )
 
-            # Resources input (optional)
+            # Resources (optional)
             resources = get_resources()
             if resources:
                 resource_options = [{'id': None, 'name': 'None'}] + resources
@@ -254,8 +245,6 @@ def render_spell_wrappers():
                         'cost_amount': cost_amount,
                         'effect_ids': effect_ids
                     }
-                    if spells and 'spell_id' in locals():
-                        data['spell_id'] = spell_id
                     if resources and resource_id is not None:
                         data['resource_id'] = resource_id
                     success, message = save_spell_wrapper(data)
