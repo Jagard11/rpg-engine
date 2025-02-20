@@ -7,12 +7,9 @@ from pathlib import Path
 from CharacterManagement import (
     render_character_editor,
     render_job_editor, 
-    render_race_editor,
-    render_spell_editor
+    render_race_editor
 )
-from SpellManager import render_spell_manager
 from ClassManager import render_class_manager
-from SpellManager.spellEffects import init_effects_tables
 from ServerMessage import render_server_tab
 from LocationManager import render_location_editor_tab
 from DatabaseInspector import render_db_inspector_tab
@@ -23,18 +20,14 @@ def init_database():
     if not db_path.exists():
         st.error("Database not found. Please run SchemaManager/initializeSchema.py first.")
         raise FileNotFoundError("Database not found")
-    
-    # Initialize effects tables
-    init_effects_tables()
 
 # Initialize application
 st.set_page_config(page_title="RPG Character Management", layout="wide")
 init_database()
 
 # Create tabs
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "Character Editors", 
-    "Spell Editor",
     "Class Editor",
     "Location Editor", 
     "Database Editor", 
@@ -43,11 +36,10 @@ tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
 
 with tab1:
     # Create subtabs for different editors
-    char_tab, job_tab, race_tab, spell_tab = st.tabs([
+    char_tab, job_tab, race_tab = st.tabs([
         "Character Editor",
         "Job Editor", 
-        "Race Editor",
-        "Spell Editor"
+        "Race Editor"
     ])
     
     with char_tab:
@@ -58,14 +50,8 @@ with tab1:
         
     with race_tab:
         render_race_editor()
-        
-    with spell_tab:
-        render_spell_editor()
 
 with tab2:
-    render_spell_manager()
-
-with tab3:
     class_list_tab, class_editor_tab, class_spell_tab = st.tabs([
         "Class List",
         "Class Editor",
@@ -81,11 +67,11 @@ with tab3:
     with class_spell_tab:
         render_class_manager("spells")
 
-with tab4:
+with tab3:
     render_location_editor_tab()
 
-with tab5:
+with tab4:
     render_db_inspector_tab()
     
-with tab6:
+with tab5:
     render_server_tab()

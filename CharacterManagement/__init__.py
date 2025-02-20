@@ -3,11 +3,9 @@
 from .CharacterEditor.interface import render_character_editor
 from .JobEditor.interface import render_job_editor
 from .RaceEditor.interface import render_race_editor
-from .SpellEditor.interface import render_spell_editor
 
 __all__ = [
     'render_character_editor',
     'render_job_editor',
-    'render_race_editor',
-    'render_spell_editor'
+    'render_race_editor'
 ]
