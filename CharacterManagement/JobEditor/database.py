@@ -92,6 +92,22 @@ def get_class_categories() -> List[Dict]:
     finally:
         conn.close()
 
+def get_class_subcategories() -> List[Dict]:
+    """Get list of available job class subcategories"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT DISTINCT cs.id, cs.name
+            FROM class_subcategories cs
+            JOIN classes c ON cs.id = c.subcategory_id
+            WHERE c.is_racial = FALSE
+            ORDER BY cs.name
+        """)
+        return [{"id": row[0], "name": row[1]} for row in cursor.fetchall()]
+    finally:
+        conn.close()
+
 def save_job_class(class_data: Dict) -> Tuple[bool, str]:
     """Save or update a job class"""
     conn = get_db_connection()
@@ -106,6 +122,8 @@ def save_job_class(class_data: Dict) -> Tuple[bool, str]:
                 SET name = ?,
                     description = ?,
                     class_type = ?,
+                    category_id = ?,
+                    subcategory_id = ?,
                     base_hp = ?,
                     base_mp = ?,
                     hp_per_level = ?,
@@ -115,6 +133,8 @@ def save_job_class(class_data: Dict) -> Tuple[bool, str]:
                 class_data['name'],
                 class_data['description'],
                 class_data['class_type'],
+                class_data['category_id'],
+                class_data['subcategory_id'],
                 class_data['base_hp'],
                 class_data['base_mp'],
                 class_data['hp_per_level'],
@@ -125,13 +145,15 @@ def save_job_class(class_data: Dict) -> Tuple[bool, str]:
             # Insert new class
             cursor.execute("""
                 INSERT INTO classes (
-                    name, description, class_type, is_racial,
+                    name, description, class_type, is_racial, category_id, subcategory_id,
                     base_hp, base_mp, hp_per_level, mp_per_level
-                ) VALUES (?, ?, ?, FALSE, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, FALSE, ?, ?, ?, ?, ?, ?)
             """, (
                 class_data['name'],
                 class_data['description'],
                 class_data['class_type'],
+                class_data['category_id'],
+                class_data['subcategory_id'],
                 class_data['base_hp'],
                 class_data['base_mp'],
                 class_data['hp_per_level'],
