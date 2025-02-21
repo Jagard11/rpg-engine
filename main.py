@@ -65,11 +65,13 @@ if script_to_run == "main":
 
     # Define the cells for the grid
     cells = [
-        ("Class Editor", [
+        ("Job Editor", [
             ("Job Class Editor", "job"),
             ("Job Prerequisites", "job_prerequisites"),
             ("Job Conditions", "job_conditions"),
-            ("Job Spell List", "job_spell_list"),
+            ("Job Spell List", "job_spell_list")
+        ]),
+        ("Race Editor", [
             ("Race Class Editor", "race"),
             ("Race Equipment Slots", "race_equipment_slots")
         ]),
@@ -97,22 +99,22 @@ if script_to_run == "main":
         ])
     ]
 
-    # Generate HTML for the grid
+    # Generate HTML for the grid with four columns
     html = """
     <style>
     .grid-container {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 10px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);  /* Sets the grid to 4 columns */
+    gap: 10px;
     }
     .grid-cell {
-      border: 2px solid white;
-      padding: 10px;
+    border: 2px solid white;
+    padding: 10px;
     }
     </style>
     <div class="grid-container">
     """
-    for title, links in cells:
+    for title, links in cells:  # Assuming 'cells' is your list of cell data
         html += f'<div class="grid-cell"><h3>{title}</h3>'
         for link_text, script in links:
             html += f'<a href="http://localhost:8501/?script={script}" target="_blank">{link_text}</a><br>'
