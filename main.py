@@ -1,5 +1,3 @@
-# ./main.py
-
 import streamlit as st
 from pathlib import Path
 from CharacterManagement import (
@@ -65,35 +63,63 @@ if script_to_run == "main":
     st.title("RPG Editor Suite")
     st.write("Click a link below to open an editor in a new tab. Use multiple tabs to edit different records simultaneously.")
 
-    # Class Editor Section
-    with st.expander("Class Editor", expanded=True):
-        st.markdown("<a href='http://localhost:8501/?script=job' target='_blank'>Job Class Editor</a>", unsafe_allow_html=True)
-        st.markdown("<a href='http://localhost:8501/?script=job_prerequisites' target='_blank'>Job Prerequisites</a>", unsafe_allow_html=True)
-        st.markdown("<a href='http://localhost:8501/?script=job_conditions' target='_blank'>Job Conditions</a>", unsafe_allow_html=True)
-        st.markdown("<a href='http://localhost:8501/?script=job_spell_list' target='_blank'>Job Spell List</a>", unsafe_allow_html=True)
-        st.markdown("<a href='http://localhost:8501/?script=race' target='_blank'>Race Class Editor</a>", unsafe_allow_html=True)
-        st.markdown("<a href='http://localhost:8501/?script=race_equipment_slots' target='_blank'>Race Equipment Slots</a>", unsafe_allow_html=True)
+    # Define the cells for the grid
+    cells = [
+        ("Class Editor", [
+            ("Job Class Editor", "job"),
+            ("Job Prerequisites", "job_prerequisites"),
+            ("Job Conditions", "job_conditions"),
+            ("Job Spell List", "job_spell_list"),
+            ("Race Class Editor", "race"),
+            ("Race Equipment Slots", "race_equipment_slots")
+        ]),
+        ("Character Editor", [
+            ("Character Editor (Basic Info)", "character"),
+            ("Character History", "character_history"),
+            ("Equipment", "character_equipment"),
+            ("Level Distribution", "character_level_distribution"),
+            ("Spell List", "character_spell_list"),
+            ("Completed Quests", "character_quests"),
+            ("Earned Achievements", "character_achievements")
+        ]),
+        ("Spell Editor", [
+            ("Spell Effect Editor", "spell_effect"),
+            ("Spell Wrappers", "spell_wrappers")
+        ]),
+        ("Location Editor", [
+            ("Location Editor", "location")
+        ]),
+        ("Database Inspector", [
+            ("Database Inspector", "db_inspector")
+        ]),
+        ("Server Message", [
+            ("Server Message", "server")
+        ])
+    ]
 
-    # Character Editor Section
-    with st.expander("Character Editor", expanded=True):
-        st.markdown("<a href='http://localhost:8501/?script=character' target='_blank'>Character Editor (Basic Info)</a>", unsafe_allow_html=True)
-        st.markdown("<a href='http://localhost:8501/?script=character_history' target='_blank'>Character History</a>", unsafe_allow_html=True)
-        st.markdown("<a href='http://localhost:8501/?script=character_equipment' target='_blank'>Equipment</a>", unsafe_allow_html=True)
-        st.markdown("<a href='http://localhost:8501/?script=character_level_distribution' target='_blank'>Level Distribution</a>", unsafe_allow_html=True)
-        st.markdown("<a href='http://localhost:8501/?script=character_spell_list' target='_blank'>Spell List</a>", unsafe_allow_html=True)
-        st.markdown("<a href='http://localhost:8501/?script=character_quests' target='_blank'>Completed Quests</a>", unsafe_allow_html=True)
-        st.markdown("<a href='http://localhost:8501/?script=character_achievements' target='_blank'>Earned Achievements</a>", unsafe_allow_html=True)
+    # Generate HTML for the grid
+    html = """
+    <style>
+    .grid-container {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+    .grid-cell {
+      border: 2px solid white;
+      padding: 10px;
+    }
+    </style>
+    <div class="grid-container">
+    """
+    for title, links in cells:
+        html += f'<div class="grid-cell"><h3>{title}</h3>'
+        for link_text, script in links:
+            html += f'<a href="http://localhost:8501/?script={script}" target="_blank">{link_text}</a><br>'
+        html += '</div>'
+    html += '</div>'
 
-    # Spell Editor Section
-    with st.expander("Spell Editor", expanded=True):
-        st.markdown("<a href='http://localhost:8501/?script=spell_effect' target='_blank'>Spell Effect Editor</a>", unsafe_allow_html=True)
-        st.markdown("<a href='http://localhost:8501/?script=spell_wrappers' target='_blank'>Spell Wrappers</a>", unsafe_allow_html=True)
-
-    # Additional Tools Section
-    with st.expander("Additional Tools", expanded=True):
-        st.markdown("<a href='http://localhost:8501/?script=location' target='_blank'>Location Editor</a>", unsafe_allow_html=True)
-        st.markdown("<a href='http://localhost:8501/?script=db_inspector' target='_blank'>Database Inspector</a>", unsafe_allow_html=True)
-        st.markdown("<a href='http://localhost:8501/?script=server' target='_blank'>Server Message</a>", unsafe_allow_html=True)
+    st.markdown(html, unsafe_allow_html=True)
 
     st.info("Tip: Right-click links and select 'Open in New Tab' to quickly open multiple editors.")
 else:
