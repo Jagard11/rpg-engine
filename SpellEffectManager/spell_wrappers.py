@@ -19,13 +19,18 @@ def get_spell_wrappers() -> List[Dict]:
                 s.name AS spell_name, 
                 s.description AS spell_description, 
                 r.name AS resource_name, 
-                sc.cost_amount
+                sc.cost_amount,
+                s.charges_per_day,
+                st.max_range,
+                st.max_targets
             FROM spell_costs sc
             JOIN spells s ON sc.spell_id = s.id
             LEFT JOIN resources r ON sc.resource_id = r.id
+            LEFT JOIN spell_targeting st ON s.id = st.spell_id
             ORDER BY s.name
         """)
-        columns = ['id', 'spell_name', 'spell_description', 'resource_name', 'cost_amount']
+        columns = ['id', 'spell_name', 'spell_description', 'resource_name', 'cost_amount', 
+                   'charges_per_day', 'max_range', 'max_targets']
         return [dict(zip(columns, row)) for row in cursor.fetchall()]
     except sqlite3.Error as e:
         st.error(f"Database error fetching spell wrappers: {e}")
@@ -45,15 +50,24 @@ def get_spell_wrapper_details(wrapper_id: int) -> Optional[Dict]:
                 s.description AS spell_description, 
                 sc.spell_id, 
                 sc.resource_id, 
-                sc.cost_amount
+                sc.cost_amount,
+                s.charges_per_day,
+                st.max_range,
+                st.max_targets,
+                st.requires_los,
+                st.allow_dead_targets,
+                st.ignore_target_immunity
             FROM spell_costs sc
             JOIN spells s ON sc.spell_id = s.id
+            LEFT JOIN spell_targeting st ON s.id = st.spell_id
             WHERE sc.id = ?
         """, (wrapper_id,))
         result = cursor.fetchone()
         if not result:
             return None
-        columns = ['id', 'spell_name', 'spell_description', 'spell_id', 'resource_id', 'cost_amount']
+        columns = ['id', 'spell_name', 'spell_description', 'spell_id', 'resource_id', 
+                   'cost_amount', 'charges_per_day', 'max_range', 'max_targets', 
+                   'requires_los', 'allow_dead_targets', 'ignore_target_immunity']
         wrapper_data = dict(zip(columns, result))
 
         cursor.execute("""
@@ -65,7 +79,6 @@ def get_spell_wrapper_details(wrapper_id: int) -> Optional[Dict]:
         """, (wrapper_data['spell_id'],))
         effects = [{'id': row[0], 'name': row[1]} for row in cursor.fetchall()]
         wrapper_data['effect_ids'] = [e['id'] for e in effects]
-        wrapper_data['effect_names'] = [e['name'] for e in effects]
         return wrapper_data
     except sqlite3.Error as e:
         st.error(f"Database error fetching wrapper details: {e}")
@@ -74,7 +87,7 @@ def get_spell_wrapper_details(wrapper_id: int) -> Optional[Dict]:
         conn.close()
 
 def save_spell_wrapper(data: Dict) -> Tuple[bool, str]:
-    """Save or update a spell wrapper, handling nullable resource_id"""
+    """Save or update a spell wrapper"""
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
@@ -85,11 +98,15 @@ def save_spell_wrapper(data: Dict) -> Tuple[bool, str]:
         spell_result = cursor.fetchone()
         if spell_result:
             spell_id = spell_result[0]
+            cursor.execute("""
+                UPDATE spells SET description = ?, charges_per_day = ?
+                WHERE id = ?
+            """, (data['spell_description'], data['charges_per_day'], spell_id))
         else:
             cursor.execute("""
-                INSERT INTO spells (name, description, spell_tier)
-                VALUES (?, ?, 1)
-            """, (data['spell_name'], data.get('spell_description', ''),))
+                INSERT INTO spells (name, description, spell_tier, charges_per_day)
+                VALUES (?, ?, 1, ?)
+            """, (data['spell_name'], data['spell_description'], data['charges_per_day']))
             spell_id = cursor.lastrowid
 
         # Handle resource (optional)
@@ -131,6 +148,15 @@ def save_spell_wrapper(data: Dict) -> Tuple[bool, str]:
                     INSERT INTO spell_has_effects (spell_id, spell_effect_id, effect_order)
                     VALUES (?, ?, ?)
                 """, (spell_id, effect_id, order))
+
+        # Update spell_targeting
+        cursor.execute("DELETE FROM spell_targeting WHERE spell_id = ?", (spell_id,))
+        cursor.execute("""
+            INSERT INTO spell_targeting (spell_id, max_targets, requires_los, allow_dead_targets, 
+                                       ignore_target_immunity, max_range)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (spell_id, data['max_targets'], data['requires_los'], data['allow_dead_targets'], 
+              data['ignore_target_immunity'], data['max_range']))
 
         conn.commit()
         return True, f"Spell Wrapper {'updated' if data.get('id') else 'created'} successfully!"
@@ -190,13 +216,17 @@ def render_spell_wrappers():
     with col2:
         wrapper_data = get_spell_wrapper_details(st.session_state.get('selected_wrapper_id')) if st.session_state.get('selected_wrapper_id') else {}
         
-        with st.form(key="spell_wrapper_form"):
-            # Single mandatory spell name field
-            spell_name = st.text_input(
-                "Spell Name",
-                value=wrapper_data.get('spell_name', ''),
-                help="Enter the name of the spell (required)."
-            )
+        with st.form("spell_wrapper_form"):
+            spell_name = st.text_input("Spell Name", 
+                                     value=wrapper_data.get('spell_name', ''),
+                                     help="Enter the name of the spell (required).")
+            spell_description = st.text_area("Spell Description (optional)", 
+                                           value=wrapper_data.get('spell_description', ''))
+
+            # Casting Time
+            casting_time = st.number_input("Casting Time (seconds)", 
+                                         min_value=0.0, step=0.1, 
+                                         value=float(wrapper_data.get('casting_time', 0.0)) if wrapper_data.get('casting_time') is not None else 0.0)
 
             # Resources (optional)
             resources = get_resources()
@@ -211,12 +241,34 @@ def render_spell_wrappers():
                 resource_name = None if resource_id is None else next(r['name'] for r in resources if r['id'] == resource_id)
             else:
                 st.info("No resources found. Optionally enter a new resource name or leave blank.")
-                resource_name = st.text_input("New Resource Name (optional)", value=wrapper_data.get('resource_name', '') if wrapper_data.get('resource_name') else '')
+                resource_name = st.text_input("New Resource Name (optional)", 
+                                            value=wrapper_data.get('resource_name', '') if wrapper_data.get('resource_name') else '')
 
-            cost_amount = st.number_input("Cost Amount", min_value=0, value=wrapper_data.get('cost_amount', 0))
-            spell_description = st.text_area("Spell Description (optional)", value=wrapper_data.get('spell_description', ''))
+            cost_amount = st.number_input("Cost Amount", 
+                                        min_value=0, 
+                                        value=wrapper_data.get('cost_amount', 0))
 
-            # Spell Effects multi-select
+            # Charges Per Day
+            charges_per_day = st.number_input("Charges Per Day (optional, 0 for unlimited)", 
+                                            min_value=0, 
+                                            value=wrapper_data.get('charges_per_day', 0) if wrapper_data.get('charges_per_day') is not None else 0)
+
+            # Targeting Details
+            st.subheader("Targeting")
+            max_range = st.number_input("Max Range (meters)", 
+                                      min_value=0, 
+                                      value=wrapper_data.get('max_range', 0) if wrapper_data.get('max_range') is not None else 0)
+            max_targets = st.number_input("Max Targets", 
+                                        min_value=1, 
+                                        value=wrapper_data.get('max_targets', 1) if wrapper_data.get('max_targets') is not None else 1)
+            requires_los = st.checkbox("Requires Line of Sight", 
+                                     value=wrapper_data.get('requires_los', True) if wrapper_data.get('requires_los') is not None else True)
+            allow_dead_targets = st.checkbox("Allow Dead Targets", 
+                                           value=wrapper_data.get('allow_dead_targets', False) if wrapper_data.get('allow_dead_targets') is not None else False)
+            ignore_target_immunity = st.checkbox("Ignore Target Immunity", 
+                                               value=wrapper_data.get('ignore_target_immunity', False) if wrapper_data.get('ignore_target_immunity') is not None else False)
+
+            # Spell Effects
             effects = get_spell_effects()
             if effects:
                 effect_ids = st.multiselect(
@@ -243,6 +295,13 @@ def render_spell_wrappers():
                         'spell_description': spell_description,
                         'resource_name': resource_name,
                         'cost_amount': cost_amount,
+                        'charges_per_day': charges_per_day if charges_per_day > 0 else None,
+                        'casting_time': casting_time,
+                        'max_range': max_range,
+                        'max_targets': max_targets,
+                        'requires_los': requires_los,
+                        'allow_dead_targets': allow_dead_targets,
+                        'ignore_target_immunity': ignore_target_immunity,
                         'effect_ids': effect_ids
                     }
                     if resources and resource_id is not None:
