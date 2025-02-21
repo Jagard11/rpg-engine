@@ -3,7 +3,7 @@
 import streamlit as st
 from typing import Literal
 import pandas as pd
-from .classesTable import render_classes_table
+from .classesTable import render_job_table
 from .classEditor import render_class_editor
 from .classSpellList import render_class_spell_list
 
@@ -19,7 +19,7 @@ def render_class_manager(view: Literal["list", "editor", "spells"]):
         
     match view:
         case "list":
-            render_classes_table()
+            render_job_table()
         case "editor":
             render_class_editor()
         case "spells":

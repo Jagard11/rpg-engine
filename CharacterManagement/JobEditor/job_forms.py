@@ -8,53 +8,53 @@ from .database import (
     save_job_class
 )
 
-def render_job_class_form(selected_class: Dict) -> None:
-    """Render the job class editing form
+def render_job_class_form(selected_class: Optional[Dict] = None, mode: str = "create", record_id: Optional[int] = None) -> None:
+    """Render the job class editing form with dynamic subtitle
     
     Args:
-        selected_class: Dictionary containing the selected class data
+        selected_class: Dictionary containing the selected class data (None for new)
+        mode: "edit" or "create"
+        record_id: ID of the record being edited (if mode=="edit")
     """
     with st.form("job_class_form"):
-        st.subheader("Edit Job Class")
+        # Set the subtitle based on mode and record ID
+        if mode == "edit" and record_id:
+            st.subheader(f"Edit Job Class - {record_id}")
+        else:
+            st.subheader("Create New Job Class")
         
         # Basic info
         col1, col2 = st.columns(2)
         with col1:
-            name = st.text_input("Name", value=selected_class['name'])
+            name = st.text_input("Name", value=selected_class['name'] if selected_class else '')
             
         with col2:
             class_types = get_class_types()
             type_id = st.selectbox(
                 "Type",
                 options=[t["id"] for t in class_types],
-                format_func=lambda x: next(t["name"] for t in class_types 
-                                        if t["id"] == x),
+                format_func=lambda x: next(t["name"] for t in class_types if t["id"] == x),
                 index=0
             )
         
-        description = st.text_area("Description", 
-                                 value=selected_class['description'])
+        description = st.text_area("Description", value=selected_class['description'] if selected_class else '')
         
         # Stats
         st.subheader("Stats")
         col1, col2 = st.columns(2)
         
         with col1:
-            base_hp = st.number_input("Base HP", 
-                                    value=selected_class['base_hp'])
-            base_mp = st.number_input("Base MP", 
-                                    value=selected_class['base_mp'])
+            base_hp = st.number_input("Base HP", value=selected_class['base_hp'] if selected_class else 0)
+            base_mp = st.number_input("Base MP", value=selected_class['base_mp'] if selected_class else 0)
         
         with col2:
-            hp_per_level = st.number_input("HP per Level", 
-                                          value=selected_class['hp_per_level'])
-            mp_per_level = st.number_input("MP per Level", 
-                                          value=selected_class['mp_per_level'])
+            hp_per_level = st.number_input("HP per Level", value=selected_class['hp_per_level'] if selected_class else 0)
+            mp_per_level = st.number_input("MP per Level", value=selected_class['mp_per_level'] if selected_class else 0)
         
         # Save button
         if st.form_submit_button("Save Changes"):
             success, message = save_job_class({
-                'id': selected_class['id'],
+                'id': selected_class['id'] if selected_class else None,
                 'name': name,
                 'description': description,
                 'class_type': type_id,

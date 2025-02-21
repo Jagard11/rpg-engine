@@ -1,3 +1,5 @@
+# ./main.py
+
 import streamlit as st
 from pathlib import Path
 from CharacterManagement import (
@@ -16,6 +18,7 @@ from CharacterManagement.JobEditor.forms.prerequisites import render_job_prerequ
 from CharacterManagement.JobEditor.forms.conditions import render_job_conditions
 from CharacterManagement.JobEditor.forms.spell_list import render_job_spell_list
 from ClassManager import render_class_manager
+from ClassManager.classesTable import render_job_table
 from ServerMessage import render_server_tab
 from LocationManager import render_location_editor_tab
 from DatabaseInspector import render_db_inspector_tab
@@ -41,10 +44,11 @@ editors = {
     "character_spell_list": render_spell_list,
     "character_quests": render_completed_quests,
     "character_achievements": render_earned_achievements,
-    "job": render_job_editor,
+    "job_class_editor": render_job_editor,
     "job_prerequisites": render_job_prerequisites,
     "job_conditions": render_job_conditions,
     "job_spell_list": render_job_spell_list,
+    "job_table": render_job_table,
     "race": render_race_editor,
     "race_equipment_slots": render_equipment_slots,
     "class": lambda: render_class_manager("editor"),
@@ -66,10 +70,11 @@ if script_to_run == "main":
     # Define the cells for the grid
     cells = [
         ("Job Editor", [
-            ("Job Class Editor", "job"),
+            ("Job Class Editor", "job_class_editor"),
             ("Job Prerequisites", "job_prerequisites"),
             ("Job Conditions", "job_conditions"),
-            ("Job Spell List", "job_spell_list")
+            ("Job Spell List", "job_spell_list"),
+            ("Job Table", "job_table")
         ]),
         ("Race Editor", [
             ("Race Class Editor", "race"),
