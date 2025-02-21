@@ -25,15 +25,20 @@ from DatabaseInspector import render_db_inspector_tab
 from SpellEffectManager import render_spell_effect_editor
 from SpellEffectManager.spell_wrappers import render_spell_wrappers
 
+# Set page config as the first Streamlit command
+st.set_page_config(page_title="RPG Character Management", layout="wide")
+
 def init_database():
     """Initialize database connection and required tables"""
     db_path = Path('rpg_data.db')
     if not db_path.exists():
-        st.error("Database not found. Please run SchemaManager/initializeSchema.py first.")
-        raise FileNotFoundError("Database not found")
+        raise FileNotFoundError("Database not found. Please run SchemaManager/initializeSchema.py first.")
 
-st.set_page_config(page_title="RPG Character Management", layout="wide")
-init_database()
+try:
+    init_database()
+except FileNotFoundError as e:
+    st.error(str(e))
+    st.stop()  # Stop the app if database is not found
 
 # Editor definitions with script keys
 editors = {
@@ -44,7 +49,7 @@ editors = {
     "character_spell_list": render_spell_list,
     "character_quests": render_completed_quests,
     "character_achievements": render_earned_achievements,
-    "job_class_editor": render_job_editor,
+    "job_classeditor": render_job_editor,
     "job_prerequisites": render_job_prerequisites,
     "job_conditions": render_job_conditions,
     "job_spell_list": render_job_spell_list,
@@ -70,7 +75,7 @@ if script_to_run == "main":
     # Define the cells for the grid
     cells = [
         ("Job Editor", [
-            ("Job Class Editor", "job_class_editor"),
+            ("Job Class Editor", "job_classeditor"),
             ("Job Prerequisites", "job_prerequisites"),
             ("Job Conditions", "job_conditions"),
             ("Job Spell List", "job_spell_list"),
@@ -119,7 +124,7 @@ if script_to_run == "main":
     </style>
     <div class="grid-container">
     """
-    for title, links in cells:  # Assuming 'cells' is your list of cell data
+    for title, links in cells:
         html += f'<div class="grid-cell"><h3>{title}</h3>'
         for link_text, script in links:
             html += f'<a href="http://localhost:8501/?script={script}" target="_blank">{link_text}</a><br>'

@@ -99,7 +99,7 @@ def render_job_table():
         return
 
     # Add clickable Edit hyperlinks column with correct URL
-    editor_url = "http://localhost:8501/?script=job_class_editor"  # Matches main.py routing
+    editor_url = "http://localhost:8501/?script=job_classeditor&mode=edit"
     df['Edit'] = df['id'].apply(
         lambda x: f'<a href="{editor_url}&edit_id={x}" target="_blank">Edit</a>'
     )
@@ -133,9 +133,7 @@ def render_job_table():
     col1, col2, col3 = st.columns(3)
     with col1:
         if st.button("New Record", key="new_record"):
-            st.session_state.current_class_id = 0
-            st.session_state.is_racial = 0
-            st.session_state.view = "editor"
+            st.query_params.update({"script": "job_classeditor", "mode": "create"})
             st.rerun()
     with col2:
         if st.session_state.selected_ids:
