@@ -15,7 +15,6 @@ from ClassManager.conditions import render_job_conditions
 from ClassManager.spell_list import render_job_spell_list
 from ClassManager import render_class_manager
 from ClassManager.classesTable import render_job_table
-from ClassManager.interface import render_job_editor
 from ServerMessage import render_server_tab
 from LocationManager import render_location_editor_tab
 from DatabaseInspector import render_db_inspector_tab
@@ -45,7 +44,6 @@ editors = {
     "character_spell_list": render_spell_list,
     "character_quests": render_completed_quests,
     "character_achievements": render_earned_achievements,
-    "job_classeditor": render_job_editor,
     "job_prerequisites": render_job_prerequisites,
     "job_conditions": render_job_conditions,
     "job_spell_list": render_job_spell_list,
@@ -71,7 +69,6 @@ if script_to_run == "main":
     cells = [
         ("Job Editor", [
             ("Job Table", "job_table"),
-            ("Job Class Editor", "job_classeditor"),
             ("Job Prerequisites", "job_prerequisites"),
             ("Job Conditions", "job_conditions"),
             ("Job Spell List", "job_spell_list")
