@@ -70,11 +70,11 @@ if script_to_run == "main":
     # Define the cells for the grid
     cells = [
         ("Job Editor", [
+            ("Job Table", "job_table"),
             ("Job Class Editor", "job_classeditor"),
             ("Job Prerequisites", "job_prerequisites"),
             ("Job Conditions", "job_conditions"),
-            ("Job Spell List", "job_spell_list"),
-            ("Job Table", "job_table")
+            ("Job Spell List", "job_spell_list")
         ]),
         ("Race Editor", [
             ("Race Equipment Slots", "race_equipment_slots")
