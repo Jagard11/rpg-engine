@@ -12,6 +12,7 @@ def render_character_history(character_data: dict = None):
         - Include events like battles fought, skills learned, relationships formed, and major life milestones.
         - Allow adding, editing, and deleting events with details (e.g., date, description, participants).
         - Integrate with other systems (e.g., quests, classes) to auto-generate some events.
+        - Intended to help an AI take over for a player when they wish to control a different character and this one becomes an NPC.
         - Current Status: Placeholder - awaiting design finalization.
         """
     )
