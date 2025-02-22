@@ -1,4 +1,4 @@
-# ./ClassManager/classesTable.py
+# ./ClassManager/JobClassEditor/classesTable.py
 
 import streamlit as st
 import sqlite3

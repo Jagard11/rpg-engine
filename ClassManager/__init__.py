@@ -3,9 +3,8 @@
 import streamlit as st
 from typing import Literal
 import pandas as pd
-from .classesTable import render_job_table
-from .classEditor import render_class_editor
-from .classSpellList import render_class_spell_list
+from .JobClassEditor.classesTable import render_job_table
+from .JobClassEditor.class_editor import render_class_editor
 
 def render_class_manager(view: Literal["list", "editor", "spells"]):
     """Main rendering function for the class management system
@@ -22,7 +21,5 @@ def render_class_manager(view: Literal["list", "editor", "spells"]):
             render_job_table()
         case "editor":
             render_class_editor()
-        case "spells":
-            render_class_spell_list()
         case _:
             st.error(f"Unknown view type: {view}")

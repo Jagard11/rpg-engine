@@ -1,9 +1,10 @@
-# ./CharacterManagement/JobEditor/forms/conditions.py
+# ./ClassManager/JobClassEditor/conditions_tab.py
 
 import streamlit as st
+from typing import Dict, Any
 
-def render_job_conditions(job_data: dict = None):
-    """Render the Conditions subtab (placeholder) for Job Class."""
+def render_conditions_tab(current_record: Dict[str, Any]):
+    """Render the Conditions tab"""
     st.subheader("Conditions Preventing Unlock")
     st.info(
         """
@@ -14,6 +15,6 @@ def render_job_conditions(job_data: dict = None):
         - Current Status: Placeholder - awaiting condition system design.
         """
     )
-    if job_data:
-        st.write(f"Job ID: {job_data.get('id', 'N/A')}")
+    if current_record:
+        st.write(f"Class ID: {current_record.get('id', 'N/A')}")
         st.write("Unlock prevention conditions not yet implemented.")

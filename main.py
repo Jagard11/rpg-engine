@@ -10,11 +10,8 @@ from CharacterManager.spell_list import render_spell_list
 from CharacterManager.quests import render_completed_quests
 from CharacterManager.achievements import render_earned_achievements
 from ClassManager.equipment_slots import render_equipment_slots
-from ClassManager.prerequisites import render_job_prerequisites
-from ClassManager.conditions import render_job_conditions
-from ClassManager.spell_list import render_job_spell_list
-from ClassManager import render_class_manager
-from ClassManager.classesTable import render_job_table
+from ClassManager.JobClassEditor.class_editor import render_class_editor  
+from ClassManager.JobClassEditor.classesTable import render_job_table    
 from ServerMessage import render_server_tab
 from LocationManager import render_location_editor_tab
 from DatabaseInspector import render_db_inspector_tab
@@ -44,12 +41,9 @@ editors = {
     "character_spell_list": render_spell_list,
     "character_quests": render_completed_quests,
     "character_achievements": render_earned_achievements,
-    "job_prerequisites": render_job_prerequisites,
-    "job_conditions": render_job_conditions,
-    "job_spell_list": render_job_spell_list,
     "job_table": render_job_table,
     "race_equipment_slots": render_equipment_slots,
-    "job_class_editor": lambda: render_class_manager("editor"),
+    "job_class_editor": render_class_editor,  # Updated to use wrapper directly
     "location": render_location_editor_tab,
     "spell_effect": render_spell_effect_editor,
     "spell_wrappers": render_spell_wrappers,
@@ -68,10 +62,7 @@ if script_to_run == "main":
     # Define the cells for the grid
     cells = [
         ("Job Editor", [
-            ("Job Table", "job_table"),
-            ("Job Prerequisites", "job_prerequisites"),
-            ("Job Conditions", "job_conditions"),
-            ("Job Spell List", "job_spell_list")
+            ("Job Table", "job_table")
         ]),
         ("Race Editor", [
             ("Race Equipment Slots", "race_equipment_slots")
