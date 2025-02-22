@@ -49,7 +49,7 @@ editors = {
     "job_spell_list": render_job_spell_list,
     "job_table": render_job_table,
     "race_equipment_slots": render_equipment_slots,
-    "class": lambda: render_class_manager("editor"),
+    "job_class_editor": lambda: render_class_manager("editor"),
     "location": render_location_editor_tab,
     "spell_effect": render_spell_effect_editor,
     "spell_wrappers": render_spell_wrappers,

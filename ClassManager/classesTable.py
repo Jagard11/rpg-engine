@@ -121,7 +121,7 @@ def render_job_table():
             st.session_state.page = 0
 
     # Fixed records per page
-    records_per_page = 25  # You can adjust this value as needed
+    records_per_page = 25
 
     # Load records for the current page
     offset = st.session_state.page * records_per_page
@@ -131,12 +131,11 @@ def render_job_table():
     if df.empty:
         st.warning("No job classes found. Click 'New Record' below to add one.")
     else:
-        # Add clickable Edit hyperlinks
-        editor_url = "http://localhost:8501/?script=job_classeditor&mode=edit"
+        # Reverted to original working URL format
+        editor_url = "http://localhost:8501/?script=job_class_editor&mode=edit"
         df['Edit'] = df['id'].apply(
             lambda x: f'<a href="{editor_url}&edit_id={x}" target="_blank">Edit</a>'
         )
-        # Display table without Select column
         st.write(
             df[['id', 'name', 'class_type', 'category_id', 'subcategory_id', 'Edit']].to_html(escape=False, index=False),
             unsafe_allow_html=True
@@ -144,7 +143,7 @@ def render_job_table():
 
     # New Record button under the table
     if st.button("New Record", key="new_record"):
-        st.query_params.update({"script": "job_classeditor", "mode": "create"})
+        st.query_params.update({"script": "job_class_editor", "mode": "create"})
         st.rerun()
 
     # Pagination controls on a single row without dropdown
