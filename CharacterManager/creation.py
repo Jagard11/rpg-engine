@@ -2,7 +2,7 @@
 
 import streamlit as st
 from typing import Dict, Optional
-from ..database import (
+from .database import (
     get_available_race_categories,
     save_character
 )

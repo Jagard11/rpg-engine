@@ -2,23 +2,20 @@
 
 import streamlit as st
 from pathlib import Path
-from CharacterManagement import (
-    render_character_editor,
-    render_job_editor,
-    render_race_editor
-)
-from CharacterManagement.CharacterEditor.forms.history import render_character_history
-from CharacterManagement.CharacterEditor.forms.equipment import render_character_equipment
-from CharacterManagement.CharacterEditor.forms.level_distribution import render_level_distribution
-from CharacterManagement.CharacterEditor.forms.spell_list import render_spell_list
-from CharacterManagement.CharacterEditor.forms.quests import render_completed_quests
-from CharacterManagement.CharacterEditor.forms.achievements import render_earned_achievements
-from CharacterManagement.RaceEditor.forms.equipment_slots import render_equipment_slots
-from CharacterManagement.JobEditor.forms.prerequisites import render_job_prerequisites
-from CharacterManagement.JobEditor.forms.conditions import render_job_conditions
-from CharacterManagement.JobEditor.forms.spell_list import render_job_spell_list
+
+from CharacterManager.history import render_character_history
+from CharacterManager.equipment import render_character_equipment
+from CharacterManager.level_distribution import render_level_distribution
+from CharacterManager.spell_list import render_spell_list
+from CharacterManager.quests import render_completed_quests
+from CharacterManager.achievements import render_earned_achievements
+from ClassManager.equipment_slots import render_equipment_slots
+from ClassManager.prerequisites import render_job_prerequisites
+from ClassManager.conditions import render_job_conditions
+from ClassManager.spell_list import render_job_spell_list
 from ClassManager import render_class_manager
 from ClassManager.classesTable import render_job_table
+from ClassManager.interface import render_job_editor
 from ServerMessage import render_server_tab
 from LocationManager import render_location_editor_tab
 from DatabaseInspector import render_db_inspector_tab
@@ -42,7 +39,6 @@ except FileNotFoundError as e:
 
 # Editor definitions with script keys
 editors = {
-    "character": render_character_editor,
     "character_history": render_character_history,
     "character_equipment": render_character_equipment,
     "character_level_distribution": render_level_distribution,
@@ -54,7 +50,6 @@ editors = {
     "job_conditions": render_job_conditions,
     "job_spell_list": render_job_spell_list,
     "job_table": render_job_table,
-    "race": render_race_editor,
     "race_equipment_slots": render_equipment_slots,
     "class": lambda: render_class_manager("editor"),
     "location": render_location_editor_tab,
@@ -82,11 +77,9 @@ if script_to_run == "main":
             ("Job Table", "job_table")
         ]),
         ("Race Editor", [
-            ("Race Class Editor", "race"),
             ("Race Equipment Slots", "race_equipment_slots")
         ]),
         ("Character Editor", [
-            ("Character Editor (Basic Info)", "character"),
             ("Character History", "character_history"),
             ("Equipment", "character_equipment"),
             ("Level Distribution", "character_level_distribution"),

@@ -2,7 +2,7 @@
 
 import streamlit as st
 from typing import Dict
-from ..database import get_character_classes
+from .database import get_character_classes
 
 def render_character_view(character: Dict) -> None:
     """Render character details view"""
