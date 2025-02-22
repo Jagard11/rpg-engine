@@ -66,11 +66,9 @@ def get_class_types() -> List[Dict]:
     cursor = conn.cursor()
     try:
         cursor.execute("""
-            SELECT DISTINCT ct.id, ct.name
-            FROM class_types ct
-            JOIN classes c ON ct.id = c.class_type
-            WHERE c.is_racial = FALSE
-            ORDER BY ct.name
+            SELECT id, name
+            FROM class_types
+            ORDER BY name
         """)
         return [{"id": row[0], "name": row[1]} for row in cursor.fetchall()]
     finally:
@@ -82,11 +80,10 @@ def get_class_categories() -> List[Dict]:
     cursor = conn.cursor()
     try:
         cursor.execute("""
-            SELECT DISTINCT cc.id, cc.name
-            FROM class_categories cc
-            JOIN classes c ON cc.id = c.category_id
-            WHERE c.is_racial = FALSE
-            ORDER BY cc.name
+            SELECT id, name
+            FROM class_categories
+            WHERE is_racial = FALSE
+            ORDER BY name
         """)
         return [{"id": row[0], "name": row[1]} for row in cursor.fetchall()]
     finally:
@@ -98,11 +95,9 @@ def get_class_subcategories() -> List[Dict]:
     cursor = conn.cursor()
     try:
         cursor.execute("""
-            SELECT DISTINCT cs.id, cs.name
-            FROM class_subcategories cs
-            JOIN classes c ON cs.id = c.subcategory_id
-            WHERE c.is_racial = FALSE
-            ORDER BY cs.name
+            SELECT id, name
+            FROM class_subcategories
+            ORDER BY name
         """)
         return [{"id": row[0], "name": row[1]} for row in cursor.fetchall()]
     finally:

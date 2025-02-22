@@ -94,65 +94,68 @@ def render_job_table():
     # Load records for the current page
     offset = st.session_state.page * st.session_state.records_per_page
     df = load_job_classes(limit=st.session_state.records_per_page, offset=offset)
-    if df.empty:
-        st.warning("No job classes found.")
-        return
 
-    # Add clickable Edit hyperlinks column with correct URL
-    editor_url = "http://localhost:8501/?script=job_classeditor&mode=edit"
-    df['Edit'] = df['id'].apply(
-        lambda x: f'<a href="{editor_url}&edit_id={x}" target="_blank">Edit</a>'
-    )
-
-    # Add a selection checkbox column
-    if 'selected_ids' not in st.session_state:
-        st.session_state.selected_ids = []
-    df['Select'] = df['id'].apply(
-        lambda x: f'<input type="checkbox" name="select_{x}" {"checked" if x in st.session_state.selected_ids else ""}>'
-    )
-
-    # Display the table with hyperlinks and checkboxes using st.markdown
-    st.subheader("Job Classes Table")
-    st.write(
-        df[['Select', 'id', 'name', 'class_type', 'category_id', 'subcategory_id', 'Edit']].to_html(escape=False, index=False),
-        unsafe_allow_html=True
-    )
-
-    # Update selected_ids based on form submission
-    with st.form(key="selection_form"):
-        submit_button = st.form_submit_button(label="Update Selection")
-        if submit_button:
-            selected_ids = [
-                int(k.split('_')[1]) for k, v in st.session_state.items()
-                if k.startswith("select_") and v
-            ]
-            st.session_state.selected_ids = selected_ids
-
-    # Action Buttons
+    # Always render the "New Record" button
     st.subheader("Actions")
     col1, col2, col3 = st.columns(3)
     with col1:
         if st.button("New Record", key="new_record"):
             st.query_params.update({"script": "job_classeditor", "mode": "create"})
             st.rerun()
-    with col2:
-        if st.session_state.selected_ids:
-            if st.button("Edit Selected", key="edit_selected"):
-                for _id in st.session_state.selected_ids:
-                    url = f"{editor_url}&edit_id={_id}"
-                    st.write(f'<script>window.open("{url}", "_blank")</script>', unsafe_allow_html=True)
-        else:
-            st.write("Select records to edit")
-    with col3:
-        if st.session_state.selected_ids:
-            if st.button("Copy Selected", key="copy_selected"):
-                copy_class_records(st.session_state.selected_ids)
-                st.success(f"Copied {len(st.session_state.selected_ids)} record(s)")
-                st.rerun()
-        else:
-            st.write("Select records to copy")
 
-    # Pagination Controls with Records per Page Dropdown
+    # Render table and other actions only if data exists
+    if df.empty:
+        st.warning("No job classes found. Click 'New Record' to add one.")
+    else:
+        # Add clickable Edit hyperlinks column with correct URL
+        editor_url = "http://localhost:8501/?script=job_classeditor&mode=edit"
+        df['Edit'] = df['id'].apply(
+            lambda x: f'<a href="{editor_url}&edit_id={x}" target="_blank">Edit</a>'
+        )
+
+        # Add a selection checkbox column
+        if 'selected_ids' not in st.session_state:
+            st.session_state.selected_ids = []
+        df['Select'] = df['id'].apply(
+            lambda x: f'<input type="checkbox" name="select_{x}" {"checked" if x in st.session_state.selected_ids else ""}>'
+        )
+
+        # Display the table with hyperlinks and checkboxes using st.markdown
+        st.subheader("Job Classes Table")
+        st.write(
+            df[['Select', 'id', 'name', 'class_type', 'category_id', 'subcategory_id', 'Edit']].to_html(escape=False, index=False),
+            unsafe_allow_html=True
+        )
+
+        # Update selected_ids based on form submission
+        with st.form(key="selection_form"):
+            submit_button = st.form_submit_button(label="Update Selection")
+            if submit_button:
+                selected_ids = [
+                    int(k.split('_')[1]) for k, v in st.session_state.items()
+                    if k.startswith("select_") and v
+                ]
+                st.session_state.selected_ids = selected_ids
+
+        # Additional action buttons for when data exists
+        with col2:
+            if st.session_state.selected_ids:
+                if st.button("Edit Selected", key="edit_selected"):
+                    for _id in st.session_state.selected_ids:
+                        url = f"{editor_url}&edit_id={_id}"
+                        st.write(f'<script>window.open("{url}", "_blank")</script>', unsafe_allow_html=True)
+            else:
+                st.write("Select records to edit")
+        with col3:
+            if st.session_state.selected_ids:
+                if st.button("Copy Selected", key="copy_selected"):
+                    copy_class_records(st.session_state.selected_ids)
+                    st.success(f"Copied {len(st.session_state.selected_ids)} record(s)")
+                    st.rerun()
+            else:
+                st.write("Select records to copy")
+
+    # Pagination Controls with Records per Page Dropdown (always shown)
     st.subheader("Pagination")
     col1, col2, col3, col4 = st.columns(4)
     with col1:
