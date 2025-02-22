@@ -4,13 +4,14 @@ import streamlit as st
 import sqlite3
 import pandas as pd
 from pathlib import Path
+from typing import Tuple
 
 def get_db_connection():
     """Create a database connection"""
     db_path = Path('rpg_data.db')
     return sqlite3.connect(db_path)
 
-def load_job_classes(limit=100, offset=0):
+def load_job_classes(limit=25, offset=0):
     """Load job classes with limit and offset for pagination"""
     query = """
     SELECT id, name, class_type, category_id, subcategory_id
@@ -81,112 +82,147 @@ def copy_class_records(class_ids):
             record.pop('id', None)
             save_class_record(record, is_new=True)
 
+def delete_class_records(class_ids: list) -> Tuple[bool, str]:
+    """Delete multiple class records by IDs"""
+    if not class_ids:
+        return False, "No records selected for deletion"
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("BEGIN TRANSACTION")
+        cursor.executemany("DELETE FROM classes WHERE id = ? AND is_racial = FALSE", [(id,) for id in class_ids])
+        deleted_count = cursor.rowcount
+        if deleted_count == len(class_ids):
+            conn.commit()
+            return True, f"Deleted {deleted_count} class(es) successfully"
+        else:
+            conn.rollback()
+            return False, "Some classes could not be deleted"
+    except Exception as e:
+        conn.rollback()
+        return False, f"Error deleting classes: {str(e)}"
+    finally:
+        conn.close()
+
 def render_job_table():
-    """Render the job classes table with enhanced features"""
+    """Render the job classes table with simplified features"""
     st.header("Job Classes Table")
 
-    # Pagination settings
+    # Initialize session state if not already set
     if 'page' not in st.session_state:
         st.session_state.page = 0
-    if 'records_per_page' not in st.session_state:
-        st.session_state.records_per_page = 50
+
+    # Handle query parameters to update session state
+    query_params = st.query_params
+    if 'page' in query_params:
+        try:
+            st.session_state.page = int(query_params['page'])
+        except ValueError:
+            st.session_state.page = 0
+
+    # Fixed records per page
+    records_per_page = 25  # You can adjust this value as needed
 
     # Load records for the current page
-    offset = st.session_state.page * st.session_state.records_per_page
-    df = load_job_classes(limit=st.session_state.records_per_page, offset=offset)
+    offset = st.session_state.page * records_per_page
+    df = load_job_classes(limit=records_per_page, offset=offset)
 
-    # Always render the "New Record" button
-    st.subheader("Actions")
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        if st.button("New Record", key="new_record"):
-            st.query_params.update({"script": "job_classeditor", "mode": "create"})
-            st.rerun()
-
-    # Render table and other actions only if data exists
+    # Render table if data exists
     if df.empty:
-        st.warning("No job classes found. Click 'New Record' to add one.")
+        st.warning("No job classes found. Click 'New Record' below to add one.")
     else:
-        # Add clickable Edit hyperlinks column with correct URL
+        # Add clickable Edit hyperlinks
         editor_url = "http://localhost:8501/?script=job_classeditor&mode=edit"
         df['Edit'] = df['id'].apply(
             lambda x: f'<a href="{editor_url}&edit_id={x}" target="_blank">Edit</a>'
         )
-
-        # Add a selection checkbox column
-        if 'selected_ids' not in st.session_state:
-            st.session_state.selected_ids = []
-        df['Select'] = df['id'].apply(
-            lambda x: f'<input type="checkbox" name="select_{x}" {"checked" if x in st.session_state.selected_ids else ""}>'
-        )
-
-        # Display the table with hyperlinks and checkboxes using st.markdown
-        st.subheader("Job Classes Table")
+        # Display table without Select column
         st.write(
-            df[['Select', 'id', 'name', 'class_type', 'category_id', 'subcategory_id', 'Edit']].to_html(escape=False, index=False),
+            df[['id', 'name', 'class_type', 'category_id', 'subcategory_id', 'Edit']].to_html(escape=False, index=False),
             unsafe_allow_html=True
         )
 
-        # Update selected_ids based on form submission
-        with st.form(key="selection_form"):
-            submit_button = st.form_submit_button(label="Update Selection")
-            if submit_button:
-                selected_ids = [
-                    int(k.split('_')[1]) for k, v in st.session_state.items()
-                    if k.startswith("select_") and v
-                ]
-                st.session_state.selected_ids = selected_ids
+    # New Record button under the table
+    if st.button("New Record", key="new_record"):
+        st.query_params.update({"script": "job_classeditor", "mode": "create"})
+        st.rerun()
 
-        # Additional action buttons for when data exists
-        with col2:
-            if st.session_state.selected_ids:
-                if st.button("Edit Selected", key="edit_selected"):
-                    for _id in st.session_state.selected_ids:
-                        url = f"{editor_url}&edit_id={_id}"
-                        st.write(f'<script>window.open("{url}", "_blank")</script>', unsafe_allow_html=True)
-            else:
-                st.write("Select records to edit")
-        with col3:
-            if st.session_state.selected_ids:
-                if st.button("Copy Selected", key="copy_selected"):
-                    copy_class_records(st.session_state.selected_ids)
-                    st.success(f"Copied {len(st.session_state.selected_ids)} record(s)")
-                    st.rerun()
-            else:
-                st.write("Select records to copy")
+    # Pagination controls on a single row without dropdown
+    st.write("")  # Spacer
 
-    # Pagination Controls with Records per Page Dropdown (always shown)
-    st.subheader("Pagination")
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        if st.session_state.page > 0:
-            if st.button("Previous", key="previous"):
-                st.session_state.page -= 1
-                st.rerun()
-        else:
-            st.write("First page")
-    with col2:
-        total_records = get_total_job_classes()
-        total_pages = (total_records // st.session_state.records_per_page) + (1 if total_records % st.session_state.records_per_page else 0)
-        st.write(f"Page {st.session_state.page + 1} of {total_pages}")
-    with col3:
-        records_per_page = st.selectbox(
-            "Records per page",
-            [25, 50, 100],
-            index=[25, 50, 100].index(st.session_state.records_per_page),
-            key="records_per_page_select"
-        )
-        if records_per_page != st.session_state.records_per_page:
-            st.session_state.records_per_page = records_per_page
-            st.session_state.page = 0  # Reset to first page on change
-            st.rerun()
-    with col4:
-        if st.session_state.page < total_pages - 1:
-            if st.button("Next", key="next"):
-                st.session_state.page += 1
-                st.rerun()
-        else:
-            st.write("Last page")
+    # Calculate pagination details
+    total_records = get_total_job_classes()
+    total_pages = (total_records // records_per_page) + (1 if total_records % records_per_page else 0)
+    current_page = st.session_state.page
+    if current_page >= total_pages:
+        current_page = total_pages - 1 if total_pages > 0 else 0
+        st.session_state.page = current_page
+    elif current_page < 0:
+        current_page = 0
+        st.session_state.page = current_page
 
-# Call the function to render the table
-render_job_table()
+    prev_page = max(0, current_page - 1)
+    next_page = min(total_pages - 1, current_page + 1)
+
+    # "Previous" button
+    if current_page > 0:
+        prev_button = f'<button onclick="window.location.href=\'?page={prev_page}\'">Previous</button>'
+    else:
+        prev_button = '<button disabled>Previous</button>'
+
+    # "Next" button
+    if current_page < total_pages - 1:
+        next_button = f'<button onclick="window.location.href=\'?page={next_page}\'">Next</button>'
+    else:
+        next_button = '<button disabled>Next</button>'
+
+    # Page information
+    page_info = f"Page {current_page + 1} of {total_pages}"
+
+    # Combine pagination elements into HTML (no dropdown)
+    pagination_html = f"""
+    <div class="pagination-container">
+        <div class="pagination-item">{prev_button}</div>
+        <div class="pagination-item">{page_info}</div>
+        <div class="pagination-item">{next_button}</div>
+    </div>
+    """
+
+    # Define CSS for layout and styling
+    st.markdown("""
+        <style>
+        .pagination-container {
+            display: flex;
+            flex-wrap: nowrap;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            gap: 10px;
+            padding: 10px 0;
+        }
+        .pagination-item {
+            flex: 1;
+            text-align: center;
+            min-width: 0;
+        }
+        .pagination-container button {
+            padding: 5px 10px;
+            margin: 0 5px;
+            border: 1px solid #ccc;
+            background-color: #f0f0f0;
+            color: #333;
+            cursor: pointer;
+        }
+        .pagination-container button[disabled] {
+            color: #999;
+            cursor: not-allowed;
+            background-color: #e0e0e0;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    # Render pagination
+    st.markdown(pagination_html, unsafe_allow_html=True)
+
+if __name__ == "__main__":
+    render_job_table()
