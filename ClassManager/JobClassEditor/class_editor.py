@@ -68,13 +68,6 @@ def render_class_editor():
     parent_container = st.container()
     
     with parent_container:
-        st.header("Job Class Editor")
-
-        # Load foreign key options
-        class_types = get_foreign_key_options('class_types')
-        categories = get_foreign_key_options('class_categories')
-        subcategories = get_foreign_key_options('class_subcategories')
-
         # Initialize or get current record ID
         if 'current_class_id' not in st.session_state:
             st.session_state.current_class_id = 0
@@ -95,6 +88,19 @@ def render_class_editor():
         # Load record
         current_record = load_class_record(st.session_state.current_class_id) or {}
 
+        # Set dynamic title
+        if st.session_state.current_class_id == 0:
+            st.header("Job Class Editor - New Record")
+        else:
+            record_id = st.session_state.current_class_id
+            record_name = current_record.get('name', 'Unnamed')  # Default to 'Unnamed' if name is missing
+            st.header(f"Job Class Editor - {record_id}: {record_name}")
+
+        # Load foreign key options
+        class_types = get_foreign_key_options('class_types')
+        categories = get_foreign_key_options('class_categories')
+        subcategories = get_foreign_key_options('class_subcategories')
+
         # Initialize session state for prerequisites and exclusions
         if 'class_prerequisites' not in st.session_state:
             st.session_state.class_prerequisites = []
@@ -108,7 +114,7 @@ def render_class_editor():
                 st.session_state.class_exclusions = excl_df.to_dict('records')
 
         with st.form("class_editor_form", clear_on_submit=False):
-            # Define tabs (removed "Equipment Slots")
+            # Define tabs
             tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
                 "Basic Info", "Stats", "Prerequisites", "Exclusions", 
                 "Conditions", "Spell List"
