@@ -1,0 +1,3 @@
+/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/CMakeFiles/VoxelGlobe.dir
+/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/CMakeFiles/edit_cache.dir
+/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/CMakeFiles/rebuild_cache.dir
