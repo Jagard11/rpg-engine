@@ -4,7 +4,7 @@
 # compile CXX with /usr/bin/c++
 CXX_DEFINES = 
 
-CXX_INCLUDES = -I"/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include"
+CXX_INCLUDES = -I"/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include" -I"/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/imgui" -I"/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/imgui/backends"
 
 CXX_FLAGS = 
 

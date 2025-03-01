@@ -2,7 +2,7 @@
 #define WORLD_HPP
 
 #include "Chunk.hpp"
-#include <glm/glm.hpp>  // Explicit GLM include
+#include <glm/glm.hpp>
 #include <unordered_map>
 #include <utility>
 
@@ -15,12 +15,15 @@ struct pair_hash {
 
 class World {
 public:
-    World() {}
+    World() : radius(1591.55f) {}
     void update(const glm::vec3& playerPos);
     const std::unordered_map<std::pair<int, int>, Chunk, pair_hash>& getChunks() const { return chunks; }
+    glm::vec3 cubeToSphere(int face, int x, int z, float y) const;
+    float findSurfaceHeight(int chunkX, int chunkZ) const; // New method
 
 private:
     std::unordered_map<std::pair<int, int>, Chunk, pair_hash> chunks;
+    float radius; // 10 km circumference -> ~1591.55 m radius
 };
 
 #endif

@@ -3,6 +3,7 @@
 #include <GLFW/glfw3.h>
 #include <glm/gtc/matrix_transform.hpp>
 #include "stb_image.h"
+#include "Debug.hpp" // Include debug header
 #include <iostream>
 
 Renderer::Renderer() {
@@ -26,18 +27,27 @@ void Renderer::render(const World& world, const Player& player) {
     glBindVertexArray(vao);
     glBindTexture(GL_TEXTURE_2D, texture);
 
-    glm::mat4 proj = glm::perspective(glm::radians(90.0f), 800.0f / 600.0f, 0.1f, 1000.0f);
-    glm::mat4 view = glm::lookAt(player.position, player.position + player.direction, {0, 1, 0});
+    glm::mat4 proj = glm::perspective(glm::radians(90.0f), 800.0f / 600.0f, 0.1f, 2000.0f);
+    glm::vec3 eyePos = player.position + player.up * player.height; // Eye at 1601.30
+    glm::vec3 lookAtPos = eyePos + player.direction * 5.0f; // Look forward/down
+    glm::mat4 view = glm::lookAt(eyePos, lookAtPos, player.up);
+    if (g_showDebug) {
+        std::cout << "Eye Pos: " << eyePos.x << ", " << eyePos.y << ", " << eyePos.z << std::endl;
+        std::cout << "LookAt Pos: " << lookAtPos.x << ", " << lookAtPos.y << ", " << lookAtPos.z << std::endl;
+    }
     glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "proj"), 1, GL_FALSE, &proj[0][0]);
     glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "view"), 1, GL_FALSE, &view[0][0]);
 
     for (const auto& [pos, chunk] : world.getChunks()) {
-        glm::mat4 model = glm::translate(glm::mat4(1.0f), {pos.first * Chunk::SIZE, 0, pos.second * Chunk::SIZE});
+        int face = pos.first / 1000;
+        int localX = pos.first % 1000;
+        glm::vec3 sphericalPos = world.cubeToSphere(face, localX, pos.second, 8.0f);
+        glm::mat4 model = glm::translate(glm::mat4(1.0f), sphericalPos);
         glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model"), 1, GL_FALSE, &model[0][0]);
         glBindBuffer(GL_ARRAY_BUFFER, vbo);
         glBufferData(GL_ARRAY_BUFFER, chunk.getMesh().size() * sizeof(float), chunk.getMesh().data(), GL_STATIC_DRAW);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0); // Pos
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float))); // UV
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
         glEnableVertexAttribArray(0);
         glEnableVertexAttribArray(1);
         glDrawArrays(GL_TRIANGLES, 0, chunk.getMesh().size() / 5);
