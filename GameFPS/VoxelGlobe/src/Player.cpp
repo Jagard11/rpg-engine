@@ -1,24 +1,43 @@
 #include "Player.hpp"
 #include <iostream>
-#include <ios> // For streamsize
+#include <ios>
 #include "Debug.hpp"
-#include <glm/gtc/type_ptr.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 Player::Player(const World& world) : speed(5.0f) {
     float surfaceHeight = world.findSurfaceHeight(0, 0); // 1599.55
     position = glm::vec3(0.0f, surfaceHeight, 0.0f);
-    direction = glm::vec3(0.0f, -1.0f, 0.0f);
-    up = glm::vec3(0.0f, 1.0f, 0.0f);
-    updateOrientation(0, 0);
-    position.x = 0.0f;
-    position.z = 0.0f;
+    up = glm::normalize(position); // Local up for spherical world
+    // Initial horizontal direction (along x-axis, projected onto tangent plane)
+    glm::vec3 initialDirection = glm::normalize(glm::vec3(1.0f, 0.0f, 0.0f) - 
+                                               glm::dot(glm::vec3(1.0f, 0.0f, 0.0f), up) * up);
+    cameraDirection = initialDirection;
+    movementDirection = initialDirection;
 
     if (g_showDebug) {
         std::cout << "Initial Player Pos: " << position.x << ", " << position.y << ", " << position.z << std::endl;
     }
 }
 
-void Player::applyGravity(float deltaTime, const World& world) {
+void Player::moveForward(float deltaTime) { 
+    position += movementDirection * speed * deltaTime; 
+}
+
+void Player::moveBackward(float deltaTime) { 
+    position -= movementDirection * speed * deltaTime; 
+}
+
+void Player::moveLeft(float deltaTime) { 
+    glm::vec3 right = glm::normalize(glm::cross(movementDirection, up));
+    position -= right * speed * deltaTime; 
+}
+
+void Player::moveRight(float deltaTime) { 
+    glm::vec3 right = glm::normalize(glm::cross(movementDirection, up));
+    position += right * speed * deltaTime; 
+}
+
+void Player::applyGravity(const World& world, float deltaTime) {
     glm::vec3 toCenter = (glm::length(position) > 0.001f) ? -glm::normalize(position) : -up;
     float gravity = 9.81f;
 
@@ -47,38 +66,39 @@ void Player::applyGravity(float deltaTime, const World& world) {
     }
 }
 
-void Player::moveForward(float deltaTime) { 
-    position += direction * speed * deltaTime; 
-}
-
-void Player::moveBackward(float deltaTime) { 
-    position -= direction * speed * deltaTime; 
-}
-
-void Player::moveLeft(float deltaTime) { 
-    glm::vec3 right = glm::normalize(glm::cross(direction, up));
-    position -= right * speed * deltaTime; 
-}
-
-void Player::moveRight(float deltaTime) { 
-    glm::vec3 right = glm::normalize(glm::cross(direction, up));
-    position += right * speed * deltaTime; 
-}
-
 void Player::updateOrientation(float deltaX, float deltaY) {
-    yaw += deltaX * 0.1f;
-    pitch += deltaY * 0.1f;
-    pitch = glm::clamp(pitch, -89.0f, 89.0f);
+    float deltaYaw = -deltaX * 0.1f;  // Negate deltaX: mouse left (negative) increases yaw (counterclockwise)
+    float deltaPitch = -deltaY * 0.1f; // Invert deltaY: mouse up (negative) looks up
 
-    direction = glm::normalize(glm::vec3(
-        cos(glm::radians(pitch)) * cos(glm::radians(yaw)),
-        sin(glm::radians(pitch)),
-        cos(glm::radians(pitch)) * sin(glm::radians(yaw))
-    ));
-    direction = glm::normalize(direction - glm::dot(direction, up) * up);
+    // Apply yaw: rotate around the local up vector
+    glm::mat4 yawRotation = glm::rotate(glm::mat4(1.0f), glm::radians(deltaYaw), up);
+    cameraDirection = glm::vec3(yawRotation * glm::vec4(cameraDirection, 0.0f));
+
+    // Compute local right vector (perpendicular to cameraDirection and up)
+    glm::vec3 right = glm::normalize(glm::cross(cameraDirection, up));
+
+    // Apply pitch: rotate around the local right vector for vertical rotation
+    glm::mat4 pitchRotation = glm::rotate(glm::mat4(1.0f), glm::radians(deltaPitch), right);
+    cameraDirection = glm::vec3(pitchRotation * glm::vec4(cameraDirection, 0.0f));
+
+    // Clamp pitch to avoid flipping (between -89 and 89 degrees)
+    float currentPitch = glm::degrees(asin(glm::dot(cameraDirection, up)));
+    if (currentPitch > 89.0f) {
+        float adjustment = 89.0f - currentPitch;
+        glm::mat4 adjustRotation = glm::rotate(glm::mat4(1.0f), glm::radians(adjustment), right);
+        cameraDirection = glm::vec3(adjustRotation * glm::vec4(cameraDirection, 0.0f));
+    } else if (currentPitch < -89.0f) {
+        float adjustment = -89.0f - currentPitch;
+        glm::mat4 adjustRotation = glm::rotate(glm::mat4(1.0f), glm::radians(adjustment), right);
+        cameraDirection = glm::vec3(adjustRotation * glm::vec4(cameraDirection, 0.0f));
+    }
+
+    // Compute horizontal movementDirection by projecting cameraDirection onto the tangent plane
+    movementDirection = glm::normalize(cameraDirection - glm::dot(cameraDirection, up) * up);
 
     if (g_showDebug) {
         std::cout << "Up: " << up.x << ", " << up.y << ", " << up.z << std::endl;
-        std::cout << "Dir: " << direction.x << ", " << direction.y << ", " << direction.z << std::endl;
+        std::cout << "Camera Dir: " << cameraDirection.x << ", " << cameraDirection.y << ", " << cameraDirection.z << std::endl;
+        std::cout << "Movement Dir: " << movementDirection.x << ", " << movementDirection.y << ", " << movementDirection.z << std::endl;
     }
 }

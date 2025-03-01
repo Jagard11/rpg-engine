@@ -5,7 +5,7 @@
 #include "stb_image.h"
 #include "Debug.hpp"
 #include <iostream>
-#include <ios> // For streamsize
+#include <ios>
 
 Renderer::Renderer() {
     glGenVertexArrays(1, &vao);
@@ -30,7 +30,7 @@ void Renderer::render(const World& world, const Player& player) {
 
     glm::mat4 proj = glm::perspective(glm::radians(90.0f), 800.0f / 600.0f, 0.1f, 2000.0f);
     glm::vec3 eyePos = player.position + player.up * player.height;
-    glm::vec3 lookAtPos = eyePos + player.direction;
+    glm::vec3 lookAtPos = eyePos + player.cameraDirection; // Use cameraDirection
     glm::mat4 view = glm::lookAt(eyePos, lookAtPos, player.up);
     if (g_showDebug) {
         std::cout << "Eye Pos: " << eyePos.x << ", " << eyePos.y << ", " << eyePos.z << std::endl;

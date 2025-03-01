@@ -1,4 +1,3 @@
-// ./GameFPS/VoxelGlobe/include/Player.hpp
 #ifndef PLAYER_HPP
 #define PLAYER_HPP
 
@@ -9,7 +8,8 @@ class Player {
 public:
     Player(const World& world);
     glm::vec3 position;
-    glm::vec3 direction;
+    glm::vec3 cameraDirection;  // Direction the camera faces (allows vertical rotation)
+    glm::vec3 movementDirection; // Direction for horizontal movement
     glm::vec3 up;
     float height = 1.75f;
     float speed = 5.0f;
@@ -20,7 +20,7 @@ public:
     void moveBackward(float deltaTime);
     void moveLeft(float deltaTime);
     void moveRight(float deltaTime);
-    void applyGravity(float deltaTime, const World& world);
+    void applyGravity(const World& world, float deltaTime);
     void updateOrientation(float deltaX, float deltaY); // Mouse input
 };
 

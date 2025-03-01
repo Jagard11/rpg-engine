@@ -34,8 +34,8 @@ int main() {
     ImGui_ImplOpenGL3_Init("#version 330");
 
     World world;
-    world.update(glm::vec3(0, 0, 0)); // Initial chunk load
-    Player player(world); // Player spawns above surface
+    world.update(glm::vec3(0, 0, 0));
+    Player player(world);
     Renderer renderer;
 
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
@@ -70,11 +70,8 @@ int main() {
             std::cout << "Debug toggled: " << (g_showDebug ? "ON" : "OFF") << std::endl;
         }
 
-        // Update world *before* gravity to ensure chunks exist
-        if (!std::isnan(player.position.x)) {
-            world.update(player.position);
-        }
-        player.applyGravity(deltaTime, world);
+        player.applyGravity(world, deltaTime);
+        world.update(player.position);
         renderer.render(world, player);
 
         ImGui_ImplOpenGL3_NewFrame();
@@ -83,12 +80,12 @@ int main() {
         if (g_showDebug) {
             ImGui::Begin("Debug Info");
             ImGui::Text("Player Pos: %.2f, %.2f, %.2f", player.position.x, player.position.y, player.position.z);
-            ImGui::Text("Direction: %.2f, %.2f, %.2f", player.direction.x, player.direction.y, player.direction.z);
+            ImGui::Text("Camera Dir: %.2f, %.2f, %.2f", player.cameraDirection.x, player.cameraDirection.y, player.cameraDirection.z);
             ImGui::Text("Up: %.2f, %.2f, %.2f", player.up.x, player.up.y, player.up.z);
             ImGui::End();
 
-            std::cout << "Camera Dir: " << player.direction.x << ", " << player.direction.y << ", " 
-                      << player.direction.z << std::endl;
+            std::cout << "Camera Dir: " << player.cameraDirection.x << ", " << player.cameraDirection.y << ", " 
+                      << player.cameraDirection.z << std::endl;
             std::cout << "Camera Up: " << player.up.x << ", " << player.up.y << ", " 
                       << player.up.z << std::endl;
         }

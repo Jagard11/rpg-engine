@@ -1,4 +1,3 @@
-// ./GameFPS/VoxelGlobe/include/Renderer.hpp
 #ifndef RENDERER_HPP
 #define RENDERER_HPP
 
@@ -10,7 +9,7 @@ class Renderer {
 public:
     Renderer();
     ~Renderer();
-    void render(const World& world, const Player& player);
+    void render(const World& world, const Player& player); // Match order with implementation
 
 private:
     GLuint vao, vbo, shaderProgram, texture;
