@@ -7,6 +7,8 @@
 #include <iostream>
 #include <ios>
 
+extern float g_fov; // Access global FOV from main.cpp
+
 Renderer::Renderer() {
     glGenVertexArrays(1, &vao);
     glGenBuffers(1, &vbo);
@@ -28,9 +30,9 @@ void Renderer::render(const World& world, const Player& player) {
     glBindVertexArray(vao);
     glBindTexture(GL_TEXTURE_2D, texture);
 
-    glm::mat4 proj = glm::perspective(glm::radians(90.0f), 800.0f / 600.0f, 0.1f, 2000.0f);
+    glm::mat4 proj = glm::perspective(glm::radians(g_fov), 800.0f / 600.0f, 0.1f, 2000.0f); // Use adjustable FOV
     glm::vec3 eyePos = player.position + player.up * player.height;
-    glm::vec3 lookAtPos = eyePos + player.cameraDirection; // Use cameraDirection
+    glm::vec3 lookAtPos = eyePos + player.cameraDirection;
     glm::mat4 view = glm::lookAt(eyePos, lookAtPos, player.up);
     if (g_showDebug) {
         std::cout << "Eye Pos: " << eyePos.x << ", " << eyePos.y << ", " << eyePos.z << std::endl;

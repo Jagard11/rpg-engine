@@ -8,14 +8,26 @@ Player::Player(const World& world) : speed(5.0f) {
     float surfaceHeight = world.findSurfaceHeight(0, 0); // 1599.55
     position = glm::vec3(0.0f, surfaceHeight, 0.0f);
     up = glm::normalize(position); // Local up for spherical world
-    // Initial horizontal direction (along x-axis, projected onto tangent plane)
-    glm::vec3 initialDirection = glm::normalize(glm::vec3(1.0f, 0.0f, 0.0f) - 
-                                               glm::dot(glm::vec3(1.0f, 0.0f, 0.0f), up) * up);
-    cameraDirection = initialDirection;
-    movementDirection = initialDirection;
+
+    // Set initial yaw (0°) and pitch (40° downward)
+    float yaw = 0.0f;   // Looking along positive x-axis horizontally
+    float pitch = 40.0f; // Pitch down 40° (positive pitch confirmed to tilt downward)
+    float radYaw = glm::radians(yaw);
+    float radPitch = glm::radians(pitch);
+    cameraDirection = glm::vec3(
+        cos(radPitch) * cos(radYaw), // x ≈ cos(40°) ≈ 0.766
+        sin(radPitch),               // y ≈ sin(40°) ≈ 0.643 (upward, but adjusted by movement logic)
+        cos(radPitch) * sin(radYaw)  // z ≈ 0 (sin(0°) = 0)
+    );
+    cameraDirection = glm::normalize(cameraDirection);
+
+    // Compute horizontal movementDirection by projecting cameraDirection onto the tangent plane
+    movementDirection = glm::normalize(cameraDirection - glm::dot(cameraDirection, up) * up);
 
     if (g_showDebug) {
         std::cout << "Initial Player Pos: " << position.x << ", " << position.y << ", " << position.z << std::endl;
+        std::cout << "Initial Camera Dir: " << cameraDirection.x << ", " << cameraDirection.y << ", " << cameraDirection.z << std::endl;
+        std::cout << "Initial Pitch (deg): " << glm::degrees(asin(cameraDirection.y)) << std::endl;
     }
 }
 
@@ -67,8 +79,8 @@ void Player::applyGravity(const World& world, float deltaTime) {
 }
 
 void Player::updateOrientation(float deltaX, float deltaY) {
-    float deltaYaw = -deltaX * 0.1f;  // Negate deltaX: mouse left (negative) increases yaw (counterclockwise)
-    float deltaPitch = -deltaY * 0.1f; // Invert deltaY: mouse up (negative) looks up
+    float deltaYaw = -deltaX * 0.1f;  // Mouse left increases yaw (counterclockwise)
+    float deltaPitch = -deltaY * 0.1f; // Mouse up looks up
 
     // Apply yaw: rotate around the local up vector
     glm::mat4 yawRotation = glm::rotate(glm::mat4(1.0f), glm::radians(deltaYaw), up);
