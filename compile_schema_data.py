@@ -1,3 +1,4 @@
+# ./compile_schema_data.py
 import os
 import sqlite3
 from datetime import datetime

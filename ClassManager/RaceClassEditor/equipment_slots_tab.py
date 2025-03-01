@@ -1,4 +1,4 @@
-# ./ClassManager/JobClassEditor/equipment_slots_tab.py
+# ./ClassManager/RaceClassEditor/equipment_slots_tab.py
 
 import streamlit as st
 from typing import Dict, Any

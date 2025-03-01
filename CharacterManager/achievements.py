@@ -1,4 +1,4 @@
-# ./CharacterManagement/CharacterEditor/forms/achievements.py
+# ./CharacterManager/achievements.py
 
 import streamlit as st
 

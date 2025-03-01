@@ -1,4 +1,4 @@
-# ./CharacterManagement/CharacterEditor/forms/creation.py
+# ./CharacterManager/creation.py
 
 import streamlit as st
 from typing import Dict, Optional

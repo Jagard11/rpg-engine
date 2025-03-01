@@ -1,4 +1,4 @@
-# ./CharacterManagement/CharacterEditor/forms/__init__.py
+# ./CharacterManager/__init__.py
 
 from .creation import render_character_creation_form
 from .view import render_character_view

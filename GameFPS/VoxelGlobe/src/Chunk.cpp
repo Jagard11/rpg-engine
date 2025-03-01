@@ -22,14 +22,14 @@ void Chunk::generateTerrain() {
     for (int x = 0; x < SIZE; x++) {
         for (int z = 0; z < SIZE; z++) {
             if (getBlock(x, 8, z).type == BlockType::GRASS) {
-                float y = 9.0f;
+                float y = 0.0f; // Relative to sphericalPos (adjusted in Renderer)
                 mesh.insert(mesh.end(), {
-                    x,     y, z,     0.0f, 0.0f, // Bottom-left
-                    x + 1, y, z,     1.0f, 0.0f, // Bottom-right
-                    x + 1, y, z + 1, 1.0f, 1.0f, // Top-right
-                    x,     y, z,     0.0f, 0.0f, // Bottom-left
-                    x + 1, y, z + 1, 1.0f, 1.0f, // Top-right
-                    x,     y, z + 1, 0.0f, 1.0f  // Top-left
+                    static_cast<float>(x),     y, static_cast<float>(z),     0.0f, 0.0f,
+                    static_cast<float>(x + 1), y, static_cast<float>(z),     1.0f, 0.0f,
+                    static_cast<float>(x + 1), y, static_cast<float>(z + 1), 1.0f, 1.0f,
+                    static_cast<float>(x),     y, static_cast<float>(z),     0.0f, 0.0f,
+                    static_cast<float>(x + 1), y, static_cast<float>(z + 1), 1.0f, 1.0f,
+                    static_cast<float>(x),     y, static_cast<float>(z + 1), 0.0f, 1.0f
                 });
             }
         }

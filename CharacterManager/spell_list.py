@@ -1,4 +1,4 @@
-# ./CharacterManagement/CharacterEditor/forms/spell_list.py
+# ./CharacterManager/spell_list.py
 
 import streamlit as st
 

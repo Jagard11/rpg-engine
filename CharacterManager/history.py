@@ -1,4 +1,4 @@
-# ./CharacterManagement/CharacterEditor/forms/history.py
+# ./CharacterManager/history.py
 
 import streamlit as st
 

@@ -3,13 +3,13 @@
 #include "Renderer.hpp"
 #include "World.hpp"
 #include "Player.hpp"
-#include "Debug.hpp" // Include debug header
+#include "Debug.hpp"
 #include <iostream>
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 
-bool g_showDebug = false; // Define global debug flag
+bool g_showDebug = false;
 
 int main() {
     if (!glfwInit()) return -1;
@@ -34,8 +34,8 @@ int main() {
     ImGui_ImplOpenGL3_Init("#version 330");
 
     World world;
-    world.update(glm::vec3(0, 0, 0));
-    Player player(world);
+    world.update(glm::vec3(0, 0, 0)); // Initial chunk load
+    Player player(world); // Player spawns above surface
     Renderer renderer;
 
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
@@ -70,8 +70,11 @@ int main() {
             std::cout << "Debug toggled: " << (g_showDebug ? "ON" : "OFF") << std::endl;
         }
 
+        // Update world *before* gravity to ensure chunks exist
+        if (!std::isnan(player.position.x)) {
+            world.update(player.position);
+        }
         player.applyGravity(deltaTime, world);
-        world.update(player.position);
         renderer.render(world, player);
 
         ImGui_ImplOpenGL3_NewFrame();
@@ -84,8 +87,10 @@ int main() {
             ImGui::Text("Up: %.2f, %.2f, %.2f", player.up.x, player.up.y, player.up.z);
             ImGui::End();
 
-            std::cout << "Camera Dir: " << player.direction.x << ", " << player.direction.y << ", " << player.direction.z << std::endl;
-            std::cout << "Camera Up: " << player.up.x << ", " << player.up.y << ", " << player.up.z << std::endl;
+            std::cout << "Camera Dir: " << player.direction.x << ", " << player.direction.y << ", " 
+                      << player.direction.z << std::endl;
+            std::cout << "Camera Up: " << player.up.x << ", " << player.up.y << ", " 
+                      << player.up.z << std::endl;
         }
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

@@ -1,4 +1,4 @@
-# ./CharacterManagement/RaceEditor/forms/equipment_slots.py
+# ./ClassManager/equipment_slots.py
 
 import streamlit as st
 

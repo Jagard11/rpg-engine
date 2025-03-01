@@ -1,12 +1,50 @@
 #include "Player.hpp"
 #include <iostream>
+#include <ios> // For streamsize
 #include "Debug.hpp"
+#include <glm/gtc/type_ptr.hpp>
 
 Player::Player(const World& world) : speed(5.0f) {
-    float surfaceY = world.findSurfaceHeight(0, 0); // 1599.55
-    position = glm::vec3(0, surfaceY, 0); // Feet at terrain top
-    direction = glm::vec3(0, -1, 0); // Look down initially
+    float surfaceHeight = world.findSurfaceHeight(0, 0); // 1599.55
+    position = glm::vec3(0.0f, surfaceHeight, 0.0f);
+    direction = glm::vec3(0.0f, -1.0f, 0.0f);
+    up = glm::vec3(0.0f, 1.0f, 0.0f);
     updateOrientation(0, 0);
+    position.x = 0.0f;
+    position.z = 0.0f;
+
+    if (g_showDebug) {
+        std::cout << "Initial Player Pos: " << position.x << ", " << position.y << ", " << position.z << std::endl;
+    }
+}
+
+void Player::applyGravity(float deltaTime, const World& world) {
+    glm::vec3 toCenter = (glm::length(position) > 0.001f) ? -glm::normalize(position) : -up;
+    float gravity = 9.81f;
+
+    glm::vec3 newPosition = position + toCenter * gravity * deltaTime;
+
+    int nextChunkX = static_cast<int>(newPosition.x / Chunk::SIZE);
+    int nextChunkZ = static_cast<int>(newPosition.z / Chunk::SIZE);
+    nextChunkX = glm::clamp(nextChunkX, -1000, 1000);
+    nextChunkZ = glm::clamp(nextChunkZ, -1000, 1000);
+    float nextSurfaceY = world.findSurfaceHeight(nextChunkX, nextChunkZ);
+
+    position.x = newPosition.x;
+    position.z = newPosition.z;
+    if (newPosition.y < nextSurfaceY) {
+        position.y = nextSurfaceY;
+        up = (glm::length(position) > 0.001f) ? glm::normalize(position) : glm::vec3(0.0f, 1.0f, 0.0f);
+    } else {
+        position.y = newPosition.y;
+    }
+
+    if (g_showDebug) {
+        std::cout << "Gravity applied, Pos: " << position.x << ", " << position.y << ", " << position.z << std::endl;
+        std::cout << "Next Surface Y: " << nextSurfaceY << std::endl;
+        std::cout << "New Pos Y: " << newPosition.y << std::endl;
+        std::cout << "To Center: " << toCenter.x << ", " << toCenter.y << ", " << toCenter.z << std::endl;
+    }
 }
 
 void Player::moveForward(float deltaTime) { 
@@ -27,26 +65,9 @@ void Player::moveRight(float deltaTime) {
     position += right * speed * deltaTime; 
 }
 
-void Player::applyGravity(float deltaTime, const World& world) {
-    glm::vec3 toCenter = -glm::normalize(position);
-    float gravity = 9.81f;
-    position += toCenter * gravity * deltaTime;
-
-    float surfaceY = world.findSurfaceHeight(
-        static_cast<int>(position.x / Chunk::SIZE),
-        static_cast<int>(position.z / Chunk::SIZE)
-    );
-    if (position.y < surfaceY) {
-        position.y = surfaceY; // Feet snap to surface
-    }
-    if (g_showDebug) std::cout << "Gravity applied, Pos: " << position.x << ", " << position.y << ", " << position.z << std::endl;
-}
-
 void Player::updateOrientation(float deltaX, float deltaY) {
-    up = glm::normalize(position);
-    
     yaw += deltaX * 0.1f;
-    pitch += deltaY * 0.1f; // Fixed pitch direction
+    pitch += deltaY * 0.1f;
     pitch = glm::clamp(pitch, -89.0f, 89.0f);
 
     direction = glm::normalize(glm::vec3(

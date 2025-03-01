@@ -1,4 +1,4 @@
-# ./CharacterManagement/CharacterEditor/forms/quests.py
+# ./CharacterManager/quests.py
 
 import streamlit as st
 

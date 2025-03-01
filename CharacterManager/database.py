@@ -1,4 +1,4 @@
-# ./CharacterManagement/CharacterEditor/database.py
+# ./CharacterManager/database.py
 
 import sqlite3
 from typing import List, Dict, Optional, Tuple

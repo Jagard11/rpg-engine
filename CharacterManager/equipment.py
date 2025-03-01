@@ -1,4 +1,4 @@
-# ./CharacterManagement/CharacterEditor/forms/equipment.py
+# ./CharacterManager/equipment.py
 
 import streamlit as st
 

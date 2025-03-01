@@ -1,15 +1,14 @@
 # ./compile_project_files.py
-
 import os
 
-def compile_project_files(root_dir, file_extension='.py'):
+def compile_project_files(root_dir, file_extensions=['.py']):
     """
-    Compiles all files with the specified extension in each subdirectory into separate output files,
+    Compiles all files with the specified extensions in each subdirectory into separate output files,
     named Compiled_<subdirectoryname>.txt, placed within their respective subdirectories.
 
     Args:
         root_dir (str): The root directory of the project.
-        file_extension (str): The file extension to include (default is '.py' for Python files).
+        file_extensions (list): List of file extensions to include (default is ['.py']).
     """
     # Iterate over immediate subdirectories in the root
     for subdirectory in os.listdir(root_dir):
@@ -24,7 +23,8 @@ def compile_project_files(root_dir, file_extension='.py'):
                 # Walk through this subdirectory only
                 for dirpath, _, filenames in os.walk(subdir_path):
                     for filename in sorted(filenames):  # Sort for consistent order
-                        if filename.endswith(file_extension):
+                        # Check if the file matches any of the specified extensions
+                        if any(filename.endswith(ext) for ext in file_extensions):
                             file_path = os.path.join(dirpath, filename)
                             relative_path = os.path.relpath(file_path, root_dir)
                             
@@ -48,7 +48,10 @@ if __name__ == "__main__":
     # Set the root directory to the current working directory (project root)
     root_directory = os.getcwd()
     
-    # Compile all .py files
-    compile_project_files(root_directory)
+    # List of file extensions to process
+    extensions_to_compile = ['.py', '.cpp', '.hpp']
+    
+    # Compile files for all specified extensions
+    compile_project_files(root_directory, file_extensions=extensions_to_compile)
     
     print("Compilation complete. Check each subdirectory for Compiled_<subdirectoryname>.txt files.")

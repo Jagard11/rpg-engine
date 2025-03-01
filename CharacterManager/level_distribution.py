@@ -1,4 +1,4 @@
-# ./CharacterManagement/CharacterEditor/forms/level_distribution.py
+# ./CharacterManager/level_distribution.py
 
 import streamlit as st
 

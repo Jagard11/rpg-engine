@@ -1,6 +1,7 @@
 #include "World.hpp"
 #include <cmath>
 #include <iostream>
+#include <ios> // Explicitly include for streamsize
 #include "Debug.hpp"
 
 void World::update(const glm::vec3& playerPos) {
@@ -9,9 +10,12 @@ void World::update(const glm::vec3& playerPos) {
     int renderDist = 8;
     chunks.clear();
 
+    px = glm::clamp(px, -1000, 1000);
+    pz = glm::clamp(pz, -1000, 1000);
+
     for (int face = 0; face < 1; face++) {
         for (int x = px - renderDist; x <= px + renderDist; x++) {
-            for (int z = pz - renderDist; z <= pz + renderDist; z++) {
+            for (int z = pz - renderDist; z <= px + renderDist; z++) {
                 chunks.emplace(std::make_pair(x + face * 1000, z), Chunk(x, z));
             }
         }
@@ -21,10 +25,10 @@ void World::update(const glm::vec3& playerPos) {
 glm::vec3 World::cubeToSphere(int face, int x, int z, float y) const {
     float bx = x * Chunk::SIZE;
     float bz = z * Chunk::SIZE;
-    float scale = 0.5f; // Revert to original scale
+    float scale = 0.5f;
     float u = bx * scale;
     float v = bz * scale;
-    glm::vec3 pos(u, radius + y, v); // Terrain top at 1599.55
+    glm::vec3 pos(u, radius + y, v); // y=8 becomes 1599.55
     if (g_showDebug) {
         std::cout << "Chunk Pos: " << pos.x << ", " << pos.y << ", " << pos.z << std::endl;
     }
@@ -40,10 +44,10 @@ float World::findSurfaceHeight(int chunkX, int chunkZ) const {
     const Chunk& chunk = it->second;
     for (int y = Chunk::SIZE - 1; y >= 0; --y) {
         BlockType type = chunk.getBlock(8, y, 8).type;
-        if (g_showDebug) std::cout << "Checking y = " << y << ": " << (int)type << std::endl;
+        if (g_showDebug) std::cout << "Checking y = " << y << ": " << static_cast<int>(type) << std::endl;
         if (type != BlockType::AIR) {
             if (g_showDebug) std::cout << "Surface at y = " << y << " in chunk (" << chunkX << ", " << chunkZ << ")" << std::endl;
-            return radius + y; // Exact top surface (1599.55)
+            return radius + y; // y=8 returns 1599.55
         }
     }
     if (g_showDebug) std::cout << "No surface in chunk (" << chunkX << ", " << chunkZ << ")" << std::endl;
