@@ -1,3 +1,4 @@
+// ./GameFPS/VoxelGlobe/src/Renderer.cpp
 #include <GL/glew.h>
 #include "Renderer.hpp"
 #include <GLFW/glfw3.h>

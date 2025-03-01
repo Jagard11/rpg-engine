@@ -2,7 +2,6 @@
 #include "World.hpp"
 #include <cmath>
 #include <iostream>
-#include <ios>
 #include "Debug.hpp"
 
 void World::update(const glm::vec3& playerPos) {
@@ -21,10 +20,13 @@ void World::update(const glm::vec3& playerPos) {
             }
         }
     }
+    if (g_showDebug) {
+        std::cout << "Chunks updated, count: " << chunks.size() << std::endl;
+    }
 }
 
 glm::vec3 World::cubeToSphere(int face, int x, int z, float y) const {
-    float scale = 1.0f; // 1:1 mapping
+    float scale = 1.0f;
     float bx = x * Chunk::SIZE * scale;
     float bz = z * Chunk::SIZE * scale;
     float u = bx;
@@ -45,12 +47,40 @@ float World::findSurfaceHeight(int chunkX, int chunkZ) const {
     const Chunk& chunk = it->second;
     for (int y = Chunk::SIZE - 1; y >= 0; --y) {
         BlockType type = chunk.getBlock(8, y, 8).type;
-        if (g_showDebug) std::cout << "Checking y = " << y << ": " << static_cast<int>(type) << std::endl;
         if (type != BlockType::AIR) {
             if (g_showDebug) std::cout << "Surface at y = " << y << " in chunk (" << chunkX << ", " << chunkZ << ")" << std::endl;
-            return radius + y * 1.0f; // 1:1 scaling
+            return radius + y * 1.0f;
         }
     }
     if (g_showDebug) std::cout << "No surface in chunk (" << chunkX << ", " << chunkZ << ")" << std::endl;
     return radius;
+}
+
+void World::setBlock(int worldX, int worldY, int worldZ, BlockType type) {
+    int chunkX = worldX / Chunk::SIZE;
+    int chunkZ = worldZ / Chunk::SIZE;
+    int localX = worldX % Chunk::SIZE;
+    int localZ = worldZ % Chunk::SIZE;
+    if (localX < 0) localX += Chunk::SIZE;
+    if (localZ < 0) localZ += Chunk::SIZE;
+
+    auto it = chunks.find(std::make_pair(chunkX, chunkZ));
+    if (it != chunks.end()) {
+        it->second.setBlock(localX, worldY, localZ, type);
+    }
+}
+
+Block World::getBlock(int worldX, int worldY, int worldZ) const {
+    int chunkX = worldX / Chunk::SIZE;
+    int chunkZ = worldZ / Chunk::SIZE;
+    int localX = worldX % Chunk::SIZE;
+    int localZ = worldZ % Chunk::SIZE;
+    if (localX < 0) localX += Chunk::SIZE;
+    if (localZ < 0) localZ += Chunk::SIZE;
+
+    auto it = chunks.find(std::make_pair(chunkX, chunkZ));
+    if (it != chunks.end()) {
+        return it->second.getBlock(localX, worldY, localZ);
+    }
+    return Block(BlockType::AIR);
 }

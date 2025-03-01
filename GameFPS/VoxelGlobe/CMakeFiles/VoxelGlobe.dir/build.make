@@ -27,9 +27,6 @@
 
 .SUFFIXES: .hpux_make_needs_suffix_list
 
-# Produce verbose output by default.
-VERBOSE = 1
-
 # Command-line flag to silence nested $(MAKE).
 $(VERBOSE)MAKESILENT = -s
 
@@ -287,7 +284,10 @@ VoxelGlobe: CMakeFiles/VoxelGlobe.dir/include/imgui/imgui_widgets.cpp.o
 VoxelGlobe: CMakeFiles/VoxelGlobe.dir/include/imgui/imgui_impl_glfw.cpp.o
 VoxelGlobe: CMakeFiles/VoxelGlobe.dir/include/imgui/imgui_impl_opengl3.cpp.o
 VoxelGlobe: CMakeFiles/VoxelGlobe.dir/build.make
+VoxelGlobe: /usr/lib/x86_64-linux-gnu/libGLEW.so
 VoxelGlobe: /usr/lib/x86_64-linux-gnu/libglfw.so.3.3
+VoxelGlobe: /usr/lib/x86_64-linux-gnu/libGLX.so
+VoxelGlobe: /usr/lib/x86_64-linux-gnu/libOpenGL.so
 VoxelGlobe: CMakeFiles/VoxelGlobe.dir/link.txt
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir="/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/CMakeFiles" --progress-num=$(CMAKE_PROGRESS_14) "Linking CXX executable VoxelGlobe"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/VoxelGlobe.dir/link.txt --verbose=$(VERBOSE)

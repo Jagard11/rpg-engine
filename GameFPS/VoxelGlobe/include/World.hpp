@@ -20,11 +20,13 @@ public:
     void update(const glm::vec3& playerPos);
     const std::unordered_map<std::pair<int, int>, Chunk, pair_hash>& getChunks() const { return chunks; }
     glm::vec3 cubeToSphere(int face, int x, int z, float y) const;
-    float findSurfaceHeight(int chunkX, int chunkZ) const; // New method
+    float findSurfaceHeight(int chunkX, int chunkZ) const;
+    void setBlock(int worldX, int worldY, int worldZ, BlockType type);
+    Block getBlock(int worldX, int worldY, int worldZ) const;
 
 private:
     std::unordered_map<std::pair<int, int>, Chunk, pair_hash> chunks;
-    float radius; // 10 km circumference -> ~1591.55 m radius
+    float radius;
 };
 
 #endif

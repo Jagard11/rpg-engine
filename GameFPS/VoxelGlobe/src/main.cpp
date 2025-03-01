@@ -1,3 +1,4 @@
+// ./GameFPS/VoxelGlobe/src/main.cpp
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include "Renderer.hpp"
@@ -5,14 +6,10 @@
 #include "Player.hpp"
 #include "Debug.hpp"
 #include <iostream>
-
-// Define the macro before including ImGui headers
-#define IMGUI_IMPL_OPENGL_LOADER_GLEW
+#include <glm/gtx/intersect.hpp>
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
-
-// Rest of your code...
 
 bool g_showDebug = false;
 bool g_showMenu = false;
@@ -53,8 +50,12 @@ int main() {
     int lastEscapeState = GLFW_RELEASE;
     int lastF8State = GLFW_RELEASE;
     int lastF12State = GLFW_RELEASE;
+    int lastLeftClickState = GLFW_RELEASE;
+    int lastRightClickState = GLFW_RELEASE;
 
     double lastTime = glfwGetTime();
+    static bool firstFrame = true;
+
     while (!glfwWindowShouldClose(window)) {
         double currentTime = glfwGetTime();
         float deltaTime = static_cast<float>(currentTime - lastTime);
@@ -92,19 +93,67 @@ int main() {
                 firstMouse = false;
             }
             float deltaX = static_cast<float>(mouseX - lastX);
-            float deltaY = static_cast<float>(mouseY - lastY);
+            float deltaY = static_cast<float>(mouseY - lastY); // Inverted for natural vertical control
             lastX = mouseX;
             lastY = mouseY;
             player.updateOrientation(deltaX, deltaY);
+
+            float scrollY = io.MouseWheel;
+            if (scrollY != 0) player.scrollInventory(scrollY);
 
             if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) player.moveForward(deltaTime);
             if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) player.moveBackward(deltaTime);
             if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) player.moveLeft(deltaTime);
             if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) player.moveRight(deltaTime);
+
+            int leftClickState = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT);
+            if (leftClickState == GLFW_PRESS && lastLeftClickState == GLFW_RELEASE) {
+                glm::vec3 rayOrigin = player.position + player.up * player.height;
+                glm::vec3 rayDir = player.cameraDirection;
+                for (float t = 0; t < 5.0f; t += 0.1f) {
+                    glm::vec3 pos = rayOrigin + rayDir * t;
+                    int x = static_cast<int>(floor(pos.x));
+                    int y = static_cast<int>(floor(pos.y));
+                    int z = static_cast<int>(floor(pos.z));
+                    if (world.getBlock(x, y, z).type == BlockType::AIR) {
+                        world.setBlock(x, y, z, player.inventory[player.selectedSlot]);
+                        break;
+                    }
+                }
+            }
+            lastLeftClickState = leftClickState;
+
+            int rightClickState = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT);
+            if (rightClickState == GLFW_PRESS && lastRightClickState == GLFW_RELEASE) {
+                glm::vec3 rayOrigin = player.position + player.up * player.height;
+                glm::vec3 rayDir = player.cameraDirection;
+                for (float t = 0; t < 5.0f; t += 0.1f) {
+                    glm::vec3 pos = rayOrigin + rayDir * t;
+                    int x = static_cast<int>(floor(pos.x));
+                    int y = static_cast<int>(floor(pos.y));
+                    int z = static_cast<int>(floor(pos.z));
+                    if (world.getBlock(x, y, z).type != BlockType::AIR) {
+                        world.setBlock(x, y, z, BlockType::AIR);
+                        break;
+                    }
+                }
+            }
+            lastRightClickState = rightClickState;
         }
 
-        player.applyGravity(world, deltaTime);
         world.update(player.position);
+        if (!firstFrame) {
+            player.applyGravity(world, deltaTime);
+        }
+        firstFrame = false;
+
+        if (g_showDebug) {
+            int chunkX = static_cast<int>(player.position.x / Chunk::SIZE);
+            int chunkZ = static_cast<int>(player.position.z / Chunk::SIZE);
+            float surfaceY = world.findSurfaceHeight(chunkX, chunkZ) + 1.0f;
+            std::cout << "Player Y: " << player.position.y << ", Surface Y: " << surfaceY << std::endl;
+        }
+
         renderer.render(world, player);
 
         ImGui_ImplOpenGL3_NewFrame();
@@ -129,6 +178,21 @@ int main() {
             }
             ImGui::End();
         }
+
+        ImGui::SetNextWindowPos(ImVec2(0, io.DisplaySize.y - 40));
+        ImGui::SetNextWindowSize(ImVec2(io.DisplaySize.x, 40));
+        ImGui::Begin("Inventory", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar);
+        for (int i = 0; i < 10; i++) {
+            ImGui::PushID(i);
+            if (i == player.selectedSlot) ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.8f, 0.2f, 1.0f));
+            if (ImGui::Button(std::to_string(i).c_str(), ImVec2(40, 40))) {
+                player.selectedSlot = i;
+            }
+            if (i == player.selectedSlot) ImGui::PopStyleColor();
+            ImGui::SameLine();
+            ImGui::PopID();
+        }
+        ImGui::End();
 
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

@@ -320,7 +320,11 @@ CMakeFiles/VoxelGlobe.dir/src/main.cpp.o: \
  /usr/include/c++/11/bits/locale_facets.tcc \
  /usr/include/c++/11/bits/basic_ios.tcc \
  /usr/include/c++/11/bits/ostream.tcc /usr/include/c++/11/istream \
- /usr/include/c++/11/bits/istream.tcc \
+ /usr/include/c++/11/bits/istream.tcc /usr/include/glm/gtx/intersect.hpp \
+ /usr/include/glm/gtx/closest_point.hpp \
+ /usr/include/glm/gtx/closest_point.inl \
+ /usr/include/glm/gtx/vector_query.hpp \
+ /usr/include/glm/gtx/vector_query.inl /usr/include/glm/gtx/intersect.inl \
  /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/imgui/imgui.h \
  /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/imgui/imconfig.h \
  /usr/include/string.h /usr/include/strings.h \

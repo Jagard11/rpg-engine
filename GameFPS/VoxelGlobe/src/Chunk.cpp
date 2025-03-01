@@ -1,3 +1,4 @@
+// ./GameFPS/VoxelGlobe/src/Chunk.cpp
 #include "Chunk.hpp"
 
 Chunk::Chunk(int x, int z) : chunkX(x), chunkZ(z) {
@@ -10,29 +11,42 @@ Block Chunk::getBlock(int x, int y, int z) const {
     return blocks[x + z * SIZE + y * SIZE * SIZE];
 }
 
+void Chunk::setBlock(int x, int y, int z, BlockType type) {
+    if (x < 0 || x >= SIZE || y < 0 || y >= SIZE || z < 0 || z >= SIZE) return;
+    blocks[x + z * SIZE + y * SIZE * SIZE] = Block(type);
+    regenerateMesh();
+}
+
 void Chunk::generateTerrain() {
     for (int x = 0; x < SIZE; x++) {
         for (int z = 0; z < SIZE; z++) {
             for (int y = 0; y < SIZE; y++) {
                 if (y < 8) blocks[x + z * SIZE + y * SIZE * SIZE] = Block(BlockType::DIRT);
                 else if (y == 8) blocks[x + z * SIZE + y * SIZE * SIZE] = Block(BlockType::GRASS);
+                else blocks[x + z * SIZE + y * SIZE * SIZE] = Block(BlockType::AIR);
             }
         }
     }
-    float voxelSize = 1.0f; // 1 unit per voxel, matching Minecraft
-    mesh.clear(); // Ensure we start fresh
+    regenerateMesh();
+}
+
+void Chunk::regenerateMesh() {
+    mesh.clear();
     for (int x = 0; x < SIZE; x++) {
         for (int z = 0; z < SIZE; z++) {
-            if (getBlock(x, 8, z).type == BlockType::GRASS) {
-                float y = 0.0f; // Base height; scaled by World::cubeToSphere
-                mesh.insert(mesh.end(), {
-                    static_cast<float>(x),     y, static_cast<float>(z),     0.0f, 0.0f,
-                    static_cast<float>(x + 1), y, static_cast<float>(z),     1.0f, 0.0f,
-                    static_cast<float>(x + 1), y, static_cast<float>(z + 1), 1.0f, 1.0f,
-                    static_cast<float>(x),     y, static_cast<float>(z),     0.0f, 0.0f,
-                    static_cast<float>(x + 1), y, static_cast<float>(z + 1), 1.0f, 1.0f,
-                    static_cast<float>(x),     y, static_cast<float>(z + 1), 0.0f, 1.0f
-                });
+            for (int y = 0; y < SIZE; y++) {
+                if (getBlock(x, y, z).type != BlockType::AIR) {
+                    if (y + 1 >= SIZE || getBlock(x, y + 1, z).type == BlockType::AIR) {
+                        mesh.insert(mesh.end(), {
+                            static_cast<float>(x),     static_cast<float>(y + 1), static_cast<float>(z),     0.0f, 0.0f,
+                            static_cast<float>(x + 1), static_cast<float>(y + 1), static_cast<float>(z),     1.0f, 0.0f,
+                            static_cast<float>(x + 1), static_cast<float>(y + 1), static_cast<float>(z + 1), 1.0f, 1.0f,
+                            static_cast<float>(x),     static_cast<float>(y + 1), static_cast<float>(z),     0.0f, 0.0f,
+                            static_cast<float>(x + 1), static_cast<float>(y + 1), static_cast<float>(z + 1), 1.0f, 1.0f,
+                            static_cast<float>(x),     static_cast<float>(y + 1), static_cast<float>(z + 1), 0.0f, 1.0f
+                        });
+                    }
+                }
             }
         }
     }
