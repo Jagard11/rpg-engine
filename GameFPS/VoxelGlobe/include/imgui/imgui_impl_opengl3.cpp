@@ -89,6 +89,9 @@
 //  ES 3.0    300       "#version 300 es"   = WebGL 2.0
 //----------------------------------------
 
+#define IMGUI_IMPL_OPENGL_LOADER_GLEW
+#include <GL/glew.h>
+
 #if defined(_MSC_VER) && !defined(_CRT_SECURE_NO_WARNINGS)
 #define _CRT_SECURE_NO_WARNINGS
 #endif
@@ -140,7 +143,7 @@
 // - You can temporarily use an unstripped version. See https://github.com/dearimgui/gl3w_stripped/releases
 // Changes to this backend using new APIs should be accompanied by a regenerated stripped loader version.
 #define IMGL3W_IMPL
-#include "imgui_impl_opengl3_loader.h"
+// #include "imgui_impl_opengl3_loader.h"
 #endif
 
 // Vertex arrays are not supported on ES2/WebGL1 unless Emscripten which uses an extension
@@ -247,10 +250,17 @@ bool    ImGui_ImplOpenGL3_Init(const char* glsl_version)
     IM_ASSERT(io.BackendRendererUserData == nullptr && "Already initialized a renderer backend!");
 
     // Initialize our loader
-#if !defined(IMGUI_IMPL_OPENGL_ES2) && !defined(IMGUI_IMPL_OPENGL_ES3) && !defined(IMGUI_IMPL_OPENGL_LOADER_CUSTOM)
+    #if defined(IMGUI_IMPL_OPENGL_LOADER_GLEW)
+    GLenum err = glewInit();
+    if (err != GLEW_OK)
+    {
+        fprintf(stderr, "Failed to initialize OpenGL loader (GLEW): %s\n", glewGetErrorString(err));
+        return false;
+    }
+#elif defined(IMGUI_IMPL_OPENGL_LOADER_GL3W)
     if (imgl3wInit() != 0)
     {
-        fprintf(stderr, "Failed to initialize OpenGL loader!\n");
+        fprintf(stderr, "Failed to initialize OpenGL loader (GL3W)!\n");
         return false;
     }
 #endif

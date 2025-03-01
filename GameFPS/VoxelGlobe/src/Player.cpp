@@ -1,27 +1,28 @@
+// ./GameFPS/VoxelGlobe/src/Player.cpp
 #include "Player.hpp"
 #include <iostream>
 #include <ios>
 #include "Debug.hpp"
 #include <glm/gtc/matrix_transform.hpp>
 
-Player::Player(const World& world) : speed(5.0f) {
-    float surfaceHeight = world.findSurfaceHeight(0, 0); // 1599.55
+Player::Player(const World& world) : speed(5.0f), height(1.75f) {
+    float surfaceHeight = world.findSurfaceHeight(0, 0); // e.g., 1599.55
     position = glm::vec3(0.0f, surfaceHeight, 0.0f);
     up = glm::normalize(position); // Local up for spherical world
 
     // Set initial yaw (0°) and pitch (-40° downward)
-    float yaw = 0.0f;   // Looking along positive x-axis horizontally
-    float pitch = -40.0f; // Pitch down 40° (negative to tilt downward)
+    yaw = 0.0f;
+    pitch = -40.0f; // Negative pitch for downward angle
     float radYaw = glm::radians(yaw);
     float radPitch = glm::radians(pitch);
     cameraDirection = glm::vec3(
-        cos(radPitch) * cos(radYaw), // x ≈ cos(-40°) ≈ 0.766
-        sin(radPitch),               // y ≈ sin(-40°) ≈ -0.643 (downward)
-        cos(radPitch) * sin(radYaw)  // z ≈ 0 (sin(0°) = 0)
+        cos(radPitch) * cos(radYaw), // x ≈ 0.766
+        sin(radPitch),               // y ≈ -0.643 (downward)
+        cos(radPitch) * sin(radYaw)  // z ≈ 0
     );
     cameraDirection = glm::normalize(cameraDirection);
 
-    // Compute horizontal movementDirection by projecting cameraDirection onto the tangent plane
+    // Compute horizontal movementDirection
     movementDirection = glm::normalize(cameraDirection - glm::dot(cameraDirection, up) * up);
 
     if (g_showDebug) {
@@ -86,10 +87,10 @@ void Player::updateOrientation(float deltaX, float deltaY) {
     glm::mat4 yawRotation = glm::rotate(glm::mat4(1.0f), glm::radians(deltaYaw), up);
     cameraDirection = glm::vec3(yawRotation * glm::vec4(cameraDirection, 0.0f));
 
-    // Compute local right vector (perpendicular to cameraDirection and up)
+    // Compute local right vector
     glm::vec3 right = glm::normalize(glm::cross(cameraDirection, up));
 
-    // Apply pitch: rotate around the local right vector for vertical rotation
+    // Apply pitch: rotate around the local right vector
     glm::mat4 pitchRotation = glm::rotate(glm::mat4(1.0f), glm::radians(deltaPitch), right);
     cameraDirection = glm::vec3(pitchRotation * glm::vec4(cameraDirection, 0.0f));
 
@@ -105,7 +106,7 @@ void Player::updateOrientation(float deltaX, float deltaY) {
         cameraDirection = glm::vec3(adjustRotation * glm::vec4(cameraDirection, 0.0f));
     }
 
-    // Compute horizontal movementDirection by projecting cameraDirection onto the tangent plane
+    // Compute horizontal movementDirection
     movementDirection = glm::normalize(cameraDirection - glm::dot(cameraDirection, up) * up);
 
     if (g_showDebug) {

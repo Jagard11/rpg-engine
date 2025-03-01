@@ -1,5 +1,5 @@
-CMakeFiles/VoxelGlobe.dir/include/imgui/backends/imgui_impl_glfw.cpp.o: \
- /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/imgui/backends/imgui_impl_glfw.cpp \
+CMakeFiles/VoxelGlobe.dir/include/imgui/imgui_impl_glfw.cpp.o: \
+ /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/imgui/imgui_impl_glfw.cpp \
  /usr/include/stdc-predef.h \
  /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/imgui/imgui.h \
  /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/imgui/imconfig.h \
@@ -17,7 +17,7 @@ CMakeFiles/VoxelGlobe.dir/include/imgui/backends/imgui_impl_glfw.cpp.o: \
  /usr/include/x86_64-linux-gnu/bits/types/locale_t.h \
  /usr/include/x86_64-linux-gnu/bits/types/__locale_t.h \
  /usr/include/strings.h /usr/include/assert.h \
- /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/imgui/backends/imgui_impl_glfw.h \
+ /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/imgui/imgui_impl_glfw.h \
  /usr/include/GLFW/glfw3.h \
  /usr/lib/gcc/x86_64-linux-gnu/11/include/stdint.h /usr/include/stdint.h \
  /usr/include/x86_64-linux-gnu/bits/types.h \

@@ -5,14 +5,20 @@
 #include "stb_image.h"
 #include "Debug.hpp"
 #include <iostream>
-#include <ios>
+#include <vector>
 
-extern float g_fov; // Access global FOV from main.cpp
+extern float g_fov;
+extern bool g_showVoxelEdges;
 
 Renderer::Renderer() {
     glGenVertexArrays(1, &vao);
     glGenBuffers(1, &vbo);
     loadShader();
+
+    glGenVertexArrays(1, &edgeVao);
+    glGenBuffers(1, &edgeVbo);
+    loadEdgeShader();
+
     loadTexture();
 }
 
@@ -20,6 +26,9 @@ Renderer::~Renderer() {
     glDeleteVertexArrays(1, &vao);
     glDeleteBuffers(1, &vbo);
     glDeleteProgram(shaderProgram);
+    glDeleteVertexArrays(1, &edgeVao);
+    glDeleteBuffers(1, &edgeVbo);
+    glDeleteProgram(edgeShaderProgram);
     glDeleteTextures(1, &texture);
 }
 
@@ -44,7 +53,7 @@ void Renderer::render(const World& world, const Player& player) {
     for (const auto& [pos, chunk] : world.getChunks()) {
         int face = pos.first / 1000;
         int localX = pos.first % 1000;
-        glm::vec3 sphericalPos = world.cubeToSphere(face, localX, pos.second, 8.0f); // Surface at 1599.55
+        glm::vec3 sphericalPos = world.cubeToSphere(face, localX, pos.second, 8.0f);
         glm::mat4 model = glm::translate(glm::mat4(1.0f), sphericalPos);
         glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model"), 1, GL_FALSE, &model[0][0]);
         glBindBuffer(GL_ARRAY_BUFFER, vbo);
@@ -55,6 +64,60 @@ void Renderer::render(const World& world, const Player& player) {
         glEnableVertexAttribArray(1);
         glDrawArrays(GL_TRIANGLES, 0, chunk.getMesh().size() / 5);
     }
+
+    if (g_showVoxelEdges) {
+        renderVoxelEdges(world, player);
+    }
+}
+
+void Renderer::renderVoxelEdges(const World& world, const Player& player) {
+    glUseProgram(edgeShaderProgram);
+    glBindVertexArray(edgeVao);
+
+    glm::mat4 proj = glm::perspective(glm::radians(g_fov), 800.0f / 600.0f, 0.1f, 2000.0f);
+    glm::vec3 eyePos = player.position + player.up * player.height;
+    glm::vec3 lookAtPos = eyePos + player.cameraDirection;
+    glm::mat4 view = glm::lookAt(eyePos, lookAtPos, player.up);
+    glUniformMatrix4fv(glGetUniformLocation(edgeShaderProgram, "proj"), 1, GL_FALSE, &proj[0][0]);
+    glUniformMatrix4fv(glGetUniformLocation(edgeShaderProgram, "view"), 1, GL_FALSE, &view[0][0]);
+
+    std::vector<float> edgeVertices;
+    float radius = 5.0f; // Debug radius around player
+    for (const auto& [pos, chunk] : world.getChunks()) {
+        int face = pos.first / 1000;
+        int localX = pos.first % 1000;
+        glm::vec3 chunkBase = world.cubeToSphere(face, localX, pos.second, 8.0f);
+        float dist = glm::length(chunkBase - player.position);
+        if (dist > radius * Chunk::SIZE) continue;
+
+        const std::vector<float>& mesh = chunk.getMesh();
+        for (size_t i = 0; i < mesh.size(); i += 30) {
+            float x1 = mesh[i] + chunkBase.x;
+            float y1 = mesh[i + 1] + chunkBase.y;
+            float z1 = mesh[i + 2] + chunkBase.z;
+            float x2 = mesh[i + 5] + chunkBase.x;
+            float y2 = mesh[i + 6] + chunkBase.y;
+            float z2 = mesh[i + 7] + chunkBase.z;
+            float x3 = mesh[i + 10] + chunkBase.x;
+            float y3 = mesh[i + 11] + chunkBase.y;
+            float z3 = mesh[i + 12] + chunkBase.z;
+            float x4 = mesh[i + 25] + chunkBase.x;
+            float y4 = mesh[i + 26] + chunkBase.y;
+            float z4 = mesh[i + 27] + chunkBase.z;
+
+            edgeVertices.insert(edgeVertices.end(), {x1, y1, z1, x2, y2, z2});
+            edgeVertices.insert(edgeVertices.end(), {x2, y2, z2, x3, y3, z3});
+            edgeVertices.insert(edgeVertices.end(), {x3, y3, z3, x4, y4, z4});
+            edgeVertices.insert(edgeVertices.end(), {x4, y4, z4, x1, y1, z1});
+        }
+    }
+
+    glBindBuffer(GL_ARRAY_BUFFER, edgeVbo);
+    glBufferData(GL_ARRAY_BUFFER, edgeVertices.size() * sizeof(float), edgeVertices.data(), GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    glLineWidth(2.0f);
+    glDrawArrays(GL_LINES, 0, edgeVertices.size() / 3);
 }
 
 void Renderer::loadShader() {
@@ -106,6 +169,55 @@ void Renderer::loadShader() {
         GLchar infoLog[512];
         glGetProgramInfoLog(shaderProgram, 512, NULL, infoLog);
         std::cerr << "Shader Program Link Error: " << infoLog << std::endl;
+    }
+    glDeleteShader(vert);
+    glDeleteShader(frag);
+}
+
+void Renderer::loadEdgeShader() {
+    const char* vertSrc = R"(
+        #version 330 core
+        layout(location = 0) in vec3 pos;
+        uniform mat4 model, view, proj;
+        void main() {
+            gl_Position = proj * view * model * vec4(pos, 1.0);
+        }
+    )";
+    const char* fragSrc = R"(
+        #version 330 core
+        out vec4 FragColor;
+        void main() {
+            FragColor = vec4(1.0, 0.0, 0.0, 1.0); // Red edges
+        }
+    )";
+    GLuint vert = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(vert, 1, &vertSrc, NULL);
+    glCompileShader(vert);
+    GLint success;
+    glGetShaderiv(vert, GL_COMPILE_STATUS, &success);
+    if (!success) {
+        GLchar infoLog[512];
+        glGetShaderInfoLog(vert, 512, NULL, infoLog);
+        std::cerr << "Edge Vertex Shader Error: " << infoLog << std::endl;
+    }
+    GLuint frag = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(frag, 1, &fragSrc, NULL);
+    glCompileShader(frag);
+    glGetShaderiv(frag, GL_COMPILE_STATUS, &success);
+    if (!success) {
+        GLchar infoLog[512];
+        glGetShaderInfoLog(frag, 512, NULL, infoLog);
+        std::cerr << "Edge Fragment Shader Error: " << infoLog << std::endl;
+    }
+    edgeShaderProgram = glCreateProgram();
+    glAttachShader(edgeShaderProgram, vert);
+    glAttachShader(edgeShaderProgram, frag);
+    glLinkProgram(edgeShaderProgram);
+    glGetProgramiv(edgeShaderProgram, GL_LINK_STATUS, &success);
+    if (!success) {
+        GLchar infoLog[512];
+        glGetProgramInfoLog(edgeShaderProgram, 512, NULL, infoLog);
+        std::cerr << "Edge Shader Program Link Error: " << infoLog << std::endl;
     }
     glDeleteShader(vert);
     glDeleteShader(frag);

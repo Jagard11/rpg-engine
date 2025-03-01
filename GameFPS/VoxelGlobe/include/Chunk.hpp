@@ -1,22 +1,21 @@
-// ./GameFPS/VoxelGlobe/include/Chunk.hpp
 #ifndef CHUNK_HPP
 #define CHUNK_HPP
 
-#include "Block.hpp"
 #include <vector>
+#include "Block.hpp"
 
 class Chunk {
 public:
-    static const int SIZE = 16;
+    static const int SIZE = 16; // Assuming 16; adjust if different
     Chunk(int x, int z);
     Block getBlock(int x, int y, int z) const;
-    const std::vector<float>& getMesh() const { return mesh; }
     void generateTerrain();
+    const std::vector<float>& getMesh() const;
 
 private:
-    std::vector<Block> blocks;
-    std::vector<float> mesh; // pos (3), uv (2)
     int chunkX, chunkZ;
+    std::vector<Block> blocks;
+    std::vector<float> mesh; // Vertex data (x, y, z, u, v)
 };
 
 #endif

@@ -5,13 +5,19 @@
 #include "Player.hpp"
 #include "Debug.hpp"
 #include <iostream>
+
+// Define the macro before including ImGui headers
+#define IMGUI_IMPL_OPENGL_LOADER_GLEW
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 
+// Rest of your code...
+
 bool g_showDebug = false;
 bool g_showMenu = false;
-float g_fov = 70.0f; // Default FOV, adjustable via menu
+bool g_showVoxelEdges = false;
+float g_fov = 70.0f;
 
 int main() {
     if (!glfwInit()) return -1;
@@ -44,9 +50,9 @@ int main() {
     double lastX = 400, lastY = 300;
     bool firstMouse = true;
 
-    // Key state tracking for one-shot toggles
     int lastEscapeState = GLFW_RELEASE;
     int lastF8State = GLFW_RELEASE;
+    int lastF12State = GLFW_RELEASE;
 
     double lastTime = glfwGetTime();
     while (!glfwWindowShouldClose(window)) {
@@ -57,16 +63,14 @@ int main() {
         double mouseX, mouseY;
         glfwGetCursorPos(window, &mouseX, &mouseY);
 
-        // Escape menu toggle (one-shot)
         int escapeState = glfwGetKey(window, GLFW_KEY_ESCAPE);
         if (escapeState == GLFW_PRESS && lastEscapeState == GLFW_RELEASE) {
             g_showMenu = !g_showMenu;
             glfwSetInputMode(window, GLFW_CURSOR, g_showMenu ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED);
-            firstMouse = true; // Reset mouse on toggle
+            firstMouse = true;
         }
         lastEscapeState = escapeState;
 
-        // F8 debug toggle (one-shot)
         int f8State = glfwGetKey(window, GLFW_KEY_F8);
         if (f8State == GLFW_PRESS && lastF8State == GLFW_RELEASE) {
             g_showDebug = !g_showDebug;
@@ -74,7 +78,13 @@ int main() {
         }
         lastF8State = f8State;
 
-        // Mouse and movement input only when menu is closed
+        int f12State = glfwGetKey(window, GLFW_KEY_F12);
+        if (f12State == GLFW_PRESS && lastF12State == GLFW_RELEASE) {
+            g_showVoxelEdges = !g_showVoxelEdges;
+            std::cout << "Voxel Edges toggled: " << (g_showVoxelEdges ? "ON" : "OFF") << std::endl;
+        }
+        lastF12State = f12State;
+
         if (!g_showMenu) {
             if (firstMouse) {
                 lastX = mouseX;
@@ -101,7 +111,6 @@ int main() {
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        // Debug window
         if (g_showDebug) {
             ImGui::Begin("Debug Info");
             ImGui::Text("Player Pos: %.2f, %.2f, %.2f", player.position.x, player.position.y, player.position.z);
@@ -110,14 +119,13 @@ int main() {
             ImGui::End();
         }
 
-        // Escape menu with FOV slider
         if (g_showMenu) {
             ImGui::Begin("Menu", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
             ImGui::SliderFloat("FOV", &g_fov, 30.0f, 110.0f, "%.1f");
             if (ImGui::Button("Close")) {
                 g_showMenu = false;
                 glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-                firstMouse = true; // Reset mouse on close
+                firstMouse = true;
             }
             ImGui::End();
         }

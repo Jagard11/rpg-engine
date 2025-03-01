@@ -1,3 +1,4 @@
+// ./GameFPS/VoxelGlobe/src/World.cpp
 #include "World.hpp"
 #include <cmath>
 #include <iostream>
@@ -23,12 +24,12 @@ void World::update(const glm::vec3& playerPos) {
 }
 
 glm::vec3 World::cubeToSphere(int face, int x, int z, float y) const {
-    float scale = 1.0f; // No scaling, 1 local unit = 1 world unit
+    float scale = 1.0f; // 1:1 mapping
     float bx = x * Chunk::SIZE * scale;
     float bz = z * Chunk::SIZE * scale;
     float u = bx;
     float v = bz;
-    glm::vec3 pos(u, radius + y, v); // y=8 from renderer call sets surface at 1599.55
+    glm::vec3 pos(u, radius + y * scale, v);
     if (g_showDebug) {
         std::cout << "Chunk Pos: " << pos.x << ", " << pos.y << ", " << pos.z << std::endl;
     }
@@ -47,7 +48,7 @@ float World::findSurfaceHeight(int chunkX, int chunkZ) const {
         if (g_showDebug) std::cout << "Checking y = " << y << ": " << static_cast<int>(type) << std::endl;
         if (type != BlockType::AIR) {
             if (g_showDebug) std::cout << "Surface at y = " << y << " in chunk (" << chunkX << ", " << chunkZ << ")" << std::endl;
-            return radius + y; // y=8 returns 1599.55
+            return radius + y * 1.0f; // 1:1 scaling
         }
     }
     if (g_showDebug) std::cout << "No surface in chunk (" << chunkX << ", " << chunkZ << ")" << std::endl;

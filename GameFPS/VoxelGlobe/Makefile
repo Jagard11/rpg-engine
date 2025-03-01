@@ -31,6 +31,9 @@ default_target: all
 
 .SUFFIXES: .hpux_make_needs_suffix_list
 
+# Produce verbose output by default.
+VERBOSE = 1
+
 # Command-line flag to silence nested $(MAKE).
 $(VERBOSE)MAKESILENT = -s
 
@@ -129,54 +132,6 @@ VoxelGlobe/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/build
 .PHONY : VoxelGlobe/fast
 
-include/imgui/backends/imgui_impl_glfw.o: include/imgui/backends/imgui_impl_glfw.cpp.o
-.PHONY : include/imgui/backends/imgui_impl_glfw.o
-
-# target to build an object file
-include/imgui/backends/imgui_impl_glfw.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/include/imgui/backends/imgui_impl_glfw.cpp.o
-.PHONY : include/imgui/backends/imgui_impl_glfw.cpp.o
-
-include/imgui/backends/imgui_impl_glfw.i: include/imgui/backends/imgui_impl_glfw.cpp.i
-.PHONY : include/imgui/backends/imgui_impl_glfw.i
-
-# target to preprocess a source file
-include/imgui/backends/imgui_impl_glfw.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/include/imgui/backends/imgui_impl_glfw.cpp.i
-.PHONY : include/imgui/backends/imgui_impl_glfw.cpp.i
-
-include/imgui/backends/imgui_impl_glfw.s: include/imgui/backends/imgui_impl_glfw.cpp.s
-.PHONY : include/imgui/backends/imgui_impl_glfw.s
-
-# target to generate assembly for a file
-include/imgui/backends/imgui_impl_glfw.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/include/imgui/backends/imgui_impl_glfw.cpp.s
-.PHONY : include/imgui/backends/imgui_impl_glfw.cpp.s
-
-include/imgui/backends/imgui_impl_opengl3.o: include/imgui/backends/imgui_impl_opengl3.cpp.o
-.PHONY : include/imgui/backends/imgui_impl_opengl3.o
-
-# target to build an object file
-include/imgui/backends/imgui_impl_opengl3.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/include/imgui/backends/imgui_impl_opengl3.cpp.o
-.PHONY : include/imgui/backends/imgui_impl_opengl3.cpp.o
-
-include/imgui/backends/imgui_impl_opengl3.i: include/imgui/backends/imgui_impl_opengl3.cpp.i
-.PHONY : include/imgui/backends/imgui_impl_opengl3.i
-
-# target to preprocess a source file
-include/imgui/backends/imgui_impl_opengl3.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/include/imgui/backends/imgui_impl_opengl3.cpp.i
-.PHONY : include/imgui/backends/imgui_impl_opengl3.cpp.i
-
-include/imgui/backends/imgui_impl_opengl3.s: include/imgui/backends/imgui_impl_opengl3.cpp.s
-.PHONY : include/imgui/backends/imgui_impl_opengl3.s
-
-# target to generate assembly for a file
-include/imgui/backends/imgui_impl_opengl3.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/include/imgui/backends/imgui_impl_opengl3.cpp.s
-.PHONY : include/imgui/backends/imgui_impl_opengl3.cpp.s
-
 include/imgui/imgui.o: include/imgui/imgui.cpp.o
 .PHONY : include/imgui/imgui.o
 
@@ -224,6 +179,54 @@ include/imgui/imgui_draw.s: include/imgui/imgui_draw.cpp.s
 include/imgui/imgui_draw.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/include/imgui/imgui_draw.cpp.s
 .PHONY : include/imgui/imgui_draw.cpp.s
+
+include/imgui/imgui_impl_glfw.o: include/imgui/imgui_impl_glfw.cpp.o
+.PHONY : include/imgui/imgui_impl_glfw.o
+
+# target to build an object file
+include/imgui/imgui_impl_glfw.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/include/imgui/imgui_impl_glfw.cpp.o
+.PHONY : include/imgui/imgui_impl_glfw.cpp.o
+
+include/imgui/imgui_impl_glfw.i: include/imgui/imgui_impl_glfw.cpp.i
+.PHONY : include/imgui/imgui_impl_glfw.i
+
+# target to preprocess a source file
+include/imgui/imgui_impl_glfw.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/include/imgui/imgui_impl_glfw.cpp.i
+.PHONY : include/imgui/imgui_impl_glfw.cpp.i
+
+include/imgui/imgui_impl_glfw.s: include/imgui/imgui_impl_glfw.cpp.s
+.PHONY : include/imgui/imgui_impl_glfw.s
+
+# target to generate assembly for a file
+include/imgui/imgui_impl_glfw.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/include/imgui/imgui_impl_glfw.cpp.s
+.PHONY : include/imgui/imgui_impl_glfw.cpp.s
+
+include/imgui/imgui_impl_opengl3.o: include/imgui/imgui_impl_opengl3.cpp.o
+.PHONY : include/imgui/imgui_impl_opengl3.o
+
+# target to build an object file
+include/imgui/imgui_impl_opengl3.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/include/imgui/imgui_impl_opengl3.cpp.o
+.PHONY : include/imgui/imgui_impl_opengl3.cpp.o
+
+include/imgui/imgui_impl_opengl3.i: include/imgui/imgui_impl_opengl3.cpp.i
+.PHONY : include/imgui/imgui_impl_opengl3.i
+
+# target to preprocess a source file
+include/imgui/imgui_impl_opengl3.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/include/imgui/imgui_impl_opengl3.cpp.i
+.PHONY : include/imgui/imgui_impl_opengl3.cpp.i
+
+include/imgui/imgui_impl_opengl3.s: include/imgui/imgui_impl_opengl3.cpp.s
+.PHONY : include/imgui/imgui_impl_opengl3.s
+
+# target to generate assembly for a file
+include/imgui/imgui_impl_opengl3.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/include/imgui/imgui_impl_opengl3.cpp.s
+.PHONY : include/imgui/imgui_impl_opengl3.cpp.s
 
 include/imgui/imgui_tables.o: include/imgui/imgui_tables.cpp.o
 .PHONY : include/imgui/imgui_tables.o
@@ -450,18 +453,18 @@ help:
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
 	@echo "... VoxelGlobe"
-	@echo "... include/imgui/backends/imgui_impl_glfw.o"
-	@echo "... include/imgui/backends/imgui_impl_glfw.i"
-	@echo "... include/imgui/backends/imgui_impl_glfw.s"
-	@echo "... include/imgui/backends/imgui_impl_opengl3.o"
-	@echo "... include/imgui/backends/imgui_impl_opengl3.i"
-	@echo "... include/imgui/backends/imgui_impl_opengl3.s"
 	@echo "... include/imgui/imgui.o"
 	@echo "... include/imgui/imgui.i"
 	@echo "... include/imgui/imgui.s"
 	@echo "... include/imgui/imgui_draw.o"
 	@echo "... include/imgui/imgui_draw.i"
 	@echo "... include/imgui/imgui_draw.s"
+	@echo "... include/imgui/imgui_impl_glfw.o"
+	@echo "... include/imgui/imgui_impl_glfw.i"
+	@echo "... include/imgui/imgui_impl_glfw.s"
+	@echo "... include/imgui/imgui_impl_opengl3.o"
+	@echo "... include/imgui/imgui_impl_opengl3.i"
+	@echo "... include/imgui/imgui_impl_opengl3.s"
 	@echo "... include/imgui/imgui_tables.o"
 	@echo "... include/imgui/imgui_tables.i"
 	@echo "... include/imgui/imgui_tables.s"
