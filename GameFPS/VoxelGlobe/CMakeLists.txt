@@ -19,6 +19,7 @@ add_executable(VoxelGlobe
     src/World.cpp
     src/Chunk.cpp
     src/Block.cpp
+    src/VoxelManipulator.cpp  # Added new source file
     src/stb_image_impl.cpp
     include/imgui/imgui.cpp
     include/imgui/imgui_draw.cpp

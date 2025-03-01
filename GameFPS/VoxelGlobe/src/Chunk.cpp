@@ -33,9 +33,10 @@ void Chunk::generateTerrain() {
 void Chunk::regenerateMesh() {
     mesh.clear();
     for (int x = 0; x < SIZE; x++) {
-        for (int z = 0; z < SIZE; z++) {
-            for (int y = 0; y < SIZE; y++) {
+        for (int y = 0; y < SIZE; y++) {
+            for (int z = 0; z < SIZE; z++) {
                 if (getBlock(x, y, z).type != BlockType::AIR) {
+                    // Top face
                     if (y + 1 >= SIZE || getBlock(x, y + 1, z).type == BlockType::AIR) {
                         mesh.insert(mesh.end(), {
                             static_cast<float>(x),     static_cast<float>(y + 1), static_cast<float>(z),     0.0f, 0.0f,
@@ -44,6 +45,61 @@ void Chunk::regenerateMesh() {
                             static_cast<float>(x),     static_cast<float>(y + 1), static_cast<float>(z),     0.0f, 0.0f,
                             static_cast<float>(x + 1), static_cast<float>(y + 1), static_cast<float>(z + 1), 1.0f, 1.0f,
                             static_cast<float>(x),     static_cast<float>(y + 1), static_cast<float>(z + 1), 0.0f, 1.0f
+                        });
+                    }
+                    // Bottom face
+                    if (y == 0 || getBlock(x, y - 1, z).type == BlockType::AIR) {
+                        mesh.insert(mesh.end(), {
+                            static_cast<float>(x),     static_cast<float>(y), static_cast<float>(z),     0.0f, 0.0f,
+                            static_cast<float>(x + 1), static_cast<float>(y), static_cast<float>(z),     1.0f, 0.0f,
+                            static_cast<float>(x + 1), static_cast<float>(y), static_cast<float>(z + 1), 1.0f, 1.0f,
+                            static_cast<float>(x),     static_cast<float>(y), static_cast<float>(z),     0.0f, 0.0f,
+                            static_cast<float>(x + 1), static_cast<float>(y), static_cast<float>(z + 1), 1.0f, 1.0f,
+                            static_cast<float>(x),     static_cast<float>(y), static_cast<float>(z + 1), 0.0f, 1.0f
+                        });
+                    }
+                    // Front face (+z)
+                    if (z + 1 >= SIZE || getBlock(x, y, z + 1).type == BlockType::AIR) {
+                        mesh.insert(mesh.end(), {
+                            static_cast<float>(x),     static_cast<float>(y),     static_cast<float>(z + 1), 0.0f, 0.0f,
+                            static_cast<float>(x + 1), static_cast<float>(y),     static_cast<float>(z + 1), 1.0f, 0.0f,
+                            static_cast<float>(x + 1), static_cast<float>(y + 1), static_cast<float>(z + 1), 1.0f, 1.0f,
+                            static_cast<float>(x),     static_cast<float>(y),     static_cast<float>(z + 1), 0.0f, 0.0f,
+                            static_cast<float>(x + 1), static_cast<float>(y + 1), static_cast<float>(z + 1), 1.0f, 1.0f,
+                            static_cast<float>(x),     static_cast<float>(y + 1), static_cast<float>(z + 1), 0.0f, 1.0f
+                        });
+                    }
+                    // Back face (-z)
+                    if (z == 0 || getBlock(x, y, z - 1).type == BlockType::AIR) {
+                        mesh.insert(mesh.end(), {
+                            static_cast<float>(x),     static_cast<float>(y),     static_cast<float>(z), 0.0f, 0.0f,
+                            static_cast<float>(x + 1), static_cast<float>(y),     static_cast<float>(z), 1.0f, 0.0f,
+                            static_cast<float>(x + 1), static_cast<float>(y + 1), static_cast<float>(z), 1.0f, 1.0f,
+                            static_cast<float>(x),     static_cast<float>(y),     static_cast<float>(z), 0.0f, 0.0f,
+                            static_cast<float>(x + 1), static_cast<float>(y + 1), static_cast<float>(z), 1.0f, 1.0f,
+                            static_cast<float>(x),     static_cast<float>(y + 1), static_cast<float>(z), 0.0f, 1.0f
+                        });
+                    }
+                    // Right face (+x)
+                    if (x + 1 >= SIZE || getBlock(x + 1, y, z).type == BlockType::AIR) {
+                        mesh.insert(mesh.end(), {
+                            static_cast<float>(x + 1), static_cast<float>(y),     static_cast<float>(z),     0.0f, 0.0f,
+                            static_cast<float>(x + 1), static_cast<float>(y + 1), static_cast<float>(z),     1.0f, 0.0f,
+                            static_cast<float>(x + 1), static_cast<float>(y + 1), static_cast<float>(z + 1), 1.0f, 1.0f,
+                            static_cast<float>(x + 1), static_cast<float>(y),     static_cast<float>(z),     0.0f, 0.0f,
+                            static_cast<float>(x + 1), static_cast<float>(y + 1), static_cast<float>(z + 1), 1.0f, 1.0f,
+                            static_cast<float>(x + 1), static_cast<float>(y),     static_cast<float>(z + 1), 0.0f, 1.0f
+                        });
+                    }
+                    // Left face (-x)
+                    if (x == 0 || getBlock(x - 1, y, z).type == BlockType::AIR) {
+                        mesh.insert(mesh.end(), {
+                            static_cast<float>(x), static_cast<float>(y),     static_cast<float>(z),     0.0f, 0.0f,
+                            static_cast<float>(x), static_cast<float>(y + 1), static_cast<float>(z),     1.0f, 0.0f,
+                            static_cast<float>(x), static_cast<float>(y + 1), static_cast<float>(z + 1), 1.0f, 1.0f,
+                            static_cast<float>(x), static_cast<float>(y),     static_cast<float>(z),     0.0f, 0.0f,
+                            static_cast<float>(x), static_cast<float>(y + 1), static_cast<float>(z + 1), 1.0f, 1.0f,
+                            static_cast<float>(x), static_cast<float>(y),     static_cast<float>(z + 1), 0.0f, 1.0f
                         });
                     }
                 }

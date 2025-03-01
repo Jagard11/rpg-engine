@@ -18,6 +18,7 @@ set(CMAKE_DEPENDS_DEPENDENCY_FILES
   "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/Chunk.cpp" "CMakeFiles/VoxelGlobe.dir/src/Chunk.cpp.o" "gcc" "CMakeFiles/VoxelGlobe.dir/src/Chunk.cpp.o.d"
   "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/Player.cpp" "CMakeFiles/VoxelGlobe.dir/src/Player.cpp.o" "gcc" "CMakeFiles/VoxelGlobe.dir/src/Player.cpp.o.d"
   "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/Renderer.cpp" "CMakeFiles/VoxelGlobe.dir/src/Renderer.cpp.o" "gcc" "CMakeFiles/VoxelGlobe.dir/src/Renderer.cpp.o.d"
+  "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/VoxelManipulator.cpp" "CMakeFiles/VoxelGlobe.dir/src/VoxelManipulator.cpp.o" "gcc" "CMakeFiles/VoxelGlobe.dir/src/VoxelManipulator.cpp.o.d"
   "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/World.cpp" "CMakeFiles/VoxelGlobe.dir/src/World.cpp.o" "gcc" "CMakeFiles/VoxelGlobe.dir/src/World.cpp.o.d"
   "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/main.cpp" "CMakeFiles/VoxelGlobe.dir/src/main.cpp.o" "gcc" "CMakeFiles/VoxelGlobe.dir/src/main.cpp.o.d"
   "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/stb_image_impl.cpp" "CMakeFiles/VoxelGlobe.dir/src/stb_image_impl.cpp.o" "gcc" "CMakeFiles/VoxelGlobe.dir/src/stb_image_impl.cpp.o.d"

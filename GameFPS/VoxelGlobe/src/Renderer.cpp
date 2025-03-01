@@ -57,13 +57,16 @@ void Renderer::render(const World& world, const Player& player) {
         glm::vec3 sphericalPos = world.cubeToSphere(face, localX, pos.second, 8.0f);
         glm::mat4 model = glm::translate(glm::mat4(1.0f), sphericalPos);
         glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model"), 1, GL_FALSE, &model[0][0]);
-        glBindBuffer(GL_ARRAY_BUFFER, vbo);
-        glBufferData(GL_ARRAY_BUFFER, chunk.getMesh().size() * sizeof(float), chunk.getMesh().data(), GL_STATIC_DRAW);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
-        glEnableVertexAttribArray(0);
-        glEnableVertexAttribArray(1);
-        glDrawArrays(GL_TRIANGLES, 0, chunk.getMesh().size() / 5);
+        const std::vector<float>& mesh = chunk.getMesh();
+        if (!mesh.empty()) {
+            glBindBuffer(GL_ARRAY_BUFFER, vbo);
+            glBufferData(GL_ARRAY_BUFFER, mesh.size() * sizeof(float), mesh.data(), GL_STATIC_DRAW);
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+            glEnableVertexAttribArray(0);
+            glEnableVertexAttribArray(1);
+            glDrawArrays(GL_TRIANGLES, 0, mesh.size() / 5);
+        }
     }
 
     if (g_showVoxelEdges) {
@@ -83,7 +86,7 @@ void Renderer::renderVoxelEdges(const World& world, const Player& player) {
     glUniformMatrix4fv(glGetUniformLocation(edgeShaderProgram, "view"), 1, GL_FALSE, &view[0][0]);
 
     std::vector<float> edgeVertices;
-    float radius = 5.0f; // Debug radius around player
+    float radius = 5.0f;
     for (const auto& [pos, chunk] : world.getChunks()) {
         int face = pos.first / 1000;
         int localX = pos.first % 1000;
@@ -188,7 +191,7 @@ void Renderer::loadEdgeShader() {
         #version 330 core
         out vec4 FragColor;
         void main() {
-            FragColor = vec4(1.0, 0.0, 0.0, 1.0); // Red edges
+            FragColor = vec4(1.0, 0.0, 0.0, 1.0);
         }
     )";
     GLuint vert = glCreateShader(GL_VERTEX_SHADER);

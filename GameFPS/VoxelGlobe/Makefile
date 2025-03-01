@@ -369,6 +369,30 @@ src/Renderer.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Renderer.cpp.s
 .PHONY : src/Renderer.cpp.s
 
+src/VoxelManipulator.o: src/VoxelManipulator.cpp.o
+.PHONY : src/VoxelManipulator.o
+
+# target to build an object file
+src/VoxelManipulator.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/VoxelManipulator.cpp.o
+.PHONY : src/VoxelManipulator.cpp.o
+
+src/VoxelManipulator.i: src/VoxelManipulator.cpp.i
+.PHONY : src/VoxelManipulator.i
+
+# target to preprocess a source file
+src/VoxelManipulator.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/VoxelManipulator.cpp.i
+.PHONY : src/VoxelManipulator.cpp.i
+
+src/VoxelManipulator.s: src/VoxelManipulator.cpp.s
+.PHONY : src/VoxelManipulator.s
+
+# target to generate assembly for a file
+src/VoxelManipulator.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/VoxelManipulator.cpp.s
+.PHONY : src/VoxelManipulator.cpp.s
+
 src/World.o: src/World.cpp.o
 .PHONY : src/World.o
 
@@ -480,6 +504,9 @@ help:
 	@echo "... src/Renderer.o"
 	@echo "... src/Renderer.i"
 	@echo "... src/Renderer.s"
+	@echo "... src/VoxelManipulator.o"
+	@echo "... src/VoxelManipulator.i"
+	@echo "... src/VoxelManipulator.s"
 	@echo "... src/World.o"
 	@echo "... src/World.i"
 	@echo "... src/World.s"

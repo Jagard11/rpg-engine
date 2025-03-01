@@ -19,6 +19,8 @@ file(REMOVE_RECURSE
   "CMakeFiles/VoxelGlobe.dir/src/Player.cpp.o.d"
   "CMakeFiles/VoxelGlobe.dir/src/Renderer.cpp.o"
   "CMakeFiles/VoxelGlobe.dir/src/Renderer.cpp.o.d"
+  "CMakeFiles/VoxelGlobe.dir/src/VoxelManipulator.cpp.o"
+  "CMakeFiles/VoxelGlobe.dir/src/VoxelManipulator.cpp.o.d"
   "CMakeFiles/VoxelGlobe.dir/src/World.cpp.o"
   "CMakeFiles/VoxelGlobe.dir/src/World.cpp.o.d"
   "CMakeFiles/VoxelGlobe.dir/src/main.cpp.o"

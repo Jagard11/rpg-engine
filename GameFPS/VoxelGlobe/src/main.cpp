@@ -4,6 +4,7 @@
 #include "Renderer.hpp"
 #include "World.hpp"
 #include "Player.hpp"
+#include "VoxelManipulator.hpp"
 #include "Debug.hpp"
 #include <iostream>
 #include <glm/gtx/intersect.hpp>
@@ -41,6 +42,7 @@ int main() {
     World world;
     world.update(glm::vec3(0, 0, 0));
     Player player(world);
+    VoxelManipulator voxelManip(world);
     Renderer renderer;
 
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
@@ -93,7 +95,7 @@ int main() {
                 firstMouse = false;
             }
             float deltaX = static_cast<float>(mouseX - lastX);
-            float deltaY = static_cast<float>(mouseY - lastY); // Inverted for natural vertical control
+            float deltaY = static_cast<float>(mouseY - lastY);
             lastX = mouseX;
             lastY = mouseY;
             player.updateOrientation(deltaX, deltaY);
@@ -108,35 +110,13 @@ int main() {
 
             int leftClickState = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT);
             if (leftClickState == GLFW_PRESS && lastLeftClickState == GLFW_RELEASE) {
-                glm::vec3 rayOrigin = player.position + player.up * player.height;
-                glm::vec3 rayDir = player.cameraDirection;
-                for (float t = 0; t < 5.0f; t += 0.1f) {
-                    glm::vec3 pos = rayOrigin + rayDir * t;
-                    int x = static_cast<int>(floor(pos.x));
-                    int y = static_cast<int>(floor(pos.y));
-                    int z = static_cast<int>(floor(pos.z));
-                    if (world.getBlock(x, y, z).type == BlockType::AIR) {
-                        world.setBlock(x, y, z, player.inventory[player.selectedSlot]);
-                        break;
-                    }
-                }
+                voxelManip.placeBlock(player, BlockType::GRASS);
             }
             lastLeftClickState = leftClickState;
 
             int rightClickState = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT);
             if (rightClickState == GLFW_PRESS && lastRightClickState == GLFW_RELEASE) {
-                glm::vec3 rayOrigin = player.position + player.up * player.height;
-                glm::vec3 rayDir = player.cameraDirection;
-                for (float t = 0; t < 5.0f; t += 0.1f) {
-                    glm::vec3 pos = rayOrigin + rayDir * t;
-                    int x = static_cast<int>(floor(pos.x));
-                    int y = static_cast<int>(floor(pos.y));
-                    int z = static_cast<int>(floor(pos.z));
-                    if (world.getBlock(x, y, z).type != BlockType::AIR) {
-                        world.setBlock(x, y, z, BlockType::AIR);
-                        break;
-                    }
-                }
+                voxelManip.removeBlock(player);
             }
             lastRightClickState = rightClickState;
         }
@@ -150,7 +130,7 @@ int main() {
         if (g_showDebug) {
             int chunkX = static_cast<int>(player.position.x / Chunk::SIZE);
             int chunkZ = static_cast<int>(player.position.z / Chunk::SIZE);
-            float surfaceY = world.findSurfaceHeight(chunkX, chunkZ) + 1.0f;
+            float surfaceY = world.findSurfaceHeight(chunkX, chunkZ) + 9.0f; // Match gravity offset
             std::cout << "Player Y: " << player.position.y << ", Surface Y: " << surfaceY << std::endl;
         }
 

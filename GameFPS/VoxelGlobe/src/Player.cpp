@@ -5,10 +5,10 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 Player::Player(const World& world) : speed(5.0f), height(1.75f) {
-    position = glm::vec3(0.0f, 1640.0f, 0.0f); // Adjusted spawn height
+    position = glm::vec3(0.0f, 1640.0f, 0.0f);
     up = glm::normalize(position);
     yaw = 0.0f;
-    pitch = 45.0f; // Look downward at 45 degrees
+    pitch = 45.0f;
     float radYaw = glm::radians(yaw);
     float radPitch = glm::radians(pitch);
     cameraDirection = glm::vec3(cos(radPitch) * cos(radYaw), sin(radPitch), cos(radPitch) * sin(radYaw));
@@ -37,23 +37,30 @@ void Player::applyGravity(const World& world, float deltaTime) {
     float gravity = 9.81f;
     glm::vec3 newPosition = position + toCenter * gravity * deltaTime;
 
-    int chunkX = static_cast<int>(position.x / Chunk::SIZE); // Use current position
-    int chunkZ = static_cast<int>(position.z / Chunk::SIZE); // Use current position
-    chunkX = glm::clamp(chunkX, -1000, 1000);
-    chunkZ = glm::clamp(chunkZ, -1000, 1000);
-    float terrainHeight = world.findSurfaceHeight(chunkX, chunkZ) + 9.0f; // Adjusted to match top face at radius + 17
+    // Check a larger area around the player for the highest surface
+    float maxTerrainHeight = world.findSurfaceHeight(position.x, position.z);
+    for (int dx = -3; dx <= 3; dx++) { // Increased radius to ±3
+        for (int dz = -3; dz <= 3; dz++) {
+            float checkX = position.x + dx;
+            float checkZ = position.z + dz;
+            float height = world.findSurfaceHeight(checkX, checkZ);
+            if (height > maxTerrainHeight) {
+                maxTerrainHeight = height;
+            }
+        }
+    }
 
     position.x = newPosition.x;
     position.z = newPosition.z;
-    if (newPosition.y <= terrainHeight) {
-        position.y = terrainHeight; // Snap feet to the top of the terrain
+    if (newPosition.y <= maxTerrainHeight) {
+        position.y = maxTerrainHeight;
     } else {
-        position.y = newPosition.y; // Continue falling
+        position.y = newPosition.y;
     }
     up = (glm::length(position) > 0.001f) ? glm::normalize(position) : glm::vec3(0.0f, 1.0f, 0.0f);
 
     if (g_showDebug) {
-        std::cout << "terrainHeight: " << terrainHeight << ", newPosition.y: " << newPosition.y << std::endl;
+        std::cout << "terrainHeight: " << maxTerrainHeight << ", newPosition.y: " << newPosition.y << std::endl;
         std::cout << "Gravity applied, Pos: " << position.x << ", " << position.y << ", " << position.z << std::endl;
         std::cout << "Eye Pos (pos.y + height): " << position.x << ", " << (position.y + height) << ", " << position.z << std::endl;
     }
