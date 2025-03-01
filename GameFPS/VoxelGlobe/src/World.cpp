@@ -1,7 +1,7 @@
 #include "World.hpp"
 #include <cmath>
 #include <iostream>
-#include <ios> // Explicitly include for streamsize
+#include <ios>
 #include "Debug.hpp"
 
 void World::update(const glm::vec3& playerPos) {
@@ -15,7 +15,7 @@ void World::update(const glm::vec3& playerPos) {
 
     for (int face = 0; face < 1; face++) {
         for (int x = px - renderDist; x <= px + renderDist; x++) {
-            for (int z = pz - renderDist; z <= px + renderDist; z++) {
+            for (int z = pz - renderDist; z <= pz + renderDist; z++) {
                 chunks.emplace(std::make_pair(x + face * 1000, z), Chunk(x, z));
             }
         }
@@ -23,12 +23,12 @@ void World::update(const glm::vec3& playerPos) {
 }
 
 glm::vec3 World::cubeToSphere(int face, int x, int z, float y) const {
-    float bx = x * Chunk::SIZE;
-    float bz = z * Chunk::SIZE;
-    float scale = 0.5f;
-    float u = bx * scale;
-    float v = bz * scale;
-    glm::vec3 pos(u, radius + y, v); // y=8 becomes 1599.55
+    float scale = 1.0f; // No scaling, 1 local unit = 1 world unit
+    float bx = x * Chunk::SIZE * scale;
+    float bz = z * Chunk::SIZE * scale;
+    float u = bx;
+    float v = bz;
+    glm::vec3 pos(u, radius + y, v); // y=8 from renderer call sets surface at 1599.55
     if (g_showDebug) {
         std::cout << "Chunk Pos: " << pos.x << ", " << pos.y << ", " << pos.z << std::endl;
     }

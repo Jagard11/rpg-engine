@@ -9,14 +9,14 @@ Player::Player(const World& world) : speed(5.0f) {
     position = glm::vec3(0.0f, surfaceHeight, 0.0f);
     up = glm::normalize(position); // Local up for spherical world
 
-    // Set initial yaw (0°) and pitch (40° downward)
+    // Set initial yaw (0°) and pitch (-40° downward)
     float yaw = 0.0f;   // Looking along positive x-axis horizontally
-    float pitch = 40.0f; // Pitch down 40° (positive pitch confirmed to tilt downward)
+    float pitch = -40.0f; // Pitch down 40° (negative to tilt downward)
     float radYaw = glm::radians(yaw);
     float radPitch = glm::radians(pitch);
     cameraDirection = glm::vec3(
-        cos(radPitch) * cos(radYaw), // x ≈ cos(40°) ≈ 0.766
-        sin(radPitch),               // y ≈ sin(40°) ≈ 0.643 (upward, but adjusted by movement logic)
+        cos(radPitch) * cos(radYaw), // x ≈ cos(-40°) ≈ 0.766
+        sin(radPitch),               // y ≈ sin(-40°) ≈ -0.643 (downward)
         cos(radPitch) * sin(radYaw)  // z ≈ 0 (sin(0°) = 0)
     );
     cameraDirection = glm::normalize(cameraDirection);

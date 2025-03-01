@@ -30,7 +30,7 @@ void Renderer::render(const World& world, const Player& player) {
     glBindVertexArray(vao);
     glBindTexture(GL_TEXTURE_2D, texture);
 
-    glm::mat4 proj = glm::perspective(glm::radians(g_fov), 800.0f / 600.0f, 0.1f, 2000.0f); // Use adjustable FOV
+    glm::mat4 proj = glm::perspective(glm::radians(g_fov), 800.0f / 600.0f, 0.1f, 2000.0f);
     glm::vec3 eyePos = player.position + player.up * player.height;
     glm::vec3 lookAtPos = eyePos + player.cameraDirection;
     glm::mat4 view = glm::lookAt(eyePos, lookAtPos, player.up);
@@ -44,7 +44,7 @@ void Renderer::render(const World& world, const Player& player) {
     for (const auto& [pos, chunk] : world.getChunks()) {
         int face = pos.first / 1000;
         int localX = pos.first % 1000;
-        glm::vec3 sphericalPos = world.cubeToSphere(face, localX, pos.second, 8.0f); // Base at 1599.55
+        glm::vec3 sphericalPos = world.cubeToSphere(face, localX, pos.second, 8.0f); // Surface at 1599.55
         glm::mat4 model = glm::translate(glm::mat4(1.0f), sphericalPos);
         glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model"), 1, GL_FALSE, &model[0][0]);
         glBindBuffer(GL_ARRAY_BUFFER, vbo);

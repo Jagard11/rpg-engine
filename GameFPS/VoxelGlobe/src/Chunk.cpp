@@ -19,17 +19,18 @@ void Chunk::generateTerrain() {
             }
         }
     }
+    float voxelSize = 1.0f; // 1 unit per voxel, matching Minecraft
     for (int x = 0; x < SIZE; x++) {
         for (int z = 0; z < SIZE; z++) {
             if (getBlock(x, 8, z).type == BlockType::GRASS) {
-                float y = 0.0f; // Relative to sphericalPos (adjusted in Renderer)
+                float y = 0.0f; // Render at chunk base; surface height handled by cubeToSphere
                 mesh.insert(mesh.end(), {
-                    static_cast<float>(x),     y, static_cast<float>(z),     0.0f, 0.0f,
-                    static_cast<float>(x + 1), y, static_cast<float>(z),     1.0f, 0.0f,
-                    static_cast<float>(x + 1), y, static_cast<float>(z + 1), 1.0f, 1.0f,
-                    static_cast<float>(x),     y, static_cast<float>(z),     0.0f, 0.0f,
-                    static_cast<float>(x + 1), y, static_cast<float>(z + 1), 1.0f, 1.0f,
-                    static_cast<float>(x),     y, static_cast<float>(z + 1), 0.0f, 1.0f
+                    static_cast<float>(x) * voxelSize,     y * voxelSize, static_cast<float>(z) * voxelSize,     0.0f, 0.0f,
+                    static_cast<float>(x + 1) * voxelSize, y * voxelSize, static_cast<float>(z) * voxelSize,     1.0f, 0.0f,
+                    static_cast<float>(x + 1) * voxelSize, y * voxelSize, static_cast<float>(z + 1) * voxelSize, 1.0f, 1.0f,
+                    static_cast<float>(x) * voxelSize,     y * voxelSize, static_cast<float>(z) * voxelSize,     0.0f, 0.0f,
+                    static_cast<float>(x + 1) * voxelSize, y * voxelSize, static_cast<float>(z + 1) * voxelSize, 1.0f, 1.0f,
+                    static_cast<float>(x) * voxelSize,     y * voxelSize, static_cast<float>(z + 1) * voxelSize, 0.0f, 1.0f
                 });
             }
         }
