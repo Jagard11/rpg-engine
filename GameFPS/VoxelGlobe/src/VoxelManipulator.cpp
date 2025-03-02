@@ -1,4 +1,4 @@
-// ./GameFPS/VoxelGlobe/src/VoxelManipulator.cpp
+// ./VoxelGlobe/src/VoxelManipulator.cpp
 #include "VoxelManipulator.hpp"
 #include "Debug.hpp"
 #include <iostream>
@@ -12,11 +12,11 @@ bool VoxelManipulator::placeBlock(const Player& player, BlockType type) {
 
     if (raycast(eyePos, player.cameraDirection, 5.0f, hitPos, hitNormal)) {
         glm::ivec3 placePos = hitPos + glm::ivec3(hitNormal);
-        
-        if (placePos.y >= 0 && placePos.y < Chunk::SIZE * 2) {
-            worldRef.setBlock(placePos.x, placePos.y, placePos.z, type);
+        int worldY = placePos.y + static_cast<int>(1591.55f + 8.0f); // Adjust to world coordinates
+        if (placePos.y >= 0 && placePos.y < Chunk::SIZE) {
+            worldRef.setBlock(placePos.x, worldY, placePos.z, type);
             if (g_showDebug) {
-                std::cout << "Placed block at (" << placePos.x << ", " << placePos.y << ", " << placePos.z 
+                std::cout << "Placed block at (" << placePos.x << ", " << worldY << ", " << placePos.z 
                           << ") Type: " << static_cast<int>(type) << std::endl;
             }
             return true;
@@ -35,9 +35,10 @@ bool VoxelManipulator::removeBlock(const Player& player) {
     glm::vec3 hitNormal;
 
     if (raycast(eyePos, player.cameraDirection, 5.0f, hitPos, hitNormal)) {
-        worldRef.setBlock(hitPos.x, hitPos.y, hitPos.z, BlockType::AIR);
+        int worldY = hitPos.y + static_cast<int>(1591.55f + 8.0f); // Adjust to world coordinates
+        worldRef.setBlock(hitPos.x, worldY, hitPos.z, BlockType::AIR);
         if (g_showDebug) {
-            std::cout << "Removed block at (" << hitPos.x << ", " << hitPos.y << ", " << hitPos.z << ")" << std::endl;
+            std::cout << "Removed block at (" << hitPos.x << ", " << worldY << ", " << hitPos.z << ")" << std::endl;
         }
         return true;
     } else if (g_showDebug) {
@@ -50,7 +51,7 @@ bool VoxelManipulator::raycast(const glm::vec3& origin, const glm::vec3& directi
                                glm::ivec3& hitPos, glm::vec3& hitNormal) const {
     glm::vec3 dir = glm::normalize(direction);
     float t = 0.0f;
-    float step = 0.1f; // Slightly larger step for stability, still precise
+    float step = 0.1f;
     const float radius = 1591.55f;
     const float chunkBaseY = radius + 8.0f;
 
@@ -66,7 +67,6 @@ bool VoxelManipulator::raycast(const glm::vec3& origin, const glm::vec3& directi
             if (block.type != BlockType::AIR) {
                 hitPos = glm::ivec3(worldX, localY, worldZ);
 
-                // Simplified normal calculation, then adjust for top face
                 glm::vec3 hitPoint = pos;
                 glm::vec3 blockCenter = glm::vec3(worldX + 0.5f, localY + chunkBaseY + 0.5f, worldZ + 0.5f);
                 glm::vec3 diff = hitPoint - blockCenter;
@@ -76,8 +76,7 @@ bool VoxelManipulator::raycast(const glm::vec3& origin, const glm::vec3& directi
                 if (fabs(diff.y) > fabs(maxDiff)) { maxDiff = diff.y; hitNormal = glm::vec3(0, diff.y > 0 ? 1 : -1, 0); }
                 if (fabs(diff.z) > fabs(maxDiff)) { hitNormal = glm::vec3(0, 0, diff.z > 0 ? 1 : -1); }
 
-                // Override with top face if ray is downward and hits top
-                if (dir.y < -0.3f && diff.y > 0) { // Relaxed threshold
+                if (dir.y < -0.3f && diff.y > 0) {
                     hitNormal = glm::vec3(0, 1, 0);
                 }
 

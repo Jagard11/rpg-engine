@@ -1,4 +1,4 @@
-// ./GameFPS/VoxelGlobe/src/Player.cpp
+// ./VoxelGlobe/src/Player.cpp
 #include "Player.hpp"
 #include <iostream>
 #include "Debug.hpp"

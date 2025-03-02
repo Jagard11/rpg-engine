@@ -1,4 +1,4 @@
-// ./GameFPS/VoxelGlobe/src/main.cpp
+// ./VoxelGlobe/src/main.cpp
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include "Renderer.hpp"
@@ -30,14 +30,18 @@ int main() {
         std::cerr << "GLEW initialization failed" << std::endl;
         return -1;
     }
+    std::cout << "OpenGL Version: " << glGetString(GL_VERSION) << std::endl;
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glFrontFace(GL_CCW);
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); (void)io;
     ImGui::StyleColorsDark();
     ImGui_ImplGlfw_InitForOpenGL(window, true);
-    ImGui_ImplOpenGL3_Init("#version 330");
+    ImGui_ImplOpenGL3_Init("#version 130");
 
     World world;
     world.update(glm::vec3(0, 0, 0));
@@ -62,6 +66,8 @@ int main() {
         double currentTime = glfwGetTime();
         float deltaTime = static_cast<float>(currentTime - lastTime);
         lastTime = currentTime;
+
+        glfwPollEvents();
 
         double mouseX, mouseY;
         glfwGetCursorPos(window, &mouseX, &mouseY);
@@ -95,7 +101,7 @@ int main() {
                 firstMouse = false;
             }
             float deltaX = static_cast<float>(mouseX - lastX);
-            float deltaY = static_cast<float>(mouseY - lastY);
+            float deltaY = static_cast<float>(lastY - mouseY); // Inverted for natural control
             lastX = mouseX;
             lastY = mouseY;
             player.updateOrientation(deltaX, deltaY);
@@ -110,7 +116,7 @@ int main() {
 
             int leftClickState = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT);
             if (leftClickState == GLFW_PRESS && lastLeftClickState == GLFW_RELEASE) {
-                voxelManip.placeBlock(player, BlockType::GRASS);
+                voxelManip.placeBlock(player, player.inventory[player.selectedSlot]);
             }
             lastLeftClickState = leftClickState;
 
@@ -130,11 +136,28 @@ int main() {
         if (g_showDebug) {
             int chunkX = static_cast<int>(player.position.x / Chunk::SIZE);
             int chunkZ = static_cast<int>(player.position.z / Chunk::SIZE);
-            float surfaceY = world.findSurfaceHeight(chunkX, chunkZ) + 9.0f; // Match gravity offset
+            float surfaceY = world.findSurfaceHeight(chunkX, chunkZ);
             std::cout << "Player Y: " << player.position.y << ", Surface Y: " << surfaceY << std::endl;
         }
 
-        renderer.render(world, player);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        // In the main loop, after raycast:
+        glm::vec3 eyePos = player.position + player.up * player.height;
+        glm::ivec3 hitPos;
+        glm::vec3 hitNormal;
+        bool hit = voxelManip.raycast(eyePos, player.cameraDirection, 10.0f, hitPos, hitNormal);
+        if (hit) {
+            // Convert hitPos to world coordinates
+            hitPos.y += static_cast<int>(1591.55f + 8.0f); // Add chunkBaseY
+            if (g_showDebug) {
+                std::cout << "Raycast hit at (world): " << hitPos.x << ", " << hitPos.y << ", " << hitPos.z << std::endl;
+            }
+        } else {
+            hitPos = glm::ivec3(-9999, -9999, -9999);
+            if (g_showDebug) std::cout << "No raycast hit" << std::endl;
+        }
+        renderer.render(world, player, hitPos);
 
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
@@ -176,10 +199,8 @@ int main() {
 
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-        glClear(GL_DEPTH_BUFFER_BIT);
 
         glfwSwapBuffers(window);
-        glfwPollEvents();
     }
 
     ImGui_ImplOpenGL3_Shutdown();

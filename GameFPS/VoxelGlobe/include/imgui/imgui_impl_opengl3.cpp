@@ -1,4 +1,4 @@
-// ./GameFPS/VoxelGlobe/include/imgui/imgui_impl_opengl3.cpp
+// ./VoxelGlobe/include/imgui/imgui_impl_opengl3.cpp
 #include <GL/glew.h>
 #include "imgui.h"
 #include "imgui_impl_opengl3.h"

@@ -1,4 +1,4 @@
-// ./GameFPS/VoxelGlobe/include/Debug.hpp
+// ./VoxelGlobe/include/Debug.hpp
 #ifndef DEBUG_HPP
 #define DEBUG_HPP
 

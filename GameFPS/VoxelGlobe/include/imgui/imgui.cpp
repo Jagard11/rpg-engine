@@ -1,4 +1,4 @@
-// ./GameFPS/VoxelGlobe/include/imgui/imgui.cpp
+// ./VoxelGlobe/include/imgui/imgui.cpp
 // dear imgui, v1.89
 // (main code and documentation)
 

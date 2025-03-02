@@ -1,4 +1,4 @@
-// ./GameFPS/VoxelGlobe/include/Chunk.hpp
+// ./VoxelGlobe/include/Chunk.hpp
 #ifndef CHUNK_HPP
 #define CHUNK_HPP
 

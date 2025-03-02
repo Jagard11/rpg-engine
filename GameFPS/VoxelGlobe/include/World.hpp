@@ -1,4 +1,4 @@
-// ./GameFPS/VoxelGlobe/include/World.hpp
+// ./VoxelGlobe/include/World.hpp
 #ifndef WORLD_HPP
 #define WORLD_HPP
 
@@ -20,8 +20,7 @@ public:
     void update(const glm::vec3& playerPos);
     const std::unordered_map<std::pair<int, int>, Chunk, pair_hash>& getChunks() const { return chunks; }
     glm::vec3 cubeToSphere(int face, int x, int z, float y) const;
-    float findSurfaceHeight(int chunkX, int chunkZ) const;
-    float findSurfaceHeight(float x, float z) const; // New overload for precise position
+    float findSurfaceHeight(float chunkX, float chunkZ) const; // Updated to float
     void setBlock(int worldX, int worldY, int worldZ, BlockType type);
     Block getBlock(int worldX, int worldY, int worldZ) const;
 
