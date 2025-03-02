@@ -129,341 +129,365 @@ VoxelGlobe/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/build
 .PHONY : VoxelGlobe/fast
 
-include/imgui/imgui.o: include/imgui/imgui.cpp.o
-.PHONY : include/imgui/imgui.o
+src/Core/main.o: src/Core/main.cpp.o
+.PHONY : src/Core/main.o
 
 # target to build an object file
-include/imgui/imgui.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/include/imgui/imgui.cpp.o
-.PHONY : include/imgui/imgui.cpp.o
+src/Core/main.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Core/main.cpp.o
+.PHONY : src/Core/main.cpp.o
 
-include/imgui/imgui.i: include/imgui/imgui.cpp.i
-.PHONY : include/imgui/imgui.i
+src/Core/main.i: src/Core/main.cpp.i
+.PHONY : src/Core/main.i
 
 # target to preprocess a source file
-include/imgui/imgui.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/include/imgui/imgui.cpp.i
-.PHONY : include/imgui/imgui.cpp.i
+src/Core/main.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Core/main.cpp.i
+.PHONY : src/Core/main.cpp.i
 
-include/imgui/imgui.s: include/imgui/imgui.cpp.s
-.PHONY : include/imgui/imgui.s
+src/Core/main.s: src/Core/main.cpp.s
+.PHONY : src/Core/main.s
 
 # target to generate assembly for a file
-include/imgui/imgui.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/include/imgui/imgui.cpp.s
-.PHONY : include/imgui/imgui.cpp.s
+src/Core/main.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Core/main.cpp.s
+.PHONY : src/Core/main.cpp.s
 
-include/imgui/imgui_draw.o: include/imgui/imgui_draw.cpp.o
-.PHONY : include/imgui/imgui_draw.o
+src/Player/Inventory.o: src/Player/Inventory.cpp.o
+.PHONY : src/Player/Inventory.o
 
 # target to build an object file
-include/imgui/imgui_draw.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/include/imgui/imgui_draw.cpp.o
-.PHONY : include/imgui/imgui_draw.cpp.o
+src/Player/Inventory.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Player/Inventory.cpp.o
+.PHONY : src/Player/Inventory.cpp.o
 
-include/imgui/imgui_draw.i: include/imgui/imgui_draw.cpp.i
-.PHONY : include/imgui/imgui_draw.i
+src/Player/Inventory.i: src/Player/Inventory.cpp.i
+.PHONY : src/Player/Inventory.i
 
 # target to preprocess a source file
-include/imgui/imgui_draw.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/include/imgui/imgui_draw.cpp.i
-.PHONY : include/imgui/imgui_draw.cpp.i
+src/Player/Inventory.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Player/Inventory.cpp.i
+.PHONY : src/Player/Inventory.cpp.i
 
-include/imgui/imgui_draw.s: include/imgui/imgui_draw.cpp.s
-.PHONY : include/imgui/imgui_draw.s
+src/Player/Inventory.s: src/Player/Inventory.cpp.s
+.PHONY : src/Player/Inventory.s
 
 # target to generate assembly for a file
-include/imgui/imgui_draw.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/include/imgui/imgui_draw.cpp.s
-.PHONY : include/imgui/imgui_draw.cpp.s
+src/Player/Inventory.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Player/Inventory.cpp.s
+.PHONY : src/Player/Inventory.cpp.s
 
-include/imgui/imgui_impl_glfw.o: include/imgui/imgui_impl_glfw.cpp.o
-.PHONY : include/imgui/imgui_impl_glfw.o
+src/Player/Movement.o: src/Player/Movement.cpp.o
+.PHONY : src/Player/Movement.o
 
 # target to build an object file
-include/imgui/imgui_impl_glfw.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/include/imgui/imgui_impl_glfw.cpp.o
-.PHONY : include/imgui/imgui_impl_glfw.cpp.o
+src/Player/Movement.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Player/Movement.cpp.o
+.PHONY : src/Player/Movement.cpp.o
 
-include/imgui/imgui_impl_glfw.i: include/imgui/imgui_impl_glfw.cpp.i
-.PHONY : include/imgui/imgui_impl_glfw.i
+src/Player/Movement.i: src/Player/Movement.cpp.i
+.PHONY : src/Player/Movement.i
 
 # target to preprocess a source file
-include/imgui/imgui_impl_glfw.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/include/imgui/imgui_impl_glfw.cpp.i
-.PHONY : include/imgui/imgui_impl_glfw.cpp.i
+src/Player/Movement.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Player/Movement.cpp.i
+.PHONY : src/Player/Movement.cpp.i
 
-include/imgui/imgui_impl_glfw.s: include/imgui/imgui_impl_glfw.cpp.s
-.PHONY : include/imgui/imgui_impl_glfw.s
+src/Player/Movement.s: src/Player/Movement.cpp.s
+.PHONY : src/Player/Movement.s
 
 # target to generate assembly for a file
-include/imgui/imgui_impl_glfw.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/include/imgui/imgui_impl_glfw.cpp.s
-.PHONY : include/imgui/imgui_impl_glfw.cpp.s
+src/Player/Movement.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Player/Movement.cpp.s
+.PHONY : src/Player/Movement.cpp.s
 
-include/imgui/imgui_impl_opengl3.o: include/imgui/imgui_impl_opengl3.cpp.o
-.PHONY : include/imgui/imgui_impl_opengl3.o
+src/Player/Player.o: src/Player/Player.cpp.o
+.PHONY : src/Player/Player.o
 
 # target to build an object file
-include/imgui/imgui_impl_opengl3.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/include/imgui/imgui_impl_opengl3.cpp.o
-.PHONY : include/imgui/imgui_impl_opengl3.cpp.o
+src/Player/Player.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Player/Player.cpp.o
+.PHONY : src/Player/Player.cpp.o
 
-include/imgui/imgui_impl_opengl3.i: include/imgui/imgui_impl_opengl3.cpp.i
-.PHONY : include/imgui/imgui_impl_opengl3.i
+src/Player/Player.i: src/Player/Player.cpp.i
+.PHONY : src/Player/Player.i
 
 # target to preprocess a source file
-include/imgui/imgui_impl_opengl3.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/include/imgui/imgui_impl_opengl3.cpp.i
-.PHONY : include/imgui/imgui_impl_opengl3.cpp.i
+src/Player/Player.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Player/Player.cpp.i
+.PHONY : src/Player/Player.cpp.i
 
-include/imgui/imgui_impl_opengl3.s: include/imgui/imgui_impl_opengl3.cpp.s
-.PHONY : include/imgui/imgui_impl_opengl3.s
+src/Player/Player.s: src/Player/Player.cpp.s
+.PHONY : src/Player/Player.s
 
 # target to generate assembly for a file
-include/imgui/imgui_impl_opengl3.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/include/imgui/imgui_impl_opengl3.cpp.s
-.PHONY : include/imgui/imgui_impl_opengl3.cpp.s
+src/Player/Player.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Player/Player.cpp.s
+.PHONY : src/Player/Player.cpp.s
 
-include/imgui/imgui_tables.o: include/imgui/imgui_tables.cpp.o
-.PHONY : include/imgui/imgui_tables.o
+src/Rendering/Renderer.o: src/Rendering/Renderer.cpp.o
+.PHONY : src/Rendering/Renderer.o
 
 # target to build an object file
-include/imgui/imgui_tables.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/include/imgui/imgui_tables.cpp.o
-.PHONY : include/imgui/imgui_tables.cpp.o
+src/Rendering/Renderer.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Rendering/Renderer.cpp.o
+.PHONY : src/Rendering/Renderer.cpp.o
 
-include/imgui/imgui_tables.i: include/imgui/imgui_tables.cpp.i
-.PHONY : include/imgui/imgui_tables.i
+src/Rendering/Renderer.i: src/Rendering/Renderer.cpp.i
+.PHONY : src/Rendering/Renderer.i
 
 # target to preprocess a source file
-include/imgui/imgui_tables.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/include/imgui/imgui_tables.cpp.i
-.PHONY : include/imgui/imgui_tables.cpp.i
+src/Rendering/Renderer.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Rendering/Renderer.cpp.i
+.PHONY : src/Rendering/Renderer.cpp.i
 
-include/imgui/imgui_tables.s: include/imgui/imgui_tables.cpp.s
-.PHONY : include/imgui/imgui_tables.s
+src/Rendering/Renderer.s: src/Rendering/Renderer.cpp.s
+.PHONY : src/Rendering/Renderer.s
 
 # target to generate assembly for a file
-include/imgui/imgui_tables.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/include/imgui/imgui_tables.cpp.s
-.PHONY : include/imgui/imgui_tables.cpp.s
+src/Rendering/Renderer.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Rendering/Renderer.cpp.s
+.PHONY : src/Rendering/Renderer.cpp.s
 
-include/imgui/imgui_widgets.o: include/imgui/imgui_widgets.cpp.o
-.PHONY : include/imgui/imgui_widgets.o
+src/World/Block.o: src/World/Block.cpp.o
+.PHONY : src/World/Block.o
 
 # target to build an object file
-include/imgui/imgui_widgets.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/include/imgui/imgui_widgets.cpp.o
-.PHONY : include/imgui/imgui_widgets.cpp.o
+src/World/Block.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/World/Block.cpp.o
+.PHONY : src/World/Block.cpp.o
 
-include/imgui/imgui_widgets.i: include/imgui/imgui_widgets.cpp.i
-.PHONY : include/imgui/imgui_widgets.i
+src/World/Block.i: src/World/Block.cpp.i
+.PHONY : src/World/Block.i
 
 # target to preprocess a source file
-include/imgui/imgui_widgets.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/include/imgui/imgui_widgets.cpp.i
-.PHONY : include/imgui/imgui_widgets.cpp.i
+src/World/Block.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/World/Block.cpp.i
+.PHONY : src/World/Block.cpp.i
 
-include/imgui/imgui_widgets.s: include/imgui/imgui_widgets.cpp.s
-.PHONY : include/imgui/imgui_widgets.s
+src/World/Block.s: src/World/Block.cpp.s
+.PHONY : src/World/Block.s
 
 # target to generate assembly for a file
-include/imgui/imgui_widgets.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/include/imgui/imgui_widgets.cpp.s
-.PHONY : include/imgui/imgui_widgets.cpp.s
+src/World/Block.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/World/Block.cpp.s
+.PHONY : src/World/Block.cpp.s
 
-src/Block.o: src/Block.cpp.o
-.PHONY : src/Block.o
+src/World/Chunk.o: src/World/Chunk.cpp.o
+.PHONY : src/World/Chunk.o
 
 # target to build an object file
-src/Block.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Block.cpp.o
-.PHONY : src/Block.cpp.o
+src/World/Chunk.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/World/Chunk.cpp.o
+.PHONY : src/World/Chunk.cpp.o
 
-src/Block.i: src/Block.cpp.i
-.PHONY : src/Block.i
+src/World/Chunk.i: src/World/Chunk.cpp.i
+.PHONY : src/World/Chunk.i
 
 # target to preprocess a source file
-src/Block.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Block.cpp.i
-.PHONY : src/Block.cpp.i
+src/World/Chunk.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/World/Chunk.cpp.i
+.PHONY : src/World/Chunk.cpp.i
 
-src/Block.s: src/Block.cpp.s
-.PHONY : src/Block.s
+src/World/Chunk.s: src/World/Chunk.cpp.s
+.PHONY : src/World/Chunk.s
 
 # target to generate assembly for a file
-src/Block.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Block.cpp.s
-.PHONY : src/Block.cpp.s
+src/World/Chunk.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/World/Chunk.cpp.s
+.PHONY : src/World/Chunk.cpp.s
 
-src/Chunk.o: src/Chunk.cpp.o
-.PHONY : src/Chunk.o
+src/World/World.o: src/World/World.cpp.o
+.PHONY : src/World/World.o
 
 # target to build an object file
-src/Chunk.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Chunk.cpp.o
-.PHONY : src/Chunk.cpp.o
+src/World/World.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/World/World.cpp.o
+.PHONY : src/World/World.cpp.o
 
-src/Chunk.i: src/Chunk.cpp.i
-.PHONY : src/Chunk.i
+src/World/World.i: src/World/World.cpp.i
+.PHONY : src/World/World.i
 
 # target to preprocess a source file
-src/Chunk.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Chunk.cpp.i
-.PHONY : src/Chunk.cpp.i
+src/World/World.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/World/World.cpp.i
+.PHONY : src/World/World.cpp.i
 
-src/Chunk.s: src/Chunk.cpp.s
-.PHONY : src/Chunk.s
+src/World/World.s: src/World/World.cpp.s
+.PHONY : src/World/World.s
 
 # target to generate assembly for a file
-src/Chunk.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Chunk.cpp.s
-.PHONY : src/Chunk.cpp.s
+src/World/World.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/World/World.cpp.s
+.PHONY : src/World/World.cpp.s
 
-src/Player.o: src/Player.cpp.o
-.PHONY : src/Player.o
+third_party/imgui/imgui.o: third_party/imgui/imgui.cpp.o
+.PHONY : third_party/imgui/imgui.o
 
 # target to build an object file
-src/Player.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Player.cpp.o
-.PHONY : src/Player.cpp.o
+third_party/imgui/imgui.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui.cpp.o
+.PHONY : third_party/imgui/imgui.cpp.o
 
-src/Player.i: src/Player.cpp.i
-.PHONY : src/Player.i
+third_party/imgui/imgui.i: third_party/imgui/imgui.cpp.i
+.PHONY : third_party/imgui/imgui.i
 
 # target to preprocess a source file
-src/Player.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Player.cpp.i
-.PHONY : src/Player.cpp.i
+third_party/imgui/imgui.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui.cpp.i
+.PHONY : third_party/imgui/imgui.cpp.i
 
-src/Player.s: src/Player.cpp.s
-.PHONY : src/Player.s
+third_party/imgui/imgui.s: third_party/imgui/imgui.cpp.s
+.PHONY : third_party/imgui/imgui.s
 
 # target to generate assembly for a file
-src/Player.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Player.cpp.s
-.PHONY : src/Player.cpp.s
+third_party/imgui/imgui.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui.cpp.s
+.PHONY : third_party/imgui/imgui.cpp.s
 
-src/Renderer.o: src/Renderer.cpp.o
-.PHONY : src/Renderer.o
+third_party/imgui/imgui_draw.o: third_party/imgui/imgui_draw.cpp.o
+.PHONY : third_party/imgui/imgui_draw.o
 
 # target to build an object file
-src/Renderer.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Renderer.cpp.o
-.PHONY : src/Renderer.cpp.o
+third_party/imgui/imgui_draw.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_draw.cpp.o
+.PHONY : third_party/imgui/imgui_draw.cpp.o
 
-src/Renderer.i: src/Renderer.cpp.i
-.PHONY : src/Renderer.i
+third_party/imgui/imgui_draw.i: third_party/imgui/imgui_draw.cpp.i
+.PHONY : third_party/imgui/imgui_draw.i
 
 # target to preprocess a source file
-src/Renderer.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Renderer.cpp.i
-.PHONY : src/Renderer.cpp.i
+third_party/imgui/imgui_draw.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_draw.cpp.i
+.PHONY : third_party/imgui/imgui_draw.cpp.i
 
-src/Renderer.s: src/Renderer.cpp.s
-.PHONY : src/Renderer.s
+third_party/imgui/imgui_draw.s: third_party/imgui/imgui_draw.cpp.s
+.PHONY : third_party/imgui/imgui_draw.s
 
 # target to generate assembly for a file
-src/Renderer.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Renderer.cpp.s
-.PHONY : src/Renderer.cpp.s
+third_party/imgui/imgui_draw.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_draw.cpp.s
+.PHONY : third_party/imgui/imgui_draw.cpp.s
 
-src/VoxelManipulator.o: src/VoxelManipulator.cpp.o
-.PHONY : src/VoxelManipulator.o
+third_party/imgui/imgui_impl_glfw.o: third_party/imgui/imgui_impl_glfw.cpp.o
+.PHONY : third_party/imgui/imgui_impl_glfw.o
 
 # target to build an object file
-src/VoxelManipulator.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/VoxelManipulator.cpp.o
-.PHONY : src/VoxelManipulator.cpp.o
+third_party/imgui/imgui_impl_glfw.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_impl_glfw.cpp.o
+.PHONY : third_party/imgui/imgui_impl_glfw.cpp.o
 
-src/VoxelManipulator.i: src/VoxelManipulator.cpp.i
-.PHONY : src/VoxelManipulator.i
+third_party/imgui/imgui_impl_glfw.i: third_party/imgui/imgui_impl_glfw.cpp.i
+.PHONY : third_party/imgui/imgui_impl_glfw.i
 
 # target to preprocess a source file
-src/VoxelManipulator.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/VoxelManipulator.cpp.i
-.PHONY : src/VoxelManipulator.cpp.i
+third_party/imgui/imgui_impl_glfw.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_impl_glfw.cpp.i
+.PHONY : third_party/imgui/imgui_impl_glfw.cpp.i
 
-src/VoxelManipulator.s: src/VoxelManipulator.cpp.s
-.PHONY : src/VoxelManipulator.s
+third_party/imgui/imgui_impl_glfw.s: third_party/imgui/imgui_impl_glfw.cpp.s
+.PHONY : third_party/imgui/imgui_impl_glfw.s
 
 # target to generate assembly for a file
-src/VoxelManipulator.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/VoxelManipulator.cpp.s
-.PHONY : src/VoxelManipulator.cpp.s
+third_party/imgui/imgui_impl_glfw.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_impl_glfw.cpp.s
+.PHONY : third_party/imgui/imgui_impl_glfw.cpp.s
 
-src/World.o: src/World.cpp.o
-.PHONY : src/World.o
+third_party/imgui/imgui_impl_opengl3.o: third_party/imgui/imgui_impl_opengl3.cpp.o
+.PHONY : third_party/imgui/imgui_impl_opengl3.o
 
 # target to build an object file
-src/World.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/World.cpp.o
-.PHONY : src/World.cpp.o
+third_party/imgui/imgui_impl_opengl3.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_impl_opengl3.cpp.o
+.PHONY : third_party/imgui/imgui_impl_opengl3.cpp.o
 
-src/World.i: src/World.cpp.i
-.PHONY : src/World.i
+third_party/imgui/imgui_impl_opengl3.i: third_party/imgui/imgui_impl_opengl3.cpp.i
+.PHONY : third_party/imgui/imgui_impl_opengl3.i
 
 # target to preprocess a source file
-src/World.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/World.cpp.i
-.PHONY : src/World.cpp.i
+third_party/imgui/imgui_impl_opengl3.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_impl_opengl3.cpp.i
+.PHONY : third_party/imgui/imgui_impl_opengl3.cpp.i
 
-src/World.s: src/World.cpp.s
-.PHONY : src/World.s
+third_party/imgui/imgui_impl_opengl3.s: third_party/imgui/imgui_impl_opengl3.cpp.s
+.PHONY : third_party/imgui/imgui_impl_opengl3.s
 
 # target to generate assembly for a file
-src/World.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/World.cpp.s
-.PHONY : src/World.cpp.s
+third_party/imgui/imgui_impl_opengl3.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_impl_opengl3.cpp.s
+.PHONY : third_party/imgui/imgui_impl_opengl3.cpp.s
 
-src/main.o: src/main.cpp.o
-.PHONY : src/main.o
+third_party/imgui/imgui_tables.o: third_party/imgui/imgui_tables.cpp.o
+.PHONY : third_party/imgui/imgui_tables.o
 
 # target to build an object file
-src/main.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/main.cpp.o
-.PHONY : src/main.cpp.o
+third_party/imgui/imgui_tables.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_tables.cpp.o
+.PHONY : third_party/imgui/imgui_tables.cpp.o
 
-src/main.i: src/main.cpp.i
-.PHONY : src/main.i
+third_party/imgui/imgui_tables.i: third_party/imgui/imgui_tables.cpp.i
+.PHONY : third_party/imgui/imgui_tables.i
 
 # target to preprocess a source file
-src/main.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/main.cpp.i
-.PHONY : src/main.cpp.i
+third_party/imgui/imgui_tables.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_tables.cpp.i
+.PHONY : third_party/imgui/imgui_tables.cpp.i
 
-src/main.s: src/main.cpp.s
-.PHONY : src/main.s
+third_party/imgui/imgui_tables.s: third_party/imgui/imgui_tables.cpp.s
+.PHONY : third_party/imgui/imgui_tables.s
 
 # target to generate assembly for a file
-src/main.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/main.cpp.s
-.PHONY : src/main.cpp.s
+third_party/imgui/imgui_tables.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_tables.cpp.s
+.PHONY : third_party/imgui/imgui_tables.cpp.s
 
-src/stb_image_impl.o: src/stb_image_impl.cpp.o
-.PHONY : src/stb_image_impl.o
+third_party/imgui/imgui_widgets.o: third_party/imgui/imgui_widgets.cpp.o
+.PHONY : third_party/imgui/imgui_widgets.o
 
 # target to build an object file
-src/stb_image_impl.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/stb_image_impl.cpp.o
-.PHONY : src/stb_image_impl.cpp.o
+third_party/imgui/imgui_widgets.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_widgets.cpp.o
+.PHONY : third_party/imgui/imgui_widgets.cpp.o
 
-src/stb_image_impl.i: src/stb_image_impl.cpp.i
-.PHONY : src/stb_image_impl.i
+third_party/imgui/imgui_widgets.i: third_party/imgui/imgui_widgets.cpp.i
+.PHONY : third_party/imgui/imgui_widgets.i
 
 # target to preprocess a source file
-src/stb_image_impl.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/stb_image_impl.cpp.i
-.PHONY : src/stb_image_impl.cpp.i
+third_party/imgui/imgui_widgets.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_widgets.cpp.i
+.PHONY : third_party/imgui/imgui_widgets.cpp.i
 
-src/stb_image_impl.s: src/stb_image_impl.cpp.s
-.PHONY : src/stb_image_impl.s
+third_party/imgui/imgui_widgets.s: third_party/imgui/imgui_widgets.cpp.s
+.PHONY : third_party/imgui/imgui_widgets.s
 
 # target to generate assembly for a file
-src/stb_image_impl.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/stb_image_impl.cpp.s
-.PHONY : src/stb_image_impl.cpp.s
+third_party/imgui/imgui_widgets.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_widgets.cpp.s
+.PHONY : third_party/imgui/imgui_widgets.cpp.s
+
+third_party/stb/stb_image_impl.o: third_party/stb/stb_image_impl.cpp.o
+.PHONY : third_party/stb/stb_image_impl.o
+
+# target to build an object file
+third_party/stb/stb_image_impl.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/third_party/stb/stb_image_impl.cpp.o
+.PHONY : third_party/stb/stb_image_impl.cpp.o
+
+third_party/stb/stb_image_impl.i: third_party/stb/stb_image_impl.cpp.i
+.PHONY : third_party/stb/stb_image_impl.i
+
+# target to preprocess a source file
+third_party/stb/stb_image_impl.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/third_party/stb/stb_image_impl.cpp.i
+.PHONY : third_party/stb/stb_image_impl.cpp.i
+
+third_party/stb/stb_image_impl.s: third_party/stb/stb_image_impl.cpp.s
+.PHONY : third_party/stb/stb_image_impl.s
+
+# target to generate assembly for a file
+third_party/stb/stb_image_impl.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/third_party/stb/stb_image_impl.cpp.s
+.PHONY : third_party/stb/stb_image_impl.cpp.s
 
 # Help Target
 help:
@@ -474,48 +498,51 @@ help:
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
 	@echo "... VoxelGlobe"
-	@echo "... include/imgui/imgui.o"
-	@echo "... include/imgui/imgui.i"
-	@echo "... include/imgui/imgui.s"
-	@echo "... include/imgui/imgui_draw.o"
-	@echo "... include/imgui/imgui_draw.i"
-	@echo "... include/imgui/imgui_draw.s"
-	@echo "... include/imgui/imgui_impl_glfw.o"
-	@echo "... include/imgui/imgui_impl_glfw.i"
-	@echo "... include/imgui/imgui_impl_glfw.s"
-	@echo "... include/imgui/imgui_impl_opengl3.o"
-	@echo "... include/imgui/imgui_impl_opengl3.i"
-	@echo "... include/imgui/imgui_impl_opengl3.s"
-	@echo "... include/imgui/imgui_tables.o"
-	@echo "... include/imgui/imgui_tables.i"
-	@echo "... include/imgui/imgui_tables.s"
-	@echo "... include/imgui/imgui_widgets.o"
-	@echo "... include/imgui/imgui_widgets.i"
-	@echo "... include/imgui/imgui_widgets.s"
-	@echo "... src/Block.o"
-	@echo "... src/Block.i"
-	@echo "... src/Block.s"
-	@echo "... src/Chunk.o"
-	@echo "... src/Chunk.i"
-	@echo "... src/Chunk.s"
-	@echo "... src/Player.o"
-	@echo "... src/Player.i"
-	@echo "... src/Player.s"
-	@echo "... src/Renderer.o"
-	@echo "... src/Renderer.i"
-	@echo "... src/Renderer.s"
-	@echo "... src/VoxelManipulator.o"
-	@echo "... src/VoxelManipulator.i"
-	@echo "... src/VoxelManipulator.s"
-	@echo "... src/World.o"
-	@echo "... src/World.i"
-	@echo "... src/World.s"
-	@echo "... src/main.o"
-	@echo "... src/main.i"
-	@echo "... src/main.s"
-	@echo "... src/stb_image_impl.o"
-	@echo "... src/stb_image_impl.i"
-	@echo "... src/stb_image_impl.s"
+	@echo "... src/Core/main.o"
+	@echo "... src/Core/main.i"
+	@echo "... src/Core/main.s"
+	@echo "... src/Player/Inventory.o"
+	@echo "... src/Player/Inventory.i"
+	@echo "... src/Player/Inventory.s"
+	@echo "... src/Player/Movement.o"
+	@echo "... src/Player/Movement.i"
+	@echo "... src/Player/Movement.s"
+	@echo "... src/Player/Player.o"
+	@echo "... src/Player/Player.i"
+	@echo "... src/Player/Player.s"
+	@echo "... src/Rendering/Renderer.o"
+	@echo "... src/Rendering/Renderer.i"
+	@echo "... src/Rendering/Renderer.s"
+	@echo "... src/World/Block.o"
+	@echo "... src/World/Block.i"
+	@echo "... src/World/Block.s"
+	@echo "... src/World/Chunk.o"
+	@echo "... src/World/Chunk.i"
+	@echo "... src/World/Chunk.s"
+	@echo "... src/World/World.o"
+	@echo "... src/World/World.i"
+	@echo "... src/World/World.s"
+	@echo "... third_party/imgui/imgui.o"
+	@echo "... third_party/imgui/imgui.i"
+	@echo "... third_party/imgui/imgui.s"
+	@echo "... third_party/imgui/imgui_draw.o"
+	@echo "... third_party/imgui/imgui_draw.i"
+	@echo "... third_party/imgui/imgui_draw.s"
+	@echo "... third_party/imgui/imgui_impl_glfw.o"
+	@echo "... third_party/imgui/imgui_impl_glfw.i"
+	@echo "... third_party/imgui/imgui_impl_glfw.s"
+	@echo "... third_party/imgui/imgui_impl_opengl3.o"
+	@echo "... third_party/imgui/imgui_impl_opengl3.i"
+	@echo "... third_party/imgui/imgui_impl_opengl3.s"
+	@echo "... third_party/imgui/imgui_tables.o"
+	@echo "... third_party/imgui/imgui_tables.i"
+	@echo "... third_party/imgui/imgui_tables.s"
+	@echo "... third_party/imgui/imgui_widgets.o"
+	@echo "... third_party/imgui/imgui_widgets.i"
+	@echo "... third_party/imgui/imgui_widgets.s"
+	@echo "... third_party/stb/stb_image_impl.o"
+	@echo "... third_party/stb/stb_image_impl.i"
+	@echo "... third_party/stb/stb_image_impl.s"
 .PHONY : help
 
 

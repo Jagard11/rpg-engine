@@ -1,6 +1,6 @@
 // ./VoxelGlobe/src/VoxelManipulator.cpp
 #include "VoxelManipulator.hpp"
-#include "Debug.hpp"
+#include "Core/Debug.hpp"
 #include <iostream>
 
 VoxelManipulator::VoxelManipulator(World& world) : worldRef(world) {}

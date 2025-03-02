@@ -2,8 +2,8 @@
 #ifndef VOXEL_MANIPULATOR_HPP
 #define VOXEL_MANIPULATOR_HPP
 
-#include "World.hpp"
-#include "Player.hpp"
+#include "World/World.hpp"
+#include "Player/Player.hpp"
 #include <glm/glm.hpp>
 
 class VoxelManipulator {
