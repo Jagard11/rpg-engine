@@ -101,7 +101,7 @@ int main() {
                 firstMouse = false;
             }
             float deltaX = static_cast<float>(mouseX - lastX);
-            float deltaY = static_cast<float>(lastY - mouseY); // Inverted for natural control
+            float deltaY = static_cast<float>(mouseY -lastY); // stop inverting this. 
             lastX = mouseX;
             lastY = mouseY;
             player.updateOrientation(deltaX, deltaY);
