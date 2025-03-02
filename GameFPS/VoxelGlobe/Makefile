@@ -153,30 +153,6 @@ src/Core/main.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Core/main.cpp.s
 .PHONY : src/Core/main.cpp.s
 
-src/Player/Inventory.o: src/Player/Inventory.cpp.o
-.PHONY : src/Player/Inventory.o
-
-# target to build an object file
-src/Player/Inventory.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Player/Inventory.cpp.o
-.PHONY : src/Player/Inventory.cpp.o
-
-src/Player/Inventory.i: src/Player/Inventory.cpp.i
-.PHONY : src/Player/Inventory.i
-
-# target to preprocess a source file
-src/Player/Inventory.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Player/Inventory.cpp.i
-.PHONY : src/Player/Inventory.cpp.i
-
-src/Player/Inventory.s: src/Player/Inventory.cpp.s
-.PHONY : src/Player/Inventory.s
-
-# target to generate assembly for a file
-src/Player/Inventory.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Player/Inventory.cpp.s
-.PHONY : src/Player/Inventory.cpp.s
-
 src/Player/Movement.o: src/Player/Movement.cpp.o
 .PHONY : src/Player/Movement.o
 
@@ -248,6 +224,78 @@ src/Rendering/Renderer.s: src/Rendering/Renderer.cpp.s
 src/Rendering/Renderer.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Rendering/Renderer.cpp.s
 .PHONY : src/Rendering/Renderer.cpp.s
+
+src/UI/Inventory/Inventory.o: src/UI/Inventory/Inventory.cpp.o
+.PHONY : src/UI/Inventory/Inventory.o
+
+# target to build an object file
+src/UI/Inventory/Inventory.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/UI/Inventory/Inventory.cpp.o
+.PHONY : src/UI/Inventory/Inventory.cpp.o
+
+src/UI/Inventory/Inventory.i: src/UI/Inventory/Inventory.cpp.i
+.PHONY : src/UI/Inventory/Inventory.i
+
+# target to preprocess a source file
+src/UI/Inventory/Inventory.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/UI/Inventory/Inventory.cpp.i
+.PHONY : src/UI/Inventory/Inventory.cpp.i
+
+src/UI/Inventory/Inventory.s: src/UI/Inventory/Inventory.cpp.s
+.PHONY : src/UI/Inventory/Inventory.s
+
+# target to generate assembly for a file
+src/UI/Inventory/Inventory.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/UI/Inventory/Inventory.cpp.s
+.PHONY : src/UI/Inventory/Inventory.cpp.s
+
+src/UI/Inventory/InventoryUI.o: src/UI/Inventory/InventoryUI.cpp.o
+.PHONY : src/UI/Inventory/InventoryUI.o
+
+# target to build an object file
+src/UI/Inventory/InventoryUI.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/UI/Inventory/InventoryUI.cpp.o
+.PHONY : src/UI/Inventory/InventoryUI.cpp.o
+
+src/UI/Inventory/InventoryUI.i: src/UI/Inventory/InventoryUI.cpp.i
+.PHONY : src/UI/Inventory/InventoryUI.i
+
+# target to preprocess a source file
+src/UI/Inventory/InventoryUI.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/UI/Inventory/InventoryUI.cpp.i
+.PHONY : src/UI/Inventory/InventoryUI.cpp.i
+
+src/UI/Inventory/InventoryUI.s: src/UI/Inventory/InventoryUI.cpp.s
+.PHONY : src/UI/Inventory/InventoryUI.s
+
+# target to generate assembly for a file
+src/UI/Inventory/InventoryUI.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/UI/Inventory/InventoryUI.cpp.s
+.PHONY : src/UI/Inventory/InventoryUI.cpp.s
+
+src/VoxelManipulator.o: src/VoxelManipulator.cpp.o
+.PHONY : src/VoxelManipulator.o
+
+# target to build an object file
+src/VoxelManipulator.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/VoxelManipulator.cpp.o
+.PHONY : src/VoxelManipulator.cpp.o
+
+src/VoxelManipulator.i: src/VoxelManipulator.cpp.i
+.PHONY : src/VoxelManipulator.i
+
+# target to preprocess a source file
+src/VoxelManipulator.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/VoxelManipulator.cpp.i
+.PHONY : src/VoxelManipulator.cpp.i
+
+src/VoxelManipulator.s: src/VoxelManipulator.cpp.s
+.PHONY : src/VoxelManipulator.s
+
+# target to generate assembly for a file
+src/VoxelManipulator.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/VoxelManipulator.cpp.s
+.PHONY : src/VoxelManipulator.cpp.s
 
 src/World/Block.o: src/World/Block.cpp.o
 .PHONY : src/World/Block.o
@@ -501,9 +549,6 @@ help:
 	@echo "... src/Core/main.o"
 	@echo "... src/Core/main.i"
 	@echo "... src/Core/main.s"
-	@echo "... src/Player/Inventory.o"
-	@echo "... src/Player/Inventory.i"
-	@echo "... src/Player/Inventory.s"
 	@echo "... src/Player/Movement.o"
 	@echo "... src/Player/Movement.i"
 	@echo "... src/Player/Movement.s"
@@ -513,6 +558,15 @@ help:
 	@echo "... src/Rendering/Renderer.o"
 	@echo "... src/Rendering/Renderer.i"
 	@echo "... src/Rendering/Renderer.s"
+	@echo "... src/UI/Inventory/Inventory.o"
+	@echo "... src/UI/Inventory/Inventory.i"
+	@echo "... src/UI/Inventory/Inventory.s"
+	@echo "... src/UI/Inventory/InventoryUI.o"
+	@echo "... src/UI/Inventory/InventoryUI.i"
+	@echo "... src/UI/Inventory/InventoryUI.s"
+	@echo "... src/VoxelManipulator.o"
+	@echo "... src/VoxelManipulator.i"
+	@echo "... src/VoxelManipulator.s"
 	@echo "... src/World/Block.o"
 	@echo "... src/World/Block.i"
 	@echo "... src/World/Block.s"

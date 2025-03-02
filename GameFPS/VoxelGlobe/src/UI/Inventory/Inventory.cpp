@@ -1,5 +1,5 @@
-// ./src/Player/Inventory.cpp
-#include "Player/Inventory.hpp"
+// ./src/UI/Inventory/Inventory.cpp
+#include "UI/Inventory/Inventory.hpp"
 #include <iostream>
 #include "Core/Debug.hpp"
 

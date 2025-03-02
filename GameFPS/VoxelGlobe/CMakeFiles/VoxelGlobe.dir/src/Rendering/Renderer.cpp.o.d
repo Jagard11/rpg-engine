@@ -252,7 +252,7 @@ CMakeFiles/VoxelGlobe.dir/src/Rendering/Renderer.cpp.o: \
  /usr/include/c++/11/bits/erase_if.h \
  /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/Player/Player.hpp \
  /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/Player/Movement.hpp \
- /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/Player/Inventory.hpp \
+ /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/UI/Inventory/Inventory.hpp \
  /usr/include/GLFW/glfw3.h /usr/include/glm/gtc/matrix_transform.hpp \
  /usr/include/glm/ext/matrix_projection.hpp \
  /usr/include/glm/gtc/constants.hpp \

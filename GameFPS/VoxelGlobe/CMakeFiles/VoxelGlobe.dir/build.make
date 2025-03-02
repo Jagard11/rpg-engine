@@ -111,24 +111,38 @@ CMakeFiles/VoxelGlobe.dir/src/Player/Movement.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/VoxelGlobe.dir/src/Player/Movement.cpp.s"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/Player/Movement.cpp" -o CMakeFiles/VoxelGlobe.dir/src/Player/Movement.cpp.s
 
-CMakeFiles/VoxelGlobe.dir/src/Player/Inventory.cpp.o: CMakeFiles/VoxelGlobe.dir/flags.make
-CMakeFiles/VoxelGlobe.dir/src/Player/Inventory.cpp.o: src/Player/Inventory.cpp
-CMakeFiles/VoxelGlobe.dir/src/Player/Inventory.cpp.o: CMakeFiles/VoxelGlobe.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir="/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/CMakeFiles" --progress-num=$(CMAKE_PROGRESS_4) "Building CXX object CMakeFiles/VoxelGlobe.dir/src/Player/Inventory.cpp.o"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/VoxelGlobe.dir/src/Player/Inventory.cpp.o -MF CMakeFiles/VoxelGlobe.dir/src/Player/Inventory.cpp.o.d -o CMakeFiles/VoxelGlobe.dir/src/Player/Inventory.cpp.o -c "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/Player/Inventory.cpp"
+CMakeFiles/VoxelGlobe.dir/src/UI/Inventory/Inventory.cpp.o: CMakeFiles/VoxelGlobe.dir/flags.make
+CMakeFiles/VoxelGlobe.dir/src/UI/Inventory/Inventory.cpp.o: src/UI/Inventory/Inventory.cpp
+CMakeFiles/VoxelGlobe.dir/src/UI/Inventory/Inventory.cpp.o: CMakeFiles/VoxelGlobe.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir="/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/CMakeFiles" --progress-num=$(CMAKE_PROGRESS_4) "Building CXX object CMakeFiles/VoxelGlobe.dir/src/UI/Inventory/Inventory.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/VoxelGlobe.dir/src/UI/Inventory/Inventory.cpp.o -MF CMakeFiles/VoxelGlobe.dir/src/UI/Inventory/Inventory.cpp.o.d -o CMakeFiles/VoxelGlobe.dir/src/UI/Inventory/Inventory.cpp.o -c "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/UI/Inventory/Inventory.cpp"
 
-CMakeFiles/VoxelGlobe.dir/src/Player/Inventory.cpp.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/VoxelGlobe.dir/src/Player/Inventory.cpp.i"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/Player/Inventory.cpp" > CMakeFiles/VoxelGlobe.dir/src/Player/Inventory.cpp.i
+CMakeFiles/VoxelGlobe.dir/src/UI/Inventory/Inventory.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/VoxelGlobe.dir/src/UI/Inventory/Inventory.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/UI/Inventory/Inventory.cpp" > CMakeFiles/VoxelGlobe.dir/src/UI/Inventory/Inventory.cpp.i
 
-CMakeFiles/VoxelGlobe.dir/src/Player/Inventory.cpp.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/VoxelGlobe.dir/src/Player/Inventory.cpp.s"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/Player/Inventory.cpp" -o CMakeFiles/VoxelGlobe.dir/src/Player/Inventory.cpp.s
+CMakeFiles/VoxelGlobe.dir/src/UI/Inventory/Inventory.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/VoxelGlobe.dir/src/UI/Inventory/Inventory.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/UI/Inventory/Inventory.cpp" -o CMakeFiles/VoxelGlobe.dir/src/UI/Inventory/Inventory.cpp.s
+
+CMakeFiles/VoxelGlobe.dir/src/UI/Inventory/InventoryUI.cpp.o: CMakeFiles/VoxelGlobe.dir/flags.make
+CMakeFiles/VoxelGlobe.dir/src/UI/Inventory/InventoryUI.cpp.o: src/UI/Inventory/InventoryUI.cpp
+CMakeFiles/VoxelGlobe.dir/src/UI/Inventory/InventoryUI.cpp.o: CMakeFiles/VoxelGlobe.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir="/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/CMakeFiles" --progress-num=$(CMAKE_PROGRESS_5) "Building CXX object CMakeFiles/VoxelGlobe.dir/src/UI/Inventory/InventoryUI.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/VoxelGlobe.dir/src/UI/Inventory/InventoryUI.cpp.o -MF CMakeFiles/VoxelGlobe.dir/src/UI/Inventory/InventoryUI.cpp.o.d -o CMakeFiles/VoxelGlobe.dir/src/UI/Inventory/InventoryUI.cpp.o -c "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/UI/Inventory/InventoryUI.cpp"
+
+CMakeFiles/VoxelGlobe.dir/src/UI/Inventory/InventoryUI.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/VoxelGlobe.dir/src/UI/Inventory/InventoryUI.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/UI/Inventory/InventoryUI.cpp" > CMakeFiles/VoxelGlobe.dir/src/UI/Inventory/InventoryUI.cpp.i
+
+CMakeFiles/VoxelGlobe.dir/src/UI/Inventory/InventoryUI.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/VoxelGlobe.dir/src/UI/Inventory/InventoryUI.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/UI/Inventory/InventoryUI.cpp" -o CMakeFiles/VoxelGlobe.dir/src/UI/Inventory/InventoryUI.cpp.s
 
 CMakeFiles/VoxelGlobe.dir/src/Rendering/Renderer.cpp.o: CMakeFiles/VoxelGlobe.dir/flags.make
 CMakeFiles/VoxelGlobe.dir/src/Rendering/Renderer.cpp.o: src/Rendering/Renderer.cpp
 CMakeFiles/VoxelGlobe.dir/src/Rendering/Renderer.cpp.o: CMakeFiles/VoxelGlobe.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir="/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/CMakeFiles" --progress-num=$(CMAKE_PROGRESS_5) "Building CXX object CMakeFiles/VoxelGlobe.dir/src/Rendering/Renderer.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir="/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/CMakeFiles" --progress-num=$(CMAKE_PROGRESS_6) "Building CXX object CMakeFiles/VoxelGlobe.dir/src/Rendering/Renderer.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/VoxelGlobe.dir/src/Rendering/Renderer.cpp.o -MF CMakeFiles/VoxelGlobe.dir/src/Rendering/Renderer.cpp.o.d -o CMakeFiles/VoxelGlobe.dir/src/Rendering/Renderer.cpp.o -c "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/Rendering/Renderer.cpp"
 
 CMakeFiles/VoxelGlobe.dir/src/Rendering/Renderer.cpp.i: cmake_force
@@ -142,7 +156,7 @@ CMakeFiles/VoxelGlobe.dir/src/Rendering/Renderer.cpp.s: cmake_force
 CMakeFiles/VoxelGlobe.dir/src/World/World.cpp.o: CMakeFiles/VoxelGlobe.dir/flags.make
 CMakeFiles/VoxelGlobe.dir/src/World/World.cpp.o: src/World/World.cpp
 CMakeFiles/VoxelGlobe.dir/src/World/World.cpp.o: CMakeFiles/VoxelGlobe.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir="/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/CMakeFiles" --progress-num=$(CMAKE_PROGRESS_6) "Building CXX object CMakeFiles/VoxelGlobe.dir/src/World/World.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir="/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/CMakeFiles" --progress-num=$(CMAKE_PROGRESS_7) "Building CXX object CMakeFiles/VoxelGlobe.dir/src/World/World.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/VoxelGlobe.dir/src/World/World.cpp.o -MF CMakeFiles/VoxelGlobe.dir/src/World/World.cpp.o.d -o CMakeFiles/VoxelGlobe.dir/src/World/World.cpp.o -c "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/World/World.cpp"
 
 CMakeFiles/VoxelGlobe.dir/src/World/World.cpp.i: cmake_force
@@ -156,7 +170,7 @@ CMakeFiles/VoxelGlobe.dir/src/World/World.cpp.s: cmake_force
 CMakeFiles/VoxelGlobe.dir/src/World/Chunk.cpp.o: CMakeFiles/VoxelGlobe.dir/flags.make
 CMakeFiles/VoxelGlobe.dir/src/World/Chunk.cpp.o: src/World/Chunk.cpp
 CMakeFiles/VoxelGlobe.dir/src/World/Chunk.cpp.o: CMakeFiles/VoxelGlobe.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir="/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/CMakeFiles" --progress-num=$(CMAKE_PROGRESS_7) "Building CXX object CMakeFiles/VoxelGlobe.dir/src/World/Chunk.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir="/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/CMakeFiles" --progress-num=$(CMAKE_PROGRESS_8) "Building CXX object CMakeFiles/VoxelGlobe.dir/src/World/Chunk.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/VoxelGlobe.dir/src/World/Chunk.cpp.o -MF CMakeFiles/VoxelGlobe.dir/src/World/Chunk.cpp.o.d -o CMakeFiles/VoxelGlobe.dir/src/World/Chunk.cpp.o -c "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/World/Chunk.cpp"
 
 CMakeFiles/VoxelGlobe.dir/src/World/Chunk.cpp.i: cmake_force
@@ -170,7 +184,7 @@ CMakeFiles/VoxelGlobe.dir/src/World/Chunk.cpp.s: cmake_force
 CMakeFiles/VoxelGlobe.dir/src/World/Block.cpp.o: CMakeFiles/VoxelGlobe.dir/flags.make
 CMakeFiles/VoxelGlobe.dir/src/World/Block.cpp.o: src/World/Block.cpp
 CMakeFiles/VoxelGlobe.dir/src/World/Block.cpp.o: CMakeFiles/VoxelGlobe.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir="/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/CMakeFiles" --progress-num=$(CMAKE_PROGRESS_8) "Building CXX object CMakeFiles/VoxelGlobe.dir/src/World/Block.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir="/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/CMakeFiles" --progress-num=$(CMAKE_PROGRESS_9) "Building CXX object CMakeFiles/VoxelGlobe.dir/src/World/Block.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/VoxelGlobe.dir/src/World/Block.cpp.o -MF CMakeFiles/VoxelGlobe.dir/src/World/Block.cpp.o.d -o CMakeFiles/VoxelGlobe.dir/src/World/Block.cpp.o -c "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/World/Block.cpp"
 
 CMakeFiles/VoxelGlobe.dir/src/World/Block.cpp.i: cmake_force
@@ -181,10 +195,24 @@ CMakeFiles/VoxelGlobe.dir/src/World/Block.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/VoxelGlobe.dir/src/World/Block.cpp.s"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/World/Block.cpp" -o CMakeFiles/VoxelGlobe.dir/src/World/Block.cpp.s
 
+CMakeFiles/VoxelGlobe.dir/src/VoxelManipulator.cpp.o: CMakeFiles/VoxelGlobe.dir/flags.make
+CMakeFiles/VoxelGlobe.dir/src/VoxelManipulator.cpp.o: src/VoxelManipulator.cpp
+CMakeFiles/VoxelGlobe.dir/src/VoxelManipulator.cpp.o: CMakeFiles/VoxelGlobe.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir="/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/CMakeFiles" --progress-num=$(CMAKE_PROGRESS_10) "Building CXX object CMakeFiles/VoxelGlobe.dir/src/VoxelManipulator.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/VoxelGlobe.dir/src/VoxelManipulator.cpp.o -MF CMakeFiles/VoxelGlobe.dir/src/VoxelManipulator.cpp.o.d -o CMakeFiles/VoxelGlobe.dir/src/VoxelManipulator.cpp.o -c "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/VoxelManipulator.cpp"
+
+CMakeFiles/VoxelGlobe.dir/src/VoxelManipulator.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/VoxelGlobe.dir/src/VoxelManipulator.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/VoxelManipulator.cpp" > CMakeFiles/VoxelGlobe.dir/src/VoxelManipulator.cpp.i
+
+CMakeFiles/VoxelGlobe.dir/src/VoxelManipulator.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/VoxelGlobe.dir/src/VoxelManipulator.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/VoxelManipulator.cpp" -o CMakeFiles/VoxelGlobe.dir/src/VoxelManipulator.cpp.s
+
 CMakeFiles/VoxelGlobe.dir/third_party/stb/stb_image_impl.cpp.o: CMakeFiles/VoxelGlobe.dir/flags.make
 CMakeFiles/VoxelGlobe.dir/third_party/stb/stb_image_impl.cpp.o: third_party/stb/stb_image_impl.cpp
 CMakeFiles/VoxelGlobe.dir/third_party/stb/stb_image_impl.cpp.o: CMakeFiles/VoxelGlobe.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir="/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/CMakeFiles" --progress-num=$(CMAKE_PROGRESS_9) "Building CXX object CMakeFiles/VoxelGlobe.dir/third_party/stb/stb_image_impl.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir="/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/CMakeFiles" --progress-num=$(CMAKE_PROGRESS_11) "Building CXX object CMakeFiles/VoxelGlobe.dir/third_party/stb/stb_image_impl.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/VoxelGlobe.dir/third_party/stb/stb_image_impl.cpp.o -MF CMakeFiles/VoxelGlobe.dir/third_party/stb/stb_image_impl.cpp.o.d -o CMakeFiles/VoxelGlobe.dir/third_party/stb/stb_image_impl.cpp.o -c "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/third_party/stb/stb_image_impl.cpp"
 
 CMakeFiles/VoxelGlobe.dir/third_party/stb/stb_image_impl.cpp.i: cmake_force
@@ -198,7 +226,7 @@ CMakeFiles/VoxelGlobe.dir/third_party/stb/stb_image_impl.cpp.s: cmake_force
 CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui.cpp.o: CMakeFiles/VoxelGlobe.dir/flags.make
 CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui.cpp.o: third_party/imgui/imgui.cpp
 CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui.cpp.o: CMakeFiles/VoxelGlobe.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir="/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/CMakeFiles" --progress-num=$(CMAKE_PROGRESS_10) "Building CXX object CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir="/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/CMakeFiles" --progress-num=$(CMAKE_PROGRESS_12) "Building CXX object CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui.cpp.o -MF CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui.cpp.o.d -o CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui.cpp.o -c "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/third_party/imgui/imgui.cpp"
 
 CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui.cpp.i: cmake_force
@@ -212,7 +240,7 @@ CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui.cpp.s: cmake_force
 CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_draw.cpp.o: CMakeFiles/VoxelGlobe.dir/flags.make
 CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_draw.cpp.o: third_party/imgui/imgui_draw.cpp
 CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_draw.cpp.o: CMakeFiles/VoxelGlobe.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir="/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/CMakeFiles" --progress-num=$(CMAKE_PROGRESS_11) "Building CXX object CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_draw.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir="/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/CMakeFiles" --progress-num=$(CMAKE_PROGRESS_13) "Building CXX object CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_draw.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_draw.cpp.o -MF CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_draw.cpp.o.d -o CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_draw.cpp.o -c "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/third_party/imgui/imgui_draw.cpp"
 
 CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_draw.cpp.i: cmake_force
@@ -226,7 +254,7 @@ CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_draw.cpp.s: cmake_force
 CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_tables.cpp.o: CMakeFiles/VoxelGlobe.dir/flags.make
 CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_tables.cpp.o: third_party/imgui/imgui_tables.cpp
 CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_tables.cpp.o: CMakeFiles/VoxelGlobe.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir="/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/CMakeFiles" --progress-num=$(CMAKE_PROGRESS_12) "Building CXX object CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_tables.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir="/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/CMakeFiles" --progress-num=$(CMAKE_PROGRESS_14) "Building CXX object CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_tables.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_tables.cpp.o -MF CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_tables.cpp.o.d -o CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_tables.cpp.o -c "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/third_party/imgui/imgui_tables.cpp"
 
 CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_tables.cpp.i: cmake_force
@@ -240,7 +268,7 @@ CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_tables.cpp.s: cmake_force
 CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_widgets.cpp.o: CMakeFiles/VoxelGlobe.dir/flags.make
 CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_widgets.cpp.o: third_party/imgui/imgui_widgets.cpp
 CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_widgets.cpp.o: CMakeFiles/VoxelGlobe.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir="/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/CMakeFiles" --progress-num=$(CMAKE_PROGRESS_13) "Building CXX object CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_widgets.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir="/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/CMakeFiles" --progress-num=$(CMAKE_PROGRESS_15) "Building CXX object CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_widgets.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_widgets.cpp.o -MF CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_widgets.cpp.o.d -o CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_widgets.cpp.o -c "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/third_party/imgui/imgui_widgets.cpp"
 
 CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_widgets.cpp.i: cmake_force
@@ -254,7 +282,7 @@ CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_widgets.cpp.s: cmake_force
 CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_impl_glfw.cpp.o: CMakeFiles/VoxelGlobe.dir/flags.make
 CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_impl_glfw.cpp.o: third_party/imgui/imgui_impl_glfw.cpp
 CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_impl_glfw.cpp.o: CMakeFiles/VoxelGlobe.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir="/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/CMakeFiles" --progress-num=$(CMAKE_PROGRESS_14) "Building CXX object CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_impl_glfw.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir="/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/CMakeFiles" --progress-num=$(CMAKE_PROGRESS_16) "Building CXX object CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_impl_glfw.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_impl_glfw.cpp.o -MF CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_impl_glfw.cpp.o.d -o CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_impl_glfw.cpp.o -c "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/third_party/imgui/imgui_impl_glfw.cpp"
 
 CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_impl_glfw.cpp.i: cmake_force
@@ -268,7 +296,7 @@ CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_impl_glfw.cpp.s: cmake_force
 CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_impl_opengl3.cpp.o: CMakeFiles/VoxelGlobe.dir/flags.make
 CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_impl_opengl3.cpp.o: third_party/imgui/imgui_impl_opengl3.cpp
 CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_impl_opengl3.cpp.o: CMakeFiles/VoxelGlobe.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir="/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/CMakeFiles" --progress-num=$(CMAKE_PROGRESS_15) "Building CXX object CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_impl_opengl3.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir="/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/CMakeFiles" --progress-num=$(CMAKE_PROGRESS_17) "Building CXX object CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_impl_opengl3.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_impl_opengl3.cpp.o -MF CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_impl_opengl3.cpp.o.d -o CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_impl_opengl3.cpp.o -c "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/third_party/imgui/imgui_impl_opengl3.cpp"
 
 CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_impl_opengl3.cpp.i: cmake_force
@@ -284,11 +312,13 @@ VoxelGlobe_OBJECTS = \
 "CMakeFiles/VoxelGlobe.dir/src/Core/main.cpp.o" \
 "CMakeFiles/VoxelGlobe.dir/src/Player/Player.cpp.o" \
 "CMakeFiles/VoxelGlobe.dir/src/Player/Movement.cpp.o" \
-"CMakeFiles/VoxelGlobe.dir/src/Player/Inventory.cpp.o" \
+"CMakeFiles/VoxelGlobe.dir/src/UI/Inventory/Inventory.cpp.o" \
+"CMakeFiles/VoxelGlobe.dir/src/UI/Inventory/InventoryUI.cpp.o" \
 "CMakeFiles/VoxelGlobe.dir/src/Rendering/Renderer.cpp.o" \
 "CMakeFiles/VoxelGlobe.dir/src/World/World.cpp.o" \
 "CMakeFiles/VoxelGlobe.dir/src/World/Chunk.cpp.o" \
 "CMakeFiles/VoxelGlobe.dir/src/World/Block.cpp.o" \
+"CMakeFiles/VoxelGlobe.dir/src/VoxelManipulator.cpp.o" \
 "CMakeFiles/VoxelGlobe.dir/third_party/stb/stb_image_impl.cpp.o" \
 "CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui.cpp.o" \
 "CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_draw.cpp.o" \
@@ -303,11 +333,13 @@ VoxelGlobe_EXTERNAL_OBJECTS =
 VoxelGlobe: CMakeFiles/VoxelGlobe.dir/src/Core/main.cpp.o
 VoxelGlobe: CMakeFiles/VoxelGlobe.dir/src/Player/Player.cpp.o
 VoxelGlobe: CMakeFiles/VoxelGlobe.dir/src/Player/Movement.cpp.o
-VoxelGlobe: CMakeFiles/VoxelGlobe.dir/src/Player/Inventory.cpp.o
+VoxelGlobe: CMakeFiles/VoxelGlobe.dir/src/UI/Inventory/Inventory.cpp.o
+VoxelGlobe: CMakeFiles/VoxelGlobe.dir/src/UI/Inventory/InventoryUI.cpp.o
 VoxelGlobe: CMakeFiles/VoxelGlobe.dir/src/Rendering/Renderer.cpp.o
 VoxelGlobe: CMakeFiles/VoxelGlobe.dir/src/World/World.cpp.o
 VoxelGlobe: CMakeFiles/VoxelGlobe.dir/src/World/Chunk.cpp.o
 VoxelGlobe: CMakeFiles/VoxelGlobe.dir/src/World/Block.cpp.o
+VoxelGlobe: CMakeFiles/VoxelGlobe.dir/src/VoxelManipulator.cpp.o
 VoxelGlobe: CMakeFiles/VoxelGlobe.dir/third_party/stb/stb_image_impl.cpp.o
 VoxelGlobe: CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui.cpp.o
 VoxelGlobe: CMakeFiles/VoxelGlobe.dir/third_party/imgui/imgui_draw.cpp.o
@@ -321,7 +353,7 @@ VoxelGlobe: /usr/lib/x86_64-linux-gnu/libglfw.so.3.3
 VoxelGlobe: /usr/lib/x86_64-linux-gnu/libGLX.so
 VoxelGlobe: /usr/lib/x86_64-linux-gnu/libOpenGL.so
 VoxelGlobe: CMakeFiles/VoxelGlobe.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir="/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/CMakeFiles" --progress-num=$(CMAKE_PROGRESS_16) "Linking CXX executable VoxelGlobe"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir="/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/CMakeFiles" --progress-num=$(CMAKE_PROGRESS_18) "Linking CXX executable VoxelGlobe"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/VoxelGlobe.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.

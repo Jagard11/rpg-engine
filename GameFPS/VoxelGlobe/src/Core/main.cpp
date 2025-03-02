@@ -5,11 +5,12 @@
 #include "World/World.hpp"
 #include "Player/Player.hpp"
 #include "Rendering/Renderer.hpp"
+#include "VoxelManipulator.hpp"
+#include "UI/Inventory/InventoryUI.hpp"
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 #include <iostream>
-#include <glm/gtx/intersect.hpp>
 
 bool g_showDebug = false;
 bool g_showMenu = false;
@@ -42,6 +43,8 @@ int main() {
     world.update(glm::vec3(0, 0, 0));
     Player player(world);
     Renderer renderer;
+    VoxelManipulator voxelManip(world);
+    InventoryUI inventoryUI;
 
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
@@ -81,42 +84,17 @@ int main() {
         lastF12State = f12State;
 
         if (!g_showMenu) {
-            player.update(window, deltaTime); // Delegate to Player
-
-            float scrollY = io.MouseWheel;
-            if (scrollY != 0) player.inventory.scroll(scrollY);
+            player.update(window, deltaTime);
 
             int leftClickState = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT);
             if (leftClickState == GLFW_PRESS && lastLeftClickState == GLFW_RELEASE) {
-                glm::vec3 rayOrigin = player.position + player.up * 1.75f; // Use hardcoded height for now
-                glm::vec3 rayDir = player.cameraDirection;
-                for (float t = 0; t < 5.0f; t += 0.1f) {
-                    glm::vec3 pos = rayOrigin + rayDir * t;
-                    int x = static_cast<int>(floor(pos.x));
-                    int y = static_cast<int>(floor(pos.y));
-                    int z = static_cast<int>(floor(pos.z));
-                    if (world.getBlock(x, y, z).type == BlockType::AIR) {
-                        world.setBlock(x, y, z, player.inventory.slots[player.inventory.selectedSlot]);
-                        break;
-                    }
-                }
+                voxelManip.placeBlock(player, player.inventory.slots[player.inventory.selectedSlot]);
             }
             lastLeftClickState = leftClickState;
 
             int rightClickState = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT);
             if (rightClickState == GLFW_PRESS && lastRightClickState == GLFW_RELEASE) {
-                glm::vec3 rayOrigin = player.position + player.up * 1.75f;
-                glm::vec3 rayDir = player.cameraDirection;
-                for (float t = 0; t < 5.0f; t += 0.1f) {
-                    glm::vec3 pos = rayOrigin + rayDir * t;
-                    int x = static_cast<int>(floor(pos.x));
-                    int y = static_cast<int>(floor(pos.y));
-                    int z = static_cast<int>(floor(pos.z));
-                    if (world.getBlock(x, y, z).type != BlockType::AIR) {
-                        world.setBlock(x, y, z, BlockType::AIR);
-                        break;
-                    }
-                }
+                voxelManip.removeBlock(player);
             }
             lastRightClickState = rightClickState;
         }
@@ -127,7 +105,14 @@ int main() {
         }
         firstFrame = false;
 
-        renderer.render(world, player);
+        glm::ivec3 hitPos;
+        glm::vec3 hitNormal;
+        glm::vec3 eyePos = player.position + player.up * player.getHeight(); // Use getHeight() for consistency
+        if (voxelManip.raycast(eyePos, player.cameraDirection, 5.0f, hitPos, hitNormal)) {
+            renderer.render(world, player, hitPos);
+        } else {
+            renderer.render(world, player);
+        }
 
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
@@ -151,20 +136,7 @@ int main() {
             ImGui::End();
         }
 
-        ImGui::SetNextWindowPos(ImVec2(0, io.DisplaySize.y - 40));
-        ImGui::SetNextWindowSize(ImVec2(io.DisplaySize.x, 40));
-        ImGui::Begin("Inventory", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar);
-        for (int i = 0; i < 10; i++) {
-            ImGui::PushID(i);
-            if (i == player.inventory.selectedSlot) ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.8f, 0.2f, 1.0f));
-            if (ImGui::Button(std::to_string(i).c_str(), ImVec2(40, 40))) {
-                player.inventory.selectedSlot = i;
-            }
-            if (i == player.inventory.selectedSlot) ImGui::PopStyleColor();
-            ImGui::SameLine();
-            ImGui::PopID();
-        }
-        ImGui::End();
+        inventoryUI.render(player.inventory, io);
 
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

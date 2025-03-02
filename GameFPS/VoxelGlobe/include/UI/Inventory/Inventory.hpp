@@ -1,6 +1,6 @@
-// ./include/Player/Inventory.hpp
-#ifndef INVENTORY_HPP
-#define INVENTORY_HPP
+// ./include/UI/Inventory/Inventory.hpp
+#ifndef UI_INVENTORY_HPP
+#define UI_INVENTORY_HPP
 
 #include "Core/Types.hpp"
 

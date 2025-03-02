@@ -6,7 +6,7 @@
 VoxelManipulator::VoxelManipulator(World& world) : worldRef(world) {}
 
 bool VoxelManipulator::placeBlock(const Player& player, BlockType type) {
-    glm::vec3 eyePos = player.position + player.up * player.height;
+    glm::vec3 eyePos = player.position + player.up * player.getHeight(); // Fixed: use getHeight()
     glm::ivec3 hitPos;
     glm::vec3 hitNormal;
 
@@ -30,7 +30,7 @@ bool VoxelManipulator::placeBlock(const Player& player, BlockType type) {
 }
 
 bool VoxelManipulator::removeBlock(const Player& player) {
-    glm::vec3 eyePos = player.position + player.up * player.height;
+    glm::vec3 eyePos = player.position + player.up * player.getHeight(); // Fixed: use getHeight()
     glm::ivec3 hitPos;
     glm::vec3 hitNormal;
 

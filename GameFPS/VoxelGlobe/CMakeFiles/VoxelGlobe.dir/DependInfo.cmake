@@ -9,10 +9,12 @@ set(CMAKE_DEPENDS_LANGUAGES
 # The set of dependency files which are needed:
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
   "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/Core/main.cpp" "CMakeFiles/VoxelGlobe.dir/src/Core/main.cpp.o" "gcc" "CMakeFiles/VoxelGlobe.dir/src/Core/main.cpp.o.d"
-  "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/Player/Inventory.cpp" "CMakeFiles/VoxelGlobe.dir/src/Player/Inventory.cpp.o" "gcc" "CMakeFiles/VoxelGlobe.dir/src/Player/Inventory.cpp.o.d"
   "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/Player/Movement.cpp" "CMakeFiles/VoxelGlobe.dir/src/Player/Movement.cpp.o" "gcc" "CMakeFiles/VoxelGlobe.dir/src/Player/Movement.cpp.o.d"
   "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/Player/Player.cpp" "CMakeFiles/VoxelGlobe.dir/src/Player/Player.cpp.o" "gcc" "CMakeFiles/VoxelGlobe.dir/src/Player/Player.cpp.o.d"
   "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/Rendering/Renderer.cpp" "CMakeFiles/VoxelGlobe.dir/src/Rendering/Renderer.cpp.o" "gcc" "CMakeFiles/VoxelGlobe.dir/src/Rendering/Renderer.cpp.o.d"
+  "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/UI/Inventory/Inventory.cpp" "CMakeFiles/VoxelGlobe.dir/src/UI/Inventory/Inventory.cpp.o" "gcc" "CMakeFiles/VoxelGlobe.dir/src/UI/Inventory/Inventory.cpp.o.d"
+  "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/UI/Inventory/InventoryUI.cpp" "CMakeFiles/VoxelGlobe.dir/src/UI/Inventory/InventoryUI.cpp.o" "gcc" "CMakeFiles/VoxelGlobe.dir/src/UI/Inventory/InventoryUI.cpp.o.d"
+  "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/VoxelManipulator.cpp" "CMakeFiles/VoxelGlobe.dir/src/VoxelManipulator.cpp.o" "gcc" "CMakeFiles/VoxelGlobe.dir/src/VoxelManipulator.cpp.o.d"
   "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/World/Block.cpp" "CMakeFiles/VoxelGlobe.dir/src/World/Block.cpp.o" "gcc" "CMakeFiles/VoxelGlobe.dir/src/World/Block.cpp.o.d"
   "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/World/Chunk.cpp" "CMakeFiles/VoxelGlobe.dir/src/World/Chunk.cpp.o" "gcc" "CMakeFiles/VoxelGlobe.dir/src/World/Chunk.cpp.o.d"
   "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/World/World.cpp" "CMakeFiles/VoxelGlobe.dir/src/World/World.cpp.o" "gcc" "CMakeFiles/VoxelGlobe.dir/src/World/World.cpp.o.d"
