@@ -1,4 +1,4 @@
-// ./VoxelGlobe/include/Chunk.hpp
+// ./include/World/Chunk.hpp
 #ifndef CHUNK_HPP
 #define CHUNK_HPP
 

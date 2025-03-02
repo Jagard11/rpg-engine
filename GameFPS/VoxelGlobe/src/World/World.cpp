@@ -1,4 +1,4 @@
-// ./VoxelGlobe/src/World.cpp
+// ./src/World/World.cpp
 #include "World/World.hpp"
 #include <cmath>
 #include <iostream>

@@ -1,4 +1,4 @@
-// ./VoxelGlobe/include/Debug.hpp
+// ./include/Core/Debug.hpp
 #ifndef DEBUG_HPP
 #define DEBUG_HPP
 

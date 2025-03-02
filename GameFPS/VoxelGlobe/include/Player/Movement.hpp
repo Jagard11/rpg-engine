@@ -1,4 +1,4 @@
-// ./GameFPS/VoxelGlobe/include/Player/Movement.hpp
+// ./include/Player/Movement.hpp
 #ifndef MOVEMENT_HPP
 #define MOVEMENT_HPP
 

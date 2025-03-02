@@ -1,4 +1,4 @@
-// ./GameFPS/VoxelGlobe/include/World/Block.hpp
+// ./include/World/Block.hpp
 #ifndef BLOCK_HPP
 #define BLOCK_HPP
 

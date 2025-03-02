@@ -1,4 +1,4 @@
-// ./VoxelGlobe/src/Chunk.cpp
+// ./src/World/Chunk.cpp
 #include "World/Chunk.hpp"
 #include <vector>
 

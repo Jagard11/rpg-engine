@@ -1,4 +1,4 @@
-// ./GameFPS/VoxelGlobe/include/Player/Inventory.hpp
+// ./include/Player/Inventory.hpp
 #ifndef INVENTORY_HPP
 #define INVENTORY_HPP
 

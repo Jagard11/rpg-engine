@@ -1,4 +1,4 @@
-// ./GameFPS/VoxelGlobe/include/Rendering/Renderer.hpp
+// ./include/Rendering/Renderer.hpp
 #ifndef RENDERER_HPP
 #define RENDERER_HPP
 

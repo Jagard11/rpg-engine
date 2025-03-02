@@ -1,4 +1,4 @@
-// ./GameFPS/VoxelGlobe/src/Player/Inventory.cpp
+// ./src/Player/Inventory.cpp
 #include "Player/Inventory.hpp"
 #include <iostream>
 #include "Core/Debug.hpp"

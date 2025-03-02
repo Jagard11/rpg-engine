@@ -1,4 +1,4 @@
-// ./GameFPS/VoxelGlobe/include/Core/Types.hpp
+// ./include/Core/Types.hpp
 #ifndef TYPES_HPP
 #define TYPES_HPP
 

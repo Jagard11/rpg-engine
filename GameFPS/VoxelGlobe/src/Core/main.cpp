@@ -1,4 +1,4 @@
-// ./GameFPS/VoxelGlobe/src/Core/main.cpp
+// ./src/Core/main.cpp
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include "Core/Debug.hpp"

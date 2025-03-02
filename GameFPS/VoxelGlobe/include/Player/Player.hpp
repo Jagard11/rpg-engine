@@ -1,4 +1,4 @@
-// ./GameFPS/VoxelGlobe/include/Player/Player.hpp
+// ./include/Player/Player.hpp
 #ifndef PLAYER_HPP
 #define PLAYER_HPP
 

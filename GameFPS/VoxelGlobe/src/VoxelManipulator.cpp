@@ -1,4 +1,4 @@
-// ./VoxelGlobe/src/VoxelManipulator.cpp
+// ./src/VoxelManipulator.cpp
 #include "VoxelManipulator.hpp"
 #include "Core/Debug.hpp"
 #include <iostream>
