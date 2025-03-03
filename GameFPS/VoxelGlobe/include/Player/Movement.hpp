@@ -13,8 +13,9 @@ public:
     void moveLeft(float deltaTime);
     void moveRight(float deltaTime);
     void applyGravity(float deltaTime);
-    void jump(); // New method
+    void jump();
     void updateOrientation(float deltaX, float deltaY);
+    void setSprinting(bool sprinting); // Added
 
 private:
     const World& world;
@@ -24,8 +25,10 @@ private:
     glm::vec3& up;
     float speed = 5.0f;
     float height = 1.75f;
-    float verticalVelocity = 0.0f; // New variable for vertical movement
-    bool isGrounded = false; // Track if player is on ground
+    float verticalVelocity = 0.0f;
+    bool isGrounded = false;
+    bool isSprinting = false; // Added
+    static constexpr float sprintMultiplier = 2.0f; // Added
     bool checkCollision(const glm::vec3& newPos) const;
 };
 

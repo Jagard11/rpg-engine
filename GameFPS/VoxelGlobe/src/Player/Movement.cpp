@@ -31,7 +31,8 @@ bool Movement::checkCollision(const glm::vec3& newPos) const {
 }
 
 void Movement::moveForward(float deltaTime) {
-    glm::vec3 newPos = position + movementDirection * speed * deltaTime;
+    float effectiveSpeed = speed * (isSprinting ? sprintMultiplier : 1.0f); // Apply sprint multiplier
+    glm::vec3 newPos = position + movementDirection * effectiveSpeed * deltaTime;
     if (!checkCollision(newPos)) {
         position = newPos;
     }
@@ -127,5 +128,12 @@ void Movement::updateOrientation(float deltaX, float deltaY) {
 
     if (DebugManager::getInstance().logPlayerInfo()) {
         std::cout << "Camera Dir: " << cameraDirection.x << ", " << cameraDirection.y << ", " << cameraDirection.z << std::endl;
+    }
+}
+
+void Movement::setSprinting(bool sprinting) {
+    isSprinting = sprinting;
+    if (DebugManager::getInstance().logPlayerInfo()) {
+        std::cout << "Sprinting: " << (sprinting ? "ON" : "OFF") << std::endl;
     }
 }

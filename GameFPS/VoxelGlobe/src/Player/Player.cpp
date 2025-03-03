@@ -49,6 +49,7 @@ void Player::update(GLFWwindow* window, float deltaTime) {
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) movement.moveLeft(deltaTime);
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) movement.moveRight(deltaTime);
     if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) movement.jump();
+    movement.setSprinting(glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS); // Added sprint check
 
     movement.applyGravity(deltaTime);
 
