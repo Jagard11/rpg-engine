@@ -8,7 +8,6 @@ Movement::Movement(const World& w, glm::vec3& pos, glm::vec3& camDir, glm::vec3&
     : world(w), position(pos), cameraDirection(camDir), movementDirection(moveDir), up(u) {}
 
 bool Movement::checkCollision(const glm::vec3& newPos) const {
-    // Check player's bounding box (simplified: 0.5 width, 1.75 height)
     int minX = static_cast<int>(floor(newPos.x - 0.25f));
     int maxX = static_cast<int>(floor(newPos.x + 0.25f));
     int minY = static_cast<int>(floor(newPos.y));
@@ -63,7 +62,8 @@ void Movement::moveRight(float deltaTime) {
 
 void Movement::applyGravity(float deltaTime) {
     float gravity = 9.81f;
-    glm::vec3 newPos = position - glm::vec3(0.0f, gravity * deltaTime, 0.0f);
+    verticalVelocity -= gravity * deltaTime; // Apply gravity to velocity
+    glm::vec3 newPos = position + glm::vec3(0.0f, verticalVelocity * deltaTime, 0.0f);
 
     // Check block directly beneath player's feet
     int worldX = static_cast<int>(floor(newPos.x));
@@ -71,16 +71,32 @@ void Movement::applyGravity(float deltaTime) {
     int floorY = static_cast<int>(floor(newPos.y - 0.01f)); // Slightly below feet
     Block blockBelow = world.getBlock(worldX, floorY, worldZ);
 
-    if (blockBelow.type != BlockType::AIR) {
+    isGrounded = false;
+    if (blockBelow.type != BlockType::AIR && verticalVelocity <= 0) {
         newPos.y = static_cast<float>(floorY + 1); // Stand on block
+        verticalVelocity = 0.0f; // Reset velocity when grounded
+        isGrounded = true;
         if (g_showDebug) std::cout << "Landed on block at y = " << floorY << std::endl;
+    } else if (checkCollision(newPos)) {
+        // Handle collision while rising (e.g., hitting a ceiling)
+        verticalVelocity = 0.0f;
+        newPos.y = position.y; // Stay at current height
+        if (g_showDebug) std::cout << "Hit ceiling or obstacle" << std::endl;
     }
 
     position = newPos;
 
     if (g_showDebug) {
-        std::cout << "Gravity applied, Pos: " << position.x << ", " << position.y << ", " << position.z << std::endl;
-        std::cout << "Eye Pos (pos.y + height): " << position.x << ", " << (position.y + height) << ", " << position.z << std::endl;
+        std::cout << "Gravity applied, Pos: " << position.x << ", " << position.y << ", " << position.z 
+                  << ", Vertical Velocity: " << verticalVelocity << std::endl;
+    }
+}
+
+void Movement::jump() {
+    if (isGrounded) {
+        verticalVelocity = 4.85f; // Initial velocity to jump ~1.2 units
+        isGrounded = false;
+        if (g_showDebug) std::cout << "Jump initiated, verticalVelocity = " << verticalVelocity << std::endl;
     }
 }
 

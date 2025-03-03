@@ -13,7 +13,7 @@ Player::Player(const World& w)
     : world(w), 
       movement(w, position, cameraDirection, movementDirection, up) {
     position = glm::vec3(0.0f, 1510.0f, 0.0f); // Start 2 blocks above surface (1508 + 2)
-    up = glm::vec3(0.0f, 1.0f, 0.0f); // Simplified up vector for flat terrain testing
+    up = glm::vec3(0.0f, 1.0f, 0.0f);
     float yaw = 0.0f, pitch = 45.0f;
     float radYaw = glm::radians(yaw);
     float radPitch = glm::radians(pitch);
@@ -24,7 +24,6 @@ Player::Player(const World& w)
     if (g_showDebug) {
         std::cout << "Initial Player Pos: " << position.x << ", " << position.y << ", " << position.z << std::endl;
         std::cout << "Initial Camera Dir: " << cameraDirection.x << ", " << cameraDirection.y << ", " << cameraDirection.z << std::endl;
-        std::cout << "Initial Eye Pos: " << position.x << ", " << position.y + getHeight() << ", " << position.z << std::endl;
     }
 }
 
@@ -50,6 +49,7 @@ void Player::update(GLFWwindow* window, float deltaTime) {
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) movement.moveBackward(deltaTime);
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) movement.moveLeft(deltaTime);
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) movement.moveRight(deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) movement.jump(); // Jump with Space key
 
     movement.applyGravity(deltaTime);
 

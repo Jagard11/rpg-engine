@@ -13,6 +13,7 @@ public:
     void moveLeft(float deltaTime);
     void moveRight(float deltaTime);
     void applyGravity(float deltaTime);
+    void jump(); // New method
     void updateOrientation(float deltaX, float deltaY);
 
 private:
@@ -23,7 +24,9 @@ private:
     glm::vec3& up;
     float speed = 5.0f;
     float height = 1.75f;
-    bool checkCollision(const glm::vec3& newPos) const; // Added declaration
+    float verticalVelocity = 0.0f; // New variable for vertical movement
+    bool isGrounded = false; // Track if player is on ground
+    bool checkCollision(const glm::vec3& newPos) const;
 };
 
 #endif
