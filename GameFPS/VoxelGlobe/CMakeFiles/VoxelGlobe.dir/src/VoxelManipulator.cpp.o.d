@@ -254,7 +254,7 @@ CMakeFiles/VoxelGlobe.dir/src/VoxelManipulator.cpp.o: \
  /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/UI/Inventory/Inventory.hpp \
  /usr/include/GLFW/glfw3.h /usr/include/GL/gl.h /usr/include/GL/glext.h \
  /usr/include/KHR/khrplatform.h \
- /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/Core/Debug.hpp \
+ /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/Debug/DebugManager.hpp \
  /usr/include/c++/11/iostream /usr/include/c++/11/ostream \
  /usr/include/c++/11/ios /usr/include/c++/11/iosfwd \
  /usr/include/c++/11/bits/stringfwd.h /usr/include/c++/11/bits/postypes.h \

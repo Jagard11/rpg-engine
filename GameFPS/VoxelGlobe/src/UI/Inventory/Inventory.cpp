@@ -1,7 +1,7 @@
 // ./src/UI/Inventory/Inventory.cpp
 #include "UI/Inventory/Inventory.hpp"
 #include <iostream>
-#include "Core/Debug.hpp"
+#include "Debug/DebugManager.hpp"
 
 Inventory::Inventory() : selectedSlot(0) {
     slots[0] = BlockType::GRASS;
@@ -15,7 +15,7 @@ void Inventory::scroll(float delta) {
     } else if (delta < 0) {
         selectedSlot = (selectedSlot - 1 + 10) % 10;
     }
-    if (g_showDebug) {
+    if (DebugManager::getInstance().logInventory()) { // Updated to new toggle
         std::cout << "Selected Slot: " << selectedSlot << " (" << static_cast<int>(slots[selectedSlot]) << ")" << std::endl;
     }
 }

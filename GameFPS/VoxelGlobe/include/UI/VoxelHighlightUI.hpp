@@ -10,7 +10,7 @@ class VoxelHighlightUI {
 public:
     VoxelHighlightUI();
     ~VoxelHighlightUI();
-    void render(const Player& player, const glm::ivec3& voxelPos);
+    void render(const Player& player, const glm::ivec3& voxelPos, float fov); // Added fov parameter
 
 private:
     GLuint vao, vbo, shaderProgram;

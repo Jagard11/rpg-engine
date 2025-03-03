@@ -2,11 +2,9 @@
 #include "UI/VoxelHighlightUI.hpp"
 #include <GLFW/glfw3.h>
 #include <glm/gtc/matrix_transform.hpp>
-#include "Core/Debug.hpp"
+#include "Debug/DebugManager.hpp"
 #include <iostream>
 #include <vector>
-
-extern float g_fov;
 
 VoxelHighlightUI::VoxelHighlightUI() {
     glGenVertexArrays(1, &vao);
@@ -28,7 +26,7 @@ VoxelHighlightUI::~VoxelHighlightUI() {
     glDeleteProgram(shaderProgram);
 }
 
-void VoxelHighlightUI::render(const Player& player, const glm::ivec3& voxelPos) {
+void VoxelHighlightUI::render(const Player& player, const glm::ivec3& voxelPos, float fov) {
     if (voxelPos == lastHighlightedVoxel || voxelPos.x == -1) return;
     lastHighlightedVoxel = voxelPos;
 
@@ -57,7 +55,7 @@ void VoxelHighlightUI::render(const Player& player, const glm::ivec3& voxelPos) 
 
     glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
 
-    glm::mat4 proj = glm::perspective(glm::radians(g_fov), 800.0f / 600.0f, 0.1f, 2000.0f);
+    glm::mat4 proj = glm::perspective(glm::radians(fov), 800.0f / 600.0f, 0.1f, 2000.0f);
     glm::vec3 eyePos = player.position + player.up * player.getHeight();
     glm::vec3 lookAtPos = eyePos + player.cameraDirection;
     glm::mat4 view = glm::lookAt(eyePos, lookAtPos, player.up);
@@ -74,7 +72,7 @@ void VoxelHighlightUI::render(const Player& player, const glm::ivec3& voxelPos) 
 
     glEnable(GL_CULL_FACE);
 
-    if (g_showDebug) {
+    if (DebugManager::getInstance().logBlockPlacement()) {
         std::cout << "Highlighted voxel at world pos (" << renderPos.x << ", " << renderPos.y << ", " << renderPos.z << ")" << std::endl;
     }
 }

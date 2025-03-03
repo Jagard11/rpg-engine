@@ -1,7 +1,7 @@
 // ./src/Player/Movement.cpp
 #include "Player/Movement.hpp"
 #include <iostream>
-#include "Core/Debug.hpp"
+#include "Debug/DebugManager.hpp"
 #include <glm/gtc/matrix_transform.hpp>
 
 Movement::Movement(const World& w, glm::vec3& pos, glm::vec3& camDir, glm::vec3& moveDir, glm::vec3& u)
@@ -19,7 +19,7 @@ bool Movement::checkCollision(const glm::vec3& newPos) const {
         for (int y = minY; y <= maxY; y++) {
             for (int z = minZ; z <= maxZ; z++) {
                 if (world.getBlock(x, y, z).type != BlockType::AIR) {
-                    if (g_showDebug) {
+                    if (DebugManager::getInstance().logCollision()) {
                         std::cout << "Collision detected at (" << x << ", " << y << ", " << z << ")" << std::endl;
                     }
                     return true;
@@ -62,31 +62,33 @@ void Movement::moveRight(float deltaTime) {
 
 void Movement::applyGravity(float deltaTime) {
     float gravity = 9.81f;
-    verticalVelocity -= gravity * deltaTime; // Apply gravity to velocity
+    verticalVelocity -= gravity * deltaTime;
     glm::vec3 newPos = position + glm::vec3(0.0f, verticalVelocity * deltaTime, 0.0f);
 
-    // Check block directly beneath player's feet
     int worldX = static_cast<int>(floor(newPos.x));
     int worldZ = static_cast<int>(floor(newPos.z));
-    int floorY = static_cast<int>(floor(newPos.y - 0.01f)); // Slightly below feet
+    int floorY = static_cast<int>(floor(newPos.y - 0.01f));
     Block blockBelow = world.getBlock(worldX, floorY, worldZ);
 
     isGrounded = false;
     if (blockBelow.type != BlockType::AIR && verticalVelocity <= 0) {
-        newPos.y = static_cast<float>(floorY + 1); // Stand on block
-        verticalVelocity = 0.0f; // Reset velocity when grounded
-        isGrounded = true;
-        if (g_showDebug) std::cout << "Landed on block at y = " << floorY << std::endl;
-    } else if (checkCollision(newPos)) {
-        // Handle collision while rising (e.g., hitting a ceiling)
+        newPos.y = static_cast<float>(floorY + 1);
         verticalVelocity = 0.0f;
-        newPos.y = position.y; // Stay at current height
-        if (g_showDebug) std::cout << "Hit ceiling or obstacle" << std::endl;
+        isGrounded = true;
+        if (DebugManager::getInstance().logPlayerInfo()) {
+            std::cout << "Landed on block at y = " << floorY << std::endl;
+        }
+    } else if (checkCollision(newPos)) {
+        verticalVelocity = 0.0f;
+        newPos.y = position.y;
+        if (DebugManager::getInstance().logCollision()) {
+            std::cout << "Hit ceiling or obstacle" << std::endl;
+        }
     }
 
     position = newPos;
 
-    if (g_showDebug) {
+    if (DebugManager::getInstance().logPlayerInfo()) {
         std::cout << "Gravity applied, Pos: " << position.x << ", " << position.y << ", " << position.z 
                   << ", Vertical Velocity: " << verticalVelocity << std::endl;
     }
@@ -94,9 +96,11 @@ void Movement::applyGravity(float deltaTime) {
 
 void Movement::jump() {
     if (isGrounded) {
-        verticalVelocity = 4.85f; // Initial velocity to jump ~1.2 units
+        verticalVelocity = 4.85f;
         isGrounded = false;
-        if (g_showDebug) std::cout << "Jump initiated, verticalVelocity = " << verticalVelocity << std::endl;
+        if (DebugManager::getInstance().logPlayerInfo()) {
+            std::cout << "Jump initiated, verticalVelocity = " << verticalVelocity << std::endl;
+        }
     }
 }
 
@@ -121,7 +125,7 @@ void Movement::updateOrientation(float deltaX, float deltaY) {
     }
     movementDirection = glm::normalize(cameraDirection - glm::dot(cameraDirection, up) * up);
 
-    if (g_showDebug) {
+    if (DebugManager::getInstance().logPlayerInfo()) {
         std::cout << "Camera Dir: " << cameraDirection.x << ", " << cameraDirection.y << ", " << cameraDirection.z << std::endl;
     }
 }

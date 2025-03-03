@@ -2,7 +2,7 @@
 #include "World/World.hpp"
 #include <cmath>
 #include <iostream>
-#include "Core/Debug.hpp"
+#include "Debug/DebugManager.hpp"
 
 void World::update(const glm::vec3& playerPos) {
     int px = static_cast<int>(playerPos.x / Chunk::SIZE);
@@ -28,7 +28,7 @@ void World::update(const glm::vec3& playerPos) {
     }
     chunks = std::move(newChunks);
 
-    if (g_showDebug) {
+    if (DebugManager::getInstance().logChunkUpdates()) {
         std::cout << "Chunks updated, count: " << chunks.size() << std::endl;
     }
 }
@@ -37,8 +37,8 @@ glm::vec3 World::cubeToSphere(int face, int x, int z, float y) const {
     float scale = 1.0f;
     float bx = x * Chunk::SIZE * scale;
     float bz = z * Chunk::SIZE * scale;
-    glm::vec3 pos(bx, 1500.0f + y, bz); // y is local offset (0-255)
-    if (g_showDebug) {
+    glm::vec3 pos(bx, 1500.0f + y, bz);
+    if (DebugManager::getInstance().logChunkUpdates()) {
         std::cout << "Chunk Pos: " << pos.x << ", " << pos.y << ", " << pos.z << std::endl;
     }
     return pos;
@@ -49,7 +49,9 @@ float World::findSurfaceHeight(float chunkX, float chunkZ) const {
     int intChunkZ = static_cast<int>(chunkZ);
     auto it = chunks.find(std::make_pair(intChunkX, intChunkZ));
     if (it == chunks.end()) {
-        if (g_showDebug) std::cout << "Chunk (" << intChunkX << ", " << intChunkZ << ") not found, defaulting to 1508" << std::endl;
+        if (DebugManager::getInstance().logChunkUpdates()) {
+            std::cout << "Chunk (" << intChunkX << ", " << intChunkZ << ") not found, defaulting to 1508" << std::endl;
+        }
         return 1508.0f;
     }
     const Chunk& chunk = it->second;
@@ -57,18 +59,24 @@ float World::findSurfaceHeight(float chunkX, float chunkZ) const {
         BlockType type = chunk.getBlock(8, y, 8).type;
         if (type != BlockType::AIR) {
             float surfaceHeight = 1500.0f + y;
-            if (g_showDebug) std::cout << "Surface at y = " << y << " in chunk (" << intChunkX << ", " << intChunkZ 
-                                      << "), world height = " << surfaceHeight << std::endl;
+            if (DebugManager::getInstance().logChunkUpdates()) {
+                std::cout << "Surface at y = " << y << " in chunk (" << intChunkX << ", " << intChunkZ 
+                          << "), world height = " << surfaceHeight << std::endl;
+            }
             return surfaceHeight;
         }
     }
-    if (g_showDebug) std::cout << "No surface in chunk (" << intChunkX << ", " << intChunkZ << "), defaulting to 1508" << std::endl;
+    if (DebugManager::getInstance().logChunkUpdates()) {
+        std::cout << "No surface in chunk (" << intChunkX << ", " << intChunkZ << "), defaulting to 1508" << std::endl;
+    }
     return 1508.0f;
 }
 
 void World::setBlock(int worldX, int worldY, int worldZ, BlockType type) {
     if (worldY < 1500 || worldY > 1755) {
-        if (g_showDebug) std::cout << "SetBlock out of bounds: Y=" << worldY << std::endl;
+        if (DebugManager::getInstance().logBlockPlacement()) {
+            std::cout << "SetBlock out of bounds: Y=" << worldY << std::endl;
+        }
         return;
     }
 
@@ -76,7 +84,7 @@ void World::setBlock(int worldX, int worldY, int worldZ, BlockType type) {
     int chunkZ = worldZ / Chunk::SIZE;
     int localX = worldX % Chunk::SIZE;
     int localZ = worldZ % Chunk::SIZE;
-    int localY = worldY - 1500; // Convert world Y to local Y (FLOOR_HEIGHT = 1500)
+    int localY = worldY - 1500;
     if (localX < 0) { localX += Chunk::SIZE; chunkX--; }
     if (localZ < 0) { localZ += Chunk::SIZE; chunkZ--; }
 
@@ -88,10 +96,8 @@ void World::setBlock(int worldX, int worldY, int worldZ, BlockType type) {
     }
     it->second.setBlock(localX, localY, localZ, type);
 
-    // Regenerate mesh for this chunk
     it->second.regenerateMesh();
 
-    // Regenerate adjacent chunks if on boundary
     if (localX == 0) {
         auto neighborKey = std::make_pair(chunkX - 1, chunkZ);
         auto neighbor = chunks.find(neighborKey);
@@ -123,7 +129,7 @@ Block World::getBlock(int worldX, int worldY, int worldZ) const {
     int chunkZ = worldZ / Chunk::SIZE;
     int localX = worldX % Chunk::SIZE;
     int localZ = worldZ % Chunk::SIZE;
-    int localY = worldY - 1500; // Convert world Y to local Y (FLOOR_HEIGHT = 1500)
+    int localY = worldY - 1500;
     if (localX < 0) { localX += Chunk::SIZE; chunkX--; }
     if (localZ < 0) { localZ += Chunk::SIZE; chunkZ--; }
 

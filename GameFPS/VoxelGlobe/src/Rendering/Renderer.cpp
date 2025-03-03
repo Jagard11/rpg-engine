@@ -1,18 +1,12 @@
 // ./src/Rendering/Renderer.cpp
-// src/Rendering/Renderer.cpp
 #include <GL/glew.h>
 #include "Rendering/Renderer.hpp"
 #include <GLFW/glfw3.h>
 #include <glm/gtc/matrix_transform.hpp>
 #include "../../third_party/stb/stb_image.h"
-#include "Core/Debug.hpp"
+#include "Debug/DebugManager.hpp"
 #include <iostream>
 #include <vector>
-
-extern float g_fov;
-extern bool g_showVoxelEdges;
-extern bool g_enableCulling;
-extern bool g_useFaceColors;
 
 Renderer::Renderer() {
     if (!glfwGetCurrentContext()) {
@@ -40,12 +34,12 @@ Renderer::~Renderer() {
     glDeleteTextures(1, &texture);
 }
 
-void Renderer::render(const World& world, const Player& player) {
+void Renderer::render(const World& world, const Player& player, float fov) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glClearColor(0.2f, 0.3f, 0.8f, 1.0f);
 
     glEnable(GL_DEPTH_TEST);
-    if (g_enableCulling) {
+    if (DebugManager::getInstance().isCullingEnabled()) {
         glEnable(GL_CULL_FACE);
         glCullFace(GL_BACK);
         glFrontFace(GL_CW);
@@ -57,14 +51,14 @@ void Renderer::render(const World& world, const Player& player) {
     glBindVertexArray(vao);
     glBindTexture(GL_TEXTURE_2D, texture);
 
-    glm::mat4 proj = glm::perspective(glm::radians(g_fov), 800.0f / 600.0f, 0.1f, 2000.0f);
+    glm::mat4 proj = glm::perspective(glm::radians(fov), 800.0f / 600.0f, 0.1f, 2000.0f);
     float playerHeight = 1.75f;
     glm::vec3 eyePos = player.position + player.up * playerHeight;
     glm::vec3 lookAtPos = eyePos + player.cameraDirection;
     glm::mat4 view = glm::lookAt(eyePos, lookAtPos, player.up);
     glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "proj"), 1, GL_FALSE, &proj[0][0]);
     glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "view"), 1, GL_FALSE, &view[0][0]);
-    glUniform1i(glGetUniformLocation(shaderProgram, "useFaceColors"), g_useFaceColors);
+    glUniform1i(glGetUniformLocation(shaderProgram, "useFaceColors"), DebugManager::getInstance().useFaceColors());
 
     for (const auto& [pos, chunk] : world.getChunks()) {
         int face = pos.first / 1000;
@@ -84,16 +78,16 @@ void Renderer::render(const World& world, const Player& player) {
         }
     }
 
-    if (g_showVoxelEdges) {
-        renderVoxelEdges(world, player);
+    if (DebugManager::getInstance().showVoxelEdges()) {
+        renderVoxelEdges(world, player, fov);
     }
 }
 
-void Renderer::renderVoxelEdges(const World& world, const Player& player) {
+void Renderer::renderVoxelEdges(const World& world, const Player& player, float fov) {
     glUseProgram(edgeShaderProgram);
     glBindVertexArray(edgeVao);
 
-    glm::mat4 proj = glm::perspective(glm::radians(g_fov), 800.0f / 600.0f, 0.1f, 2000.0f);
+    glm::mat4 proj = glm::perspective(glm::radians(fov), 800.0f / 600.0f, 0.1f, 2000.0f);
     float playerHeight = 1.75f;
     glm::vec3 eyePos = player.position + player.up * playerHeight;
     glm::vec3 lookAtPos = eyePos + player.cameraDirection;

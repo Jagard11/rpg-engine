@@ -11,9 +11,10 @@ class Renderer {
 public:
     Renderer();
     ~Renderer();
-    void render(const World& world, const Player& player);
+    void render(const World& world, const Player& player, float fov); // Added fov parameter
+
 private:
-    void renderVoxelEdges(const World& world, const Player& player);
+    void renderVoxelEdges(const World& world, const Player& player, float fov); // Added fov parameter
     void loadShader();
     void loadEdgeShader();
     void loadTexture();
@@ -21,7 +22,7 @@ private:
     GLuint vao, vbo;
     GLuint edgeVao, edgeVbo;
     GLuint shaderProgram;
-    GLuint edgeShaderProgram; // Fixed from "GL uint" to "GLuint"
+    GLuint edgeShaderProgram;
     GLuint texture;
 };
 

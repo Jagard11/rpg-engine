@@ -1,9 +1,8 @@
 // ./src/Player/Player.cpp
 #include "Player/Player.hpp"
 #include <iostream>
-#include "Core/Debug.hpp"
+#include "Debug/DebugManager.hpp"
 
-// Scroll callback function (global to work with GLFW)
 static double scrollY = 0.0;
 static void scrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
     scrollY = yoffset;
@@ -12,7 +11,7 @@ static void scrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
 Player::Player(const World& w) 
     : world(w), 
       movement(w, position, cameraDirection, movementDirection, up) {
-    position = glm::vec3(0.0f, 1510.0f, 0.0f); // Start 2 blocks above surface (1508 + 2)
+    position = glm::vec3(0.0f, 1510.0f, 0.0f);
     up = glm::vec3(0.0f, 1.0f, 0.0f);
     float yaw = 0.0f, pitch = 45.0f;
     float radYaw = glm::radians(yaw);
@@ -21,7 +20,7 @@ Player::Player(const World& w)
     cameraDirection = glm::normalize(cameraDirection);
     movementDirection = glm::normalize(cameraDirection - glm::dot(cameraDirection, up) * up);
 
-    if (g_showDebug) {
+    if (DebugManager::getInstance().logPlayerInfo()) {
         std::cout << "Initial Player Pos: " << position.x << ", " << position.y << ", " << position.z << std::endl;
         std::cout << "Initial Camera Dir: " << cameraDirection.x << ", " << cameraDirection.y << ", " << cameraDirection.z << std::endl;
     }
@@ -49,7 +48,7 @@ void Player::update(GLFWwindow* window, float deltaTime) {
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) movement.moveBackward(deltaTime);
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) movement.moveLeft(deltaTime);
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) movement.moveRight(deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) movement.jump(); // Jump with Space key
+    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) movement.jump();
 
     movement.applyGravity(deltaTime);
 

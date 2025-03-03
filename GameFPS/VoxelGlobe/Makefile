@@ -153,6 +153,54 @@ src/Core/main.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Core/main.cpp.s
 .PHONY : src/Core/main.cpp.s
 
+src/Debug/DebugManager.o: src/Debug/DebugManager.cpp.o
+.PHONY : src/Debug/DebugManager.o
+
+# target to build an object file
+src/Debug/DebugManager.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Debug/DebugManager.cpp.o
+.PHONY : src/Debug/DebugManager.cpp.o
+
+src/Debug/DebugManager.i: src/Debug/DebugManager.cpp.i
+.PHONY : src/Debug/DebugManager.i
+
+# target to preprocess a source file
+src/Debug/DebugManager.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Debug/DebugManager.cpp.i
+.PHONY : src/Debug/DebugManager.cpp.i
+
+src/Debug/DebugManager.s: src/Debug/DebugManager.cpp.s
+.PHONY : src/Debug/DebugManager.s
+
+# target to generate assembly for a file
+src/Debug/DebugManager.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Debug/DebugManager.cpp.s
+.PHONY : src/Debug/DebugManager.cpp.s
+
+src/Debug/DebugWindow.o: src/Debug/DebugWindow.cpp.o
+.PHONY : src/Debug/DebugWindow.o
+
+# target to build an object file
+src/Debug/DebugWindow.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Debug/DebugWindow.cpp.o
+.PHONY : src/Debug/DebugWindow.cpp.o
+
+src/Debug/DebugWindow.i: src/Debug/DebugWindow.cpp.i
+.PHONY : src/Debug/DebugWindow.i
+
+# target to preprocess a source file
+src/Debug/DebugWindow.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Debug/DebugWindow.cpp.i
+.PHONY : src/Debug/DebugWindow.cpp.i
+
+src/Debug/DebugWindow.s: src/Debug/DebugWindow.cpp.s
+.PHONY : src/Debug/DebugWindow.s
+
+# target to generate assembly for a file
+src/Debug/DebugWindow.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Debug/DebugWindow.cpp.s
+.PHONY : src/Debug/DebugWindow.cpp.s
+
 src/Player/Movement.o: src/Player/Movement.cpp.o
 .PHONY : src/Player/Movement.o
 
@@ -573,6 +621,12 @@ help:
 	@echo "... src/Core/main.o"
 	@echo "... src/Core/main.i"
 	@echo "... src/Core/main.s"
+	@echo "... src/Debug/DebugManager.o"
+	@echo "... src/Debug/DebugManager.i"
+	@echo "... src/Debug/DebugManager.s"
+	@echo "... src/Debug/DebugWindow.o"
+	@echo "... src/Debug/DebugWindow.i"
+	@echo "... src/Debug/DebugWindow.s"
 	@echo "... src/Player/Movement.o"
 	@echo "... src/Player/Movement.i"
 	@echo "... src/Player/Movement.s"

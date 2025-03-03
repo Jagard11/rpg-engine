@@ -1,6 +1,10 @@
 file(REMOVE_RECURSE
   "CMakeFiles/VoxelGlobe.dir/src/Core/main.cpp.o"
   "CMakeFiles/VoxelGlobe.dir/src/Core/main.cpp.o.d"
+  "CMakeFiles/VoxelGlobe.dir/src/Debug/DebugManager.cpp.o"
+  "CMakeFiles/VoxelGlobe.dir/src/Debug/DebugManager.cpp.o.d"
+  "CMakeFiles/VoxelGlobe.dir/src/Debug/DebugWindow.cpp.o"
+  "CMakeFiles/VoxelGlobe.dir/src/Debug/DebugWindow.cpp.o.d"
   "CMakeFiles/VoxelGlobe.dir/src/Player/Movement.cpp.o"
   "CMakeFiles/VoxelGlobe.dir/src/Player/Movement.cpp.o.d"
   "CMakeFiles/VoxelGlobe.dir/src/Player/Player.cpp.o"

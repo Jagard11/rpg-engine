@@ -21,6 +21,7 @@ include_directories(${CMAKE_SOURCE_DIR}/include/Player)
 include_directories(${CMAKE_SOURCE_DIR}/include/Rendering)
 include_directories(${CMAKE_SOURCE_DIR}/include/UI)
 include_directories(${CMAKE_SOURCE_DIR}/include/UI/Inventory)
+include_directories(${CMAKE_SOURCE_DIR}/include/Debug)  # Added Debug directory
 include_directories(${CMAKE_SOURCE_DIR}/third_party/imgui)
 include_directories(${CMAKE_SOURCE_DIR}/third_party/stb)
 
@@ -34,12 +35,14 @@ add_executable(VoxelGlobe
     src/Player/Movement.cpp
     src/UI/Inventory/Inventory.cpp
     src/UI/Inventory/InventoryUI.cpp
-    src/UI/VoxelHighlightUI.cpp  # Added this line
+    src/UI/VoxelHighlightUI.cpp
     src/Rendering/Renderer.cpp
     src/World/World.cpp
     src/World/Chunk.cpp
     src/World/Block.cpp
     src/VoxelManipulator.cpp
+    src/Debug/DebugManager.cpp  # Added DebugManager
+    src/Debug/DebugWindow.cpp   # Added DebugWindow
     third_party/stb/stb_image_impl.cpp
     third_party/imgui/imgui.cpp
     third_party/imgui/imgui_draw.cpp

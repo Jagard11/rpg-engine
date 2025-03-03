@@ -9,7 +9,7 @@ echo "Updating include paths..."
 # Function to update includes in a file
 update_file() {
     local file=$1
-    sed -i 's|#include "Debug.hpp"|#include "Core/Debug.hpp"|' "$file"
+    sed -i 's|#include "Debug.hpp"|#include "Debug/DebugManager.hpp"|' "$file"
     sed -i 's|#include "Block.hpp"|#include "World/Block.hpp"|' "$file"
     sed -i 's|#include "Chunk.hpp"|#include "World/Chunk.hpp"|' "$file"
     sed -i 's|#include "World.hpp"|#include "World/World.hpp"|' "$file"

@@ -9,6 +9,8 @@ set(CMAKE_DEPENDS_LANGUAGES
 # The set of dependency files which are needed:
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
   "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/Core/main.cpp" "CMakeFiles/VoxelGlobe.dir/src/Core/main.cpp.o" "gcc" "CMakeFiles/VoxelGlobe.dir/src/Core/main.cpp.o.d"
+  "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/Debug/DebugManager.cpp" "CMakeFiles/VoxelGlobe.dir/src/Debug/DebugManager.cpp.o" "gcc" "CMakeFiles/VoxelGlobe.dir/src/Debug/DebugManager.cpp.o.d"
+  "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/Debug/DebugWindow.cpp" "CMakeFiles/VoxelGlobe.dir/src/Debug/DebugWindow.cpp.o" "gcc" "CMakeFiles/VoxelGlobe.dir/src/Debug/DebugWindow.cpp.o.d"
   "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/Player/Movement.cpp" "CMakeFiles/VoxelGlobe.dir/src/Player/Movement.cpp.o" "gcc" "CMakeFiles/VoxelGlobe.dir/src/Player/Movement.cpp.o.d"
   "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/Player/Player.cpp" "CMakeFiles/VoxelGlobe.dir/src/Player/Player.cpp.o" "gcc" "CMakeFiles/VoxelGlobe.dir/src/Player/Player.cpp.o.d"
   "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/Rendering/Renderer.cpp" "CMakeFiles/VoxelGlobe.dir/src/Rendering/Renderer.cpp.o" "gcc" "CMakeFiles/VoxelGlobe.dir/src/Rendering/Renderer.cpp.o.d"

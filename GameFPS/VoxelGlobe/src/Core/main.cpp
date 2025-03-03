@@ -1,7 +1,8 @@
 // ./src/Core/main.cpp
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
-#include "Core/Debug.hpp"
+#include "Debug/DebugManager.hpp"
+#include "Debug/DebugWindow.hpp"
 #include "World/World.hpp"
 #include "Player/Player.hpp"
 #include "Rendering/Renderer.hpp"
@@ -12,14 +13,6 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 #include <iostream>
-
-// Debug globals
-bool g_showDebug = true; // Enabled by default
-bool g_showMenu = false;
-bool g_showVoxelEdges = false;
-float g_fov = 70.0f;
-bool g_enableCulling = true;
-bool g_useFaceColors = false;
 
 int main() {
     if (!glfwInit()) return -1;
@@ -50,6 +43,10 @@ int main() {
     VoxelManipulator voxelManip(world);
     InventoryUI inventoryUI;
     VoxelHighlightUI voxelHighlightUI;
+    DebugManager& debugManager = DebugManager::getInstance();
+    DebugWindow debugWindow(debugManager);
+
+    float fov = 70.0f; // FOV now lives here
 
     for (auto& [key, chunk] : world.getChunks()) {
         chunk.setWorld(&world);
@@ -58,15 +55,13 @@ int main() {
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
     int lastEscapeState = GLFW_RELEASE;
-    int lastF12State = GLFW_RELEASE;
+    int lastF8State = GLFW_RELEASE; // Changed to F8
     int lastLeftClickState = GLFW_RELEASE;
     int lastRightClickState = GLFW_RELEASE;
-    int lastF7State = GLFW_RELEASE; // Culling toggle
-    int lastF8State = GLFW_RELEASE; // Face colors toggle
+    bool showEscapeMenu = false;
 
     double lastTime = glfwGetTime();
     static bool firstFrame = true;
-    bool debugSettingsChanged = false; // Track changes to force mesh update
 
     while (!glfwWindowShouldClose(window)) {
         double currentTime = glfwGetTime();
@@ -76,35 +71,19 @@ int main() {
         // Input handling
         int escapeState = glfwGetKey(window, GLFW_KEY_ESCAPE);
         if (escapeState == GLFW_PRESS && lastEscapeState == GLFW_RELEASE) {
-            g_showMenu = !g_showMenu;
-            glfwSetInputMode(window, GLFW_CURSOR, g_showMenu ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED);
+            showEscapeMenu = !showEscapeMenu;
+            glfwSetInputMode(window, GLFW_CURSOR, showEscapeMenu || debugWindow.isVisible() ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED);
         }
         lastEscapeState = escapeState;
 
-        int f12State = glfwGetKey(window, GLFW_KEY_F12);
-        if (f12State == GLFW_PRESS && lastF12State == GLFW_RELEASE) {
-            g_showVoxelEdges = !g_showVoxelEdges;
-            std::cout << "Voxel Edges toggled: " << (g_showVoxelEdges ? "ON" : "OFF") << std::endl;
-        }
-        lastF12State = f12State;
-
-        int f7State = glfwGetKey(window, GLFW_KEY_F7);
-        if (f7State == GLFW_PRESS && lastF7State == GLFW_RELEASE) {
-            g_enableCulling = !g_enableCulling;
-            std::cout << "Culling toggled: " << (g_enableCulling ? "ON" : "OFF") << std::endl;
-            debugSettingsChanged = true;
-        }
-        lastF7State = f7State;
-
         int f8State = glfwGetKey(window, GLFW_KEY_F8);
         if (f8State == GLFW_PRESS && lastF8State == GLFW_RELEASE) {
-            g_useFaceColors = !g_useFaceColors;
-            std::cout << "Face Colors toggled: " << (g_useFaceColors ? "ON" : "OFF") << std::endl;
-            debugSettingsChanged = true;
+            debugWindow.toggleVisibility();
+            glfwSetInputMode(window, GLFW_CURSOR, debugWindow.isVisible() || showEscapeMenu ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED);
         }
         lastF8State = f8State;
 
-        if (!g_showMenu) {
+        if (!showEscapeMenu && !debugWindow.isVisible()) {
             player.update(window, deltaTime);
 
             int leftClickState = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT);
@@ -123,48 +102,34 @@ int main() {
         world.update(player.position);
         for (auto& [key, chunk] : world.getChunks()) {
             chunk.setWorld(&world);
-            if (debugSettingsChanged) {
-                chunk.regenerateMesh(); // Update mesh only when settings change
-            }
         }
-        debugSettingsChanged = false; // Reset flag after update
 
         if (!firstFrame) {
             // Gravity handled in Player::update()
         }
         firstFrame = false;
 
-        renderer.render(world, player);
+        renderer.render(world, player, fov);
 
         glm::ivec3 hitPos;
         glm::vec3 hitNormal;
         glm::vec3 eyePos = player.position + player.up * player.getHeight();
         if (voxelManip.raycast(eyePos, player.cameraDirection, 5.0f, hitPos, hitNormal, ToolType::NONE)) {
-            voxelHighlightUI.render(player, hitPos);
+            voxelHighlightUI.render(player, hitPos, fov);
         }
 
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        if (g_showDebug) {
-            ImGui::Begin("Debug Tools");
-            ImGui::Text("Player Pos: %.2f, %.2f, %.2f", player.position.x, player.position.y, player.position.z);
-            ImGui::Text("Camera Dir: %.2f, %.2f, %.2f", player.cameraDirection.x, player.cameraDirection.y, player.cameraDirection.z);
-            ImGui::Separator();
-            ImGui::Checkbox("Enable Culling (F7)", &g_enableCulling);
-            ImGui::Text("Culling State: %s", g_enableCulling ? "ON" : "OFF");
-            ImGui::Checkbox("Use Face Colors (F8)", &g_useFaceColors);
-            ImGui::Text("Face Colors: %s", g_useFaceColors ? "ON" : "OFF");
-            ImGui::End();
-        }
+        debugWindow.render(player);
 
-        if (g_showMenu) {
-            ImGui::Begin("Menu", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
-            ImGui::SliderFloat("FOV", &g_fov, 30.0f, 110.0f, "%.1f");
+        if (showEscapeMenu) {
+            ImGui::Begin("Menu", &showEscapeMenu, ImGuiWindowFlags_AlwaysAutoResize);
+            ImGui::SliderFloat("FOV", &fov, 30.0f, 110.0f, "%.1f");
             if (ImGui::Button("Close")) {
-                g_showMenu = false;
-                glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+                showEscapeMenu = false;
+                glfwSetInputMode(window, GLFW_CURSOR, debugWindow.isVisible() ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED);
             }
             ImGui::End();
         }
