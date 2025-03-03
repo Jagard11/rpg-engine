@@ -3,7 +3,7 @@
 #define PLAYER_HPP
 
 #include "Player/Movement.hpp"
-#include "UI/Inventory/Inventory.hpp" // Updated include path
+#include "UI/Inventory/Inventory.hpp"
 #include "World/World.hpp"
 #include <GLFW/glfw3.h>
 
@@ -12,6 +12,7 @@ public:
     Player(const World& world);
     void update(GLFWwindow* window, float deltaTime);
     float getHeight() const { return 1.75f; }
+    const World& getWorld() const { return world; } // Added accessor method
 
     glm::vec3 position;
     glm::vec3 cameraDirection;

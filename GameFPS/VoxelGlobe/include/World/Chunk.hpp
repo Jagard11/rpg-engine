@@ -5,7 +5,7 @@
 #include <vector>
 #include "World/Block.hpp"
 
-class World; // Forward declaration
+class World;
 
 class Chunk {
 public:
@@ -15,14 +15,14 @@ public:
     Block getBlock(int x, int y, int z) const;
     void setBlock(int x, int y, int z, BlockType type);
     void generateTerrain();
-    void regenerateMesh();
+    void regenerateMesh(int lodLevel); // Updated signature
     const std::vector<float>& getMesh() const;
 
 private:
     int chunkX, chunkZ;
     std::vector<Block> blocks;
     std::vector<float> mesh;
-    const World* world; // Pointer to world for boundary checks
+    const World* world;
 };
 
 #endif

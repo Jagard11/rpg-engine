@@ -38,14 +38,14 @@ int main() {
     ImGui_ImplOpenGL3_Init("#version 330");
 
     World world;
-    world.update(glm::vec3(0, 0, 0));
+    world.update(glm::vec3(0, world.getRadius() + 10.0f, 0)); // Start above surface
     Player player(world);
     Renderer renderer;
     VoxelManipulator voxelManip(world);
     InventoryUI inventoryUI;
     VoxelHighlightUI voxelHighlightUI;
     DebugManager& debugManager = DebugManager::getInstance();
-    DebugWindow debugWindow(debugManager, player); // Pass Player reference
+    DebugWindow debugWindow(debugManager, player);
     GraphicsSettings graphicsSettings(window);
 
     float fov = 70.0f;

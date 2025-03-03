@@ -15,12 +15,14 @@ bool Movement::checkCollision(const glm::vec3& newPos) const {
     int minZ = static_cast<int>(floor(newPos.z - 0.25f));
     int maxZ = static_cast<int>(floor(newPos.z + 0.25f));
 
+    glm::ivec3 globalOrigin = world.getLocalOrigin();
     for (int x = minX; x <= maxX; x++) {
         for (int y = minY; y <= maxY; y++) {
             for (int z = minZ; z <= maxZ; z++) {
-                if (world.getBlock(x, y, z).type != BlockType::AIR) {
+                glm::ivec3 globalPos = glm::ivec3(x, y, z) + globalOrigin;
+                if (world.getBlock(globalPos.x, globalPos.y, globalPos.z).type != BlockType::AIR) {
                     if (DebugManager::getInstance().logCollision()) {
-                        std::cout << "Collision detected at (" << x << ", " << y << ", " << z << ")" << std::endl;
+                        std::cout << "Collision detected at (" << globalPos.x << ", " << globalPos.y << ", " << globalPos.z << ")" << std::endl;
                     }
                     return true;
                 }
@@ -31,7 +33,7 @@ bool Movement::checkCollision(const glm::vec3& newPos) const {
 }
 
 void Movement::moveForward(float deltaTime) {
-    float effectiveSpeed = speed * (isSprinting ? sprintMultiplier : 1.0f); // Apply sprint multiplier
+    float effectiveSpeed = speed * (isSprinting ? sprintMultiplier : 1.0f);
     glm::vec3 newPos = position + movementDirection * effectiveSpeed * deltaTime;
     if (!checkCollision(newPos)) {
         position = newPos;
@@ -63,25 +65,29 @@ void Movement::moveRight(float deltaTime) {
 
 void Movement::applyGravity(float deltaTime) {
     float gravity = 9.81f;
+    // Gravity direction towards sphere center
+    glm::vec3 globalPos = position + glm::vec3(world.getLocalOrigin());
+    glm::vec3 gravityDir = glm::normalize(-globalPos);
     verticalVelocity -= gravity * deltaTime;
-    glm::vec3 newPos = position + glm::vec3(0.0f, verticalVelocity * deltaTime, 0.0f);
+    glm::vec3 newPos = position + gravityDir * verticalVelocity * deltaTime;
 
     int worldX = static_cast<int>(floor(newPos.x));
     int worldZ = static_cast<int>(floor(newPos.z));
     int floorY = static_cast<int>(floor(newPos.y - 0.01f));
-    Block blockBelow = world.getBlock(worldX, floorY, worldZ);
+    glm::ivec3 globalVoxel = glm::ivec3(worldX, floorY, worldZ) + world.getLocalOrigin();
+    Block blockBelow = world.getBlock(globalVoxel.x, globalVoxel.y, globalVoxel.z);
 
     isGrounded = false;
     if (blockBelow.type != BlockType::AIR && verticalVelocity <= 0) {
-        newPos.y = static_cast<float>(floorY + 1);
+        newPos = position; // Snap to surface
         verticalVelocity = 0.0f;
         isGrounded = true;
         if (DebugManager::getInstance().logPlayerInfo()) {
-            std::cout << "Landed on block at y = " << floorY << std::endl;
+            std::cout << "Landed on block at y = " << globalVoxel.y << std::endl;
         }
     } else if (checkCollision(newPos)) {
         verticalVelocity = 0.0f;
-        newPos.y = position.y;
+        newPos = position;
         if (DebugManager::getInstance().logCollision()) {
             std::cout << "Hit ceiling or obstacle" << std::endl;
         }

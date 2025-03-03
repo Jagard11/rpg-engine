@@ -17,7 +17,7 @@ Block Chunk::getBlock(int x, int y, int z) const {
     if (x < 0 || x >= SIZE || y < 0 || y >= SIZE || z < 0 || z >= SIZE) {
         if (world) {
             int worldX = chunkX * SIZE + x;
-            int worldY = 1500 + y; // FLOOR_HEIGHT = 1500
+            int worldY = y;
             int worldZ = chunkZ * SIZE + z;
             return world->getBlock(worldX, worldY, worldZ);
         }
@@ -29,7 +29,7 @@ Block Chunk::getBlock(int x, int y, int z) const {
 void Chunk::setBlock(int x, int y, int z, BlockType type) {
     if (x >= 0 && x < SIZE && y >= 0 && y < SIZE && z >= 0 && z < SIZE) {
         blocks[x + y * SIZE + z * SIZE * SIZE] = Block(type);
-        regenerateMesh();
+        regenerateMesh(0); // Default to full detail on block change
     }
 }
 
@@ -43,85 +43,111 @@ void Chunk::generateTerrain() {
             }
         }
     }
-    regenerateMesh();
+    regenerateMesh(0);
 }
 
-void Chunk::regenerateMesh() {
+void Chunk::regenerateMesh(int lodLevel) {
     mesh.clear();
-    for (int x = 0; x < SIZE; x++) {
-        for (int y = 0; y < SIZE; y++) {
-            for (int z = 0; z < SIZE; z++) {
+    if (!world) return;
+
+    glm::vec3 chunkBase = world->cubeToSphere(0, chunkX, chunkZ, 0.0f);
+    float radius = world->getRadius();
+    int step = (lodLevel == 0) ? 1 : (lodLevel == 1) ? 2 : 4; // LOD: full, half, quarter resolution
+
+    for (int x = 0; x < SIZE; x += step) {
+        for (int y = 0; y < SIZE; y += step) {
+            for (int z = 0; z < SIZE; z += step) {
                 if (getBlock(x, y, z).type != BlockType::AIR) {
-                    // Top face (+Y), clockwise from above - White (debug) or textured
-                    if (getBlock(x, y + 1, z).type == BlockType::AIR) {
-                        float u = DebugManager::getInstance().useFaceColors() ? 0.0f : 0.0f; // Face ID 0 for debug
+                    glm::vec3 voxelPos(x, y, z);
+                    glm::vec3 globalPos = chunkBase + voxelPos;
+                    float dist = glm::length(globalPos);
+                    float taperFactor = (radius - step) / radius;
+                    glm::vec3 dir = glm::normalize(globalPos);
+
+                    glm::vec3 v000(x, y, z);
+                    glm::vec3 v001(x, y, z + step);
+                    glm::vec3 v010(x, y + step, z);
+                    glm::vec3 v011(x, y + step, z + step);
+                    glm::vec3 v100(x + step, y, z);
+                    glm::vec3 v101(x + step, y, z + step);
+                    glm::vec3 v110(x + step, y + step, z);
+                    glm::vec3 v111(x + step, y + step, z + step);
+
+                    v000 = v000 + (dir * (dist - radius) * (1.0f - taperFactor));
+                    v001 = v001 + (dir * (dist - radius) * (1.0f - taperFactor));
+                    v100 = v100 + (dir * (dist - radius) * (1.0f - taperFactor));
+                    v101 = v101 + (dir * (dist - radius) * (1.0f - taperFactor));
+
+                    // Top face (+Y)
+                    if (getBlock(x, y + step, z).type == BlockType::AIR) {
+                        float u = DebugManager::getInstance().useFaceColors() ? 0.0f : 0.0f;
                         mesh.insert(mesh.end(), {
-                            static_cast<float>(x),     static_cast<float>(y + 1), static_cast<float>(z),     u, 0.0f, // Bottom-left
-                            static_cast<float>(x + 1), static_cast<float>(y + 1), static_cast<float>(z),     DebugManager::getInstance().useFaceColors() ? u : 1.0f, 0.0f, // Bottom-right
-                            static_cast<float>(x + 1), static_cast<float>(y + 1), static_cast<float>(z + 1), DebugManager::getInstance().useFaceColors() ? u : 1.0f, 1.0f, // Top-right
-                            static_cast<float>(x),     static_cast<float>(y + 1), static_cast<float>(z),     u, 0.0f, // Bottom-left
-                            static_cast<float>(x + 1), static_cast<float>(y + 1), static_cast<float>(z + 1), DebugManager::getInstance().useFaceColors() ? u : 1.0f, 1.0f, // Top-right
-                            static_cast<float>(x),     static_cast<float>(y + 1), static_cast<float>(z + 1), DebugManager::getInstance().useFaceColors() ? u : 0.0f, 1.0f  // Top-left
+                            v010.x, v010.y, v010.z, u, 0.0f,
+                            v110.x, v110.y, v110.z, DebugManager::getInstance().useFaceColors() ? u : 1.0f, 0.0f,
+                            v111.x, v111.y, v111.z, DebugManager::getInstance().useFaceColors() ? u : 1.0f, 1.0f,
+                            v010.x, v010.y, v010.z, u, 0.0f,
+                            v111.x, v111.y, v111.z, DebugManager::getInstance().useFaceColors() ? u : 1.0f, 1.0f,
+                            v011.x, v011.y, v011.z, DebugManager::getInstance().useFaceColors() ? u : 0.0f, 1.0f
                         });
                     }
-                    // Bottom face (-Y), clockwise from below - Black (debug) or textured
-                    if (getBlock(x, y - 1, z).type == BlockType::AIR) {
-                        float u = DebugManager::getInstance().useFaceColors() ? 1.0f : 0.0f; // Face ID 1 for debug
+                    // Bottom face (-Y)
+                    if (getBlock(x, y - step, z).type == BlockType::AIR) {
+                        float u = DebugManager::getInstance().useFaceColors() ? 1.0f : 0.0f;
                         mesh.insert(mesh.end(), {
-                            static_cast<float>(x),     static_cast<float>(y), static_cast<float>(z),     u, 0.0f,     // Bottom-left
-                            static_cast<float>(x + 1), static_cast<float>(y), static_cast<float>(z + 1), DebugManager::getInstance().useFaceColors() ? u : 1.0f, 1.0f,     // Top-right
-                            static_cast<float>(x + 1), static_cast<float>(y), static_cast<float>(z),     DebugManager::getInstance().useFaceColors() ? u : 1.0f, 0.0f,     // Bottom-right
-                            static_cast<float>(x),     static_cast<float>(y), static_cast<float>(z),     u, 0.0f,     // Bottom-left
-                            static_cast<float>(x),     static_cast<float>(y), static_cast<float>(z + 1), DebugManager::getInstance().useFaceColors() ? u : 0.0f, 1.0f,     // Top-left
-                            static_cast<float>(x + 1), static_cast<float>(y), static_cast<float>(z + 1), DebugManager::getInstance().useFaceColors() ? u : 1.0f, 1.0f      // Top-right
+                            v000.x, v000.y, v000.z, u, 0.0f,
+                            v101.x, v101.y, v101.z, DebugManager::getInstance().useFaceColors() ? u : 1.0f, 1.0f,
+                            v100.x, v100.y, v100.z, DebugManager::getInstance().useFaceColors() ? u : 1.0f, 0.0f,
+                            v000.x, v000.y, v000.z, u, 0.0f,
+                            v001.x, v001.y, v001.z, DebugManager::getInstance().useFaceColors() ? u : 0.0f, 1.0f,
+                            v101.x, v101.y, v101.z, DebugManager::getInstance().useFaceColors() ? u : 1.0f, 1.0f
                         });
                     }
-                    // Left face (-X), clockwise from left - Red (debug) or textured
-                    if (getBlock(x - 1, y, z).type == BlockType::AIR) {
-                        float u = DebugManager::getInstance().useFaceColors() ? 2.0f : 0.0f; // Face ID 2 for debug
+                    // Left face (-X)
+                    if (getBlock(x - step, y, z).type == BlockType::AIR) {
+                        float u = DebugManager::getInstance().useFaceColors() ? 2.0f : 0.0f;
                         mesh.insert(mesh.end(), {
-                            static_cast<float>(x), static_cast<float>(y),     static_cast<float>(z),     u, 0.0f,     // Bottom-front
-                            static_cast<float>(x), static_cast<float>(y + 1), static_cast<float>(z),     u, 1.0f,     // Top-front
-                            static_cast<float>(x), static_cast<float>(y + 1), static_cast<float>(z + 1), DebugManager::getInstance().useFaceColors() ? u : 1.0f, 1.0f,     // Top-back
-                            static_cast<float>(x), static_cast<float>(y),     static_cast<float>(z),     u, 0.0f,     // Bottom-front
-                            static_cast<float>(x), static_cast<float>(y + 1), static_cast<float>(z + 1), DebugManager::getInstance().useFaceColors() ? u : 1.0f, 1.0f,     // Top-back
-                            static_cast<float>(x), static_cast<float>(y),     static_cast<float>(z + 1), DebugManager::getInstance().useFaceColors() ? u : 1.0f, 0.0f      // Bottom-back
+                            v000.x, v000.y, v000.z, u, 0.0f,
+                            v010.x, v010.y, v010.z, u, 1.0f,
+                            v011.x, v011.y, v011.z, DebugManager::getInstance().useFaceColors() ? u : 1.0f, 1.0f,
+                            v000.x, v000.y, v000.z, u, 0.0f,
+                            v011.x, v011.y, v011.z, DebugManager::getInstance().useFaceColors() ? u : 1.0f, 1.0f,
+                            v001.x, v001.y, v001.z, DebugManager::getInstance().useFaceColors() ? u : 1.0f, 0.0f
                         });
                     }
-                    // Right face (+X), clockwise from right - Green (debug) or textured
-                    if (getBlock(x + 1, y, z).type == BlockType::AIR) {
-                        float u = DebugManager::getInstance().useFaceColors() ? 3.0f : 0.0f; // Face ID 3 for debug
+                    // Right face (+X)
+                    if (getBlock(x + step, y, z).type == BlockType::AIR) {
+                        float u = DebugManager::getInstance().useFaceColors() ? 3.0f : 0.0f;
                         mesh.insert(mesh.end(), {
-                            static_cast<float>(x + 1), static_cast<float>(y),     static_cast<float>(z),     u, 0.0f,     // Bottom-front
-                            static_cast<float>(x + 1), static_cast<float>(y + 1), static_cast<float>(z + 1), DebugManager::getInstance().useFaceColors() ? u : 1.0f, 1.0f,     // Top-back
-                            static_cast<float>(x + 1), static_cast<float>(y + 1), static_cast<float>(z),     DebugManager::getInstance().useFaceColors() ? u : 0.0f, 1.0f,     // Top-front
-                            static_cast<float>(x + 1), static_cast<float>(y),     static_cast<float>(z),     u, 0.0f,     // Bottom-front
-                            static_cast<float>(x + 1), static_cast<float>(y),     static_cast<float>(z + 1), DebugManager::getInstance().useFaceColors() ? u : 1.0f, 0.0f,     // Bottom-back
-                            static_cast<float>(x + 1), static_cast<float>(y + 1), static_cast<float>(z + 1), DebugManager::getInstance().useFaceColors() ? u : 1.0f, 1.0f      // Top-back
+                            v100.x, v100.y, v100.z, u, 0.0f,
+                            v111.x, v111.y, v111.z, DebugManager::getInstance().useFaceColors() ? u : 1.0f, 1.0f,
+                            v110.x, v110.y, v110.z, DebugManager::getInstance().useFaceColors() ? u : 0.0f, 1.0f,
+                            v100.x, v100.y, v100.z, u, 0.0f,
+                            v101.x, v101.y, v101.z, DebugManager::getInstance().useFaceColors() ? u : 1.0f, 0.0f,
+                            v111.x, v111.y, v111.z, DebugManager::getInstance().useFaceColors() ? u : 1.0f, 1.0f
                         });
                     }
-                    // Front face (-Z), clockwise from front - Purple (debug) or textured
-                    if (getBlock(x, y, z - 1).type == BlockType::AIR) {
-                        float u = DebugManager::getInstance().useFaceColors() ? 4.0f : 0.0f; // Face ID 4 for debug
+                    // Front face (-Z)
+                    if (getBlock(x, y, z - step).type == BlockType::AIR) {
+                        float u = DebugManager::getInstance().useFaceColors() ? 4.0f : 0.0f;
                         mesh.insert(mesh.end(), {
-                            static_cast<float>(x),     static_cast<float>(y),     static_cast<float>(z), u, 0.0f,     // Bottom-left
-                            static_cast<float>(x + 1), static_cast<float>(y),     static_cast<float>(z), DebugManager::getInstance().useFaceColors() ? u : 1.0f, 0.0f,     // Bottom-right
-                            static_cast<float>(x + 1), static_cast<float>(y + 1), static_cast<float>(z), DebugManager::getInstance().useFaceColors() ? u : 1.0f, 1.0f,     // Top-right
-                            static_cast<float>(x),     static_cast<float>(y),     static_cast<float>(z), u, 0.0f,     // Bottom-left
-                            static_cast<float>(x + 1), static_cast<float>(y + 1), static_cast<float>(z), DebugManager::getInstance().useFaceColors() ? u : 1.0f, 1.0f,     // Top-right
-                            static_cast<float>(x),     static_cast<float>(y + 1), static_cast<float>(z), DebugManager::getInstance().useFaceColors() ? u : 0.0f, 1.0f      // Top-left
+                            v000.x, v000.y, v000.z, u, 0.0f,
+                            v100.x, v100.y, v100.z, DebugManager::getInstance().useFaceColors() ? u : 1.0f, 0.0f,
+                            v110.x, v110.y, v110.z, DebugManager::getInstance().useFaceColors() ? u : 1.0f, 1.0f,
+                            v000.x, v000.y, v000.z, u, 0.0f,
+                            v110.x, v110.y, v110.z, DebugManager::getInstance().useFaceColors() ? u : 1.0f, 1.0f,
+                            v010.x, v010.y, v010.z, DebugManager::getInstance().useFaceColors() ? u : 0.0f, 1.0f
                         });
                     }
-                    // Back face (+Z), clockwise from back - Yellow (debug) or textured
-                    if (getBlock(x, y, z + 1).type == BlockType::AIR) {
-                        float u = DebugManager::getInstance().useFaceColors() ? 5.0f : 0.0f; // Face ID 5 for debug
+                    // Back face (+Z)
+                    if (getBlock(x, y, z + step).type == BlockType::AIR) {
+                        float u = DebugManager::getInstance().useFaceColors() ? 5.0f : 0.0f;
                         mesh.insert(mesh.end(), {
-                            static_cast<float>(x),     static_cast<float>(y),     static_cast<float>(z + 1), u, 0.0f,     // Bottom-left
-                            static_cast<float>(x + 1), static_cast<float>(y + 1), static_cast<float>(z + 1), DebugManager::getInstance().useFaceColors() ? u : 1.0f, 1.0f,     // Top-right
-                            static_cast<float>(x + 1), static_cast<float>(y),     static_cast<float>(z + 1), DebugManager::getInstance().useFaceColors() ? u : 1.0f, 0.0f,     // Bottom-right
-                            static_cast<float>(x),     static_cast<float>(y),     static_cast<float>(z + 1), u, 0.0f,     // Bottom-left
-                            static_cast<float>(x),     static_cast<float>(y + 1), static_cast<float>(z + 1), DebugManager::getInstance().useFaceColors() ? u : 0.0f, 1.0f,     // Top-left
-                            static_cast<float>(x + 1), static_cast<float>(y + 1), static_cast<float>(z + 1), DebugManager::getInstance().useFaceColors() ? u : 1.0f, 1.0f      // Top-right
+                            v001.x, v001.y, v001.z, u, 0.0f,
+                            v111.x, v111.y, v111.z, DebugManager::getInstance().useFaceColors() ? u : 1.0f, 1.0f,
+                            v101.x, v101.y, v101.z, DebugManager::getInstance().useFaceColors() ? u : 1.0f, 0.0f,
+                            v001.x, v001.y, v001.z, u, 0.0f,
+                            v011.x, v011.y, v011.z, DebugManager::getInstance().useFaceColors() ? u : 0.0f, 1.0f,
+                            v111.x, v111.y, v111.z, DebugManager::getInstance().useFaceColors() ? u : 1.0f, 1.0f
                         });
                     }
                 }

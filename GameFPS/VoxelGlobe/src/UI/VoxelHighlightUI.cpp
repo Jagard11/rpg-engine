@@ -55,7 +55,7 @@ void VoxelHighlightUI::render(const Player& player, const glm::ivec3& voxelPos, 
 
     glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
 
-    glm::mat4 proj = glm::perspective(glm::radians(70.0f), static_cast<float>(settings.getWidth()) / settings.getHeight(), 0.1f, 2000.0f);
+    glm::mat4 proj = glm::perspective(glm::radians(70.0f), static_cast<float>(settings.getWidth()) / settings.getHeight(), 0.1f, 5000.0f);
     glm::vec3 eyePos = player.position + player.up * player.getHeight();
     glm::vec3 lookAtPos = eyePos + player.cameraDirection;
     glm::mat4 view = glm::lookAt(eyePos, lookAtPos, player.up);
@@ -73,7 +73,8 @@ void VoxelHighlightUI::render(const Player& player, const glm::ivec3& voxelPos, 
     glEnable(GL_CULL_FACE);
 
     if (DebugManager::getInstance().logBlockPlacement()) {
-        std::cout << "Highlighted voxel at world pos (" << renderPos.x << ", " << renderPos.y << ", " << renderPos.z << ")" << std::endl;
+        glm::ivec3 globalPos = voxelPos + player.getWorld().getLocalOrigin(); // Updated to use getWorld()
+        std::cout << "Highlighted voxel at world pos (" << globalPos.x << ", " << globalPos.y << ", " << globalPos.z << ")" << std::endl;
     }
 }
 

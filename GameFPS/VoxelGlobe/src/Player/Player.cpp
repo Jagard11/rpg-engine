@@ -11,7 +11,7 @@ static void scrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
 Player::Player(const World& w) 
     : world(w), 
       movement(w, position, cameraDirection, movementDirection, up) {
-    position = glm::vec3(0.0f, 1510.0f, 0.0f);
+    position = glm::vec3(0.0f, 9.0f, 0.0f); // Start just above terrain (y=8)
     up = glm::vec3(0.0f, 1.0f, 0.0f);
     float yaw = 0.0f, pitch = 45.0f;
     float radYaw = glm::radians(yaw);
@@ -49,7 +49,7 @@ void Player::update(GLFWwindow* window, float deltaTime) {
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) movement.moveLeft(deltaTime);
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) movement.moveRight(deltaTime);
     if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) movement.jump();
-    movement.setSprinting(glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS); // Added sprint check
+    movement.setSprinting(glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS);
 
     movement.applyGravity(deltaTime);
 
