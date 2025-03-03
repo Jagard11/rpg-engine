@@ -11,15 +11,18 @@ class Renderer {
 public:
     Renderer();
     ~Renderer();
-    void render(const World& world, const Player& player, const glm::ivec3& highlightedVoxel = glm::ivec3(-1, -1, -1));
-    void renderVoxelEdges(const World& world, const Player& player);
-
+    void render(const World& world, const Player& player);
 private:
-    GLuint vao, vbo, shaderProgram, texture;
-    GLuint edgeVao, edgeVbo, edgeShaderProgram;
+    void renderVoxelEdges(const World& world, const Player& player);
     void loadShader();
     void loadEdgeShader();
     void loadTexture();
+
+    GLuint vao, vbo;
+    GLuint edgeVao, edgeVbo;
+    GLuint shaderProgram;
+    GLuint edgeShaderProgram; // Fixed from "GL uint" to "GLuint"
+    GLuint texture;
 };
 
 #endif

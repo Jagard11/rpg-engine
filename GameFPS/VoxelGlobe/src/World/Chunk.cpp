@@ -5,6 +5,8 @@
 #include <iostream>
 #include "Core/Debug.hpp"
 
+extern bool g_useFaceColors;
+
 Chunk::Chunk(int x, int z) : chunkX(x), chunkZ(z), blocks(SIZE * SIZE * SIZE), world(nullptr) {
     generateTerrain();
 }
@@ -52,89 +54,81 @@ void Chunk::regenerateMesh() {
         for (int y = 0; y < SIZE; y++) {
             for (int z = 0; z < SIZE; z++) {
                 if (getBlock(x, y, z).type != BlockType::AIR) {
-                    if (g_showDebug) {
-                        std::cout << "Regenerating mesh for block at (" << x << ", " << y << ", " << z 
-                                  << ") in chunk (" << chunkX << ", " << chunkZ << ")" << std::endl;
-                    }
-
-                    // Top face (+Y), clockwise from above
+                    // Top face (+Y), clockwise from above - White (debug) or textured
                     if (getBlock(x, y + 1, z).type == BlockType::AIR) {
-                        if (g_showDebug) std::cout << "Exposing top face at (" << x << ", " << y + 1 << ", " << z << ")" << std::endl;
+                        float u = g_useFaceColors ? 0.0f : 0.0f; // Face ID 0 for debug
                         mesh.insert(mesh.end(), {
-                            static_cast<float>(x),     static_cast<float>(y + 1), static_cast<float>(z),     0.0f, 0.0f, // v0
-                            static_cast<float>(x + 1), static_cast<float>(y + 1), static_cast<float>(z + 1), 1.0f, 1.0f, // v1
-                            static_cast<float>(x + 1), static_cast<float>(y + 1), static_cast<float>(z),     1.0f, 0.0f, // v2
-                            static_cast<float>(x),     static_cast<float>(y + 1), static_cast<float>(z),     0.0f, 0.0f, // v0
-                            static_cast<float>(x),     static_cast<float>(y + 1), static_cast<float>(z + 1), 0.0f, 1.0f, // v3
-                            static_cast<float>(x + 1), static_cast<float>(y + 1), static_cast<float>(z + 1), 1.0f, 1.0f  // v1
+                            static_cast<float>(x),     static_cast<float>(y + 1), static_cast<float>(z),     u, 0.0f, // Bottom-left
+                            static_cast<float>(x + 1), static_cast<float>(y + 1), static_cast<float>(z),     g_useFaceColors ? u : 1.0f, 0.0f, // Bottom-right
+                            static_cast<float>(x + 1), static_cast<float>(y + 1), static_cast<float>(z + 1), g_useFaceColors ? u : 1.0f, 1.0f, // Top-right
+                            static_cast<float>(x),     static_cast<float>(y + 1), static_cast<float>(z),     u, 0.0f, // Bottom-left
+                            static_cast<float>(x + 1), static_cast<float>(y + 1), static_cast<float>(z + 1), g_useFaceColors ? u : 1.0f, 1.0f, // Top-right
+                            static_cast<float>(x),     static_cast<float>(y + 1), static_cast<float>(z + 1), g_useFaceColors ? u : 0.0f, 1.0f  // Top-left
                         });
                     }
-                    // Bottom face (-Y), clockwise from below
+                    // Bottom face (-Y), clockwise from below - Black (debug) or textured
                     if (getBlock(x, y - 1, z).type == BlockType::AIR) {
-                        if (g_showDebug) std::cout << "Exposing bottom face at (" << x << ", " << y - 1 << ", " << z << ")" << std::endl;
+                        float u = g_useFaceColors ? 1.0f : 0.0f; // Face ID 1 for debug
                         mesh.insert(mesh.end(), {
-                            static_cast<float>(x),     static_cast<float>(y), static_cast<float>(z),     0.0f, 0.0f,     // v0
-                            static_cast<float>(x + 1), static_cast<float>(y), static_cast<float>(z + 1), 1.0f, 1.0f,     // v1
-                            static_cast<float>(x + 1), static_cast<float>(y), static_cast<float>(z),     1.0f, 0.0f,     // v2
-                            static_cast<float>(x),     static_cast<float>(y), static_cast<float>(z),     0.0f, 0.0f,     // v0
-                            static_cast<float>(x),     static_cast<float>(y), static_cast<float>(z + 1), 0.0f, 1.0f,     // v3
-                            static_cast<float>(x + 1), static_cast<float>(y), static_cast<float>(z + 1), 1.0f, 1.0f      // v1
+                            static_cast<float>(x),     static_cast<float>(y), static_cast<float>(z),     u, 0.0f,     // Bottom-left
+                            static_cast<float>(x + 1), static_cast<float>(y), static_cast<float>(z + 1), g_useFaceColors ? u : 1.0f, 1.0f,     // Top-right
+                            static_cast<float>(x + 1), static_cast<float>(y), static_cast<float>(z),     g_useFaceColors ? u : 1.0f, 0.0f,     // Bottom-right
+                            static_cast<float>(x),     static_cast<float>(y), static_cast<float>(z),     u, 0.0f,     // Bottom-left
+                            static_cast<float>(x),     static_cast<float>(y), static_cast<float>(z + 1), g_useFaceColors ? u : 0.0f, 1.0f,     // Top-left
+                            static_cast<float>(x + 1), static_cast<float>(y), static_cast<float>(z + 1), g_useFaceColors ? u : 1.0f, 1.0f      // Top-right
                         });
                     }
-                    // Left face (-X), clockwise from left
+                    // Left face (-X), clockwise from left - Red (debug) or textured
                     if (getBlock(x - 1, y, z).type == BlockType::AIR) {
-                        if (g_showDebug) std::cout << "Exposing left face at (" << x - 1 << ", " << y << ", " << z << ")" << std::endl;
+                        float u = g_useFaceColors ? 2.0f : 0.0f; // Face ID 2 for debug
                         mesh.insert(mesh.end(), {
-                            static_cast<float>(x), static_cast<float>(y),     static_cast<float>(z),     0.0f, 0.0f,     // v0
-                            static_cast<float>(x), static_cast<float>(y + 1), static_cast<float>(z + 1), 1.0f, 1.0f,     // v1
-                            static_cast<float>(x), static_cast<float>(y + 1), static_cast<float>(z),     0.0f, 1.0f,     // v2
-                            static_cast<float>(x), static_cast<float>(y),     static_cast<float>(z),     0.0f, 0.0f,     // v0
-                            static_cast<float>(x), static_cast<float>(y),     static_cast<float>(z + 1), 1.0f, 0.0f,     // v3
-                            static_cast<float>(x), static_cast<float>(y + 1), static_cast<float>(z + 1), 1.0f, 1.0f      // v1
+                            static_cast<float>(x), static_cast<float>(y),     static_cast<float>(z),     u, 0.0f,     // Bottom-front
+                            static_cast<float>(x), static_cast<float>(y + 1), static_cast<float>(z),     u, 1.0f,     // Top-front
+                            static_cast<float>(x), static_cast<float>(y + 1), static_cast<float>(z + 1), g_useFaceColors ? u : 1.0f, 1.0f,     // Top-back
+                            static_cast<float>(x), static_cast<float>(y),     static_cast<float>(z),     u, 0.0f,     // Bottom-front
+                            static_cast<float>(x), static_cast<float>(y + 1), static_cast<float>(z + 1), g_useFaceColors ? u : 1.0f, 1.0f,     // Top-back
+                            static_cast<float>(x), static_cast<float>(y),     static_cast<float>(z + 1), g_useFaceColors ? u : 1.0f, 0.0f      // Bottom-back
                         });
                     }
-                    // Right face (+X), clockwise from right
+                    // Right face (+X), clockwise from right - Green (debug) or textured
                     if (getBlock(x + 1, y, z).type == BlockType::AIR) {
-                        if (g_showDebug) std::cout << "Exposing right face at (" << x + 1 << ", " << y << ", " << z << ")" << std::endl;
+                        float u = g_useFaceColors ? 3.0f : 0.0f; // Face ID 3 for debug
                         mesh.insert(mesh.end(), {
-                            static_cast<float>(x + 1), static_cast<float>(y),     static_cast<float>(z),     0.0f, 0.0f,     // v0
-                            static_cast<float>(x + 1), static_cast<float>(y + 1), static_cast<float>(z + 1), 1.0f, 1.0f,     // v1
-                            static_cast<float>(x + 1), static_cast<float>(y + 1), static_cast<float>(z),     0.0f, 1.0f,     // v2
-                            static_cast<float>(x + 1), static_cast<float>(y),     static_cast<float>(z),     0.0f, 0.0f,     // v0
-                            static_cast<float>(x + 1), static_cast<float>(y),     static_cast<float>(z + 1), 1.0f, 0.0f,     // v3
-                            static_cast<float>(x + 1), static_cast<float>(y + 1), static_cast<float>(z + 1), 1.0f, 1.0f      // v1
+                            static_cast<float>(x + 1), static_cast<float>(y),     static_cast<float>(z),     u, 0.0f,     // Bottom-front
+                            static_cast<float>(x + 1), static_cast<float>(y + 1), static_cast<float>(z + 1), g_useFaceColors ? u : 1.0f, 1.0f,     // Top-back
+                            static_cast<float>(x + 1), static_cast<float>(y + 1), static_cast<float>(z),     g_useFaceColors ? u : 0.0f, 1.0f,     // Top-front
+                            static_cast<float>(x + 1), static_cast<float>(y),     static_cast<float>(z),     u, 0.0f,     // Bottom-front
+                            static_cast<float>(x + 1), static_cast<float>(y),     static_cast<float>(z + 1), g_useFaceColors ? u : 1.0f, 0.0f,     // Bottom-back
+                            static_cast<float>(x + 1), static_cast<float>(y + 1), static_cast<float>(z + 1), g_useFaceColors ? u : 1.0f, 1.0f      // Top-back
                         });
                     }
-                    // Front face (-Z), clockwise from front
+                    // Front face (-Z), clockwise from front - Purple (debug) or textured
                     if (getBlock(x, y, z - 1).type == BlockType::AIR) {
-                        if (g_showDebug) std::cout << "Exposing front face at (" << x << ", " << y << ", " << z - 1 << ")" << std::endl;
+                        float u = g_useFaceColors ? 4.0f : 0.0f; // Face ID 4 for debug
                         mesh.insert(mesh.end(), {
-                            static_cast<float>(x),     static_cast<float>(y),     static_cast<float>(z), 0.0f, 0.0f,     // v0
-                            static_cast<float>(x + 1), static_cast<float>(y + 1), static_cast<float>(z), 1.0f, 1.0f,     // v1
-                            static_cast<float>(x + 1), static_cast<float>(y),     static_cast<float>(z), 1.0f, 0.0f,     // v2
-                            static_cast<float>(x),     static_cast<float>(y),     static_cast<float>(z), 0.0f, 0.0f,     // v0
-                            static_cast<float>(x),     static_cast<float>(y + 1), static_cast<float>(z), 0.0f, 1.0f,     // v3
-                            static_cast<float>(x + 1), static_cast<float>(y + 1), static_cast<float>(z), 1.0f, 1.0f      // v1
+                            static_cast<float>(x),     static_cast<float>(y),     static_cast<float>(z), u, 0.0f,     // Bottom-left
+                            static_cast<float>(x + 1), static_cast<float>(y),     static_cast<float>(z), g_useFaceColors ? u : 1.0f, 0.0f,     // Bottom-right
+                            static_cast<float>(x + 1), static_cast<float>(y + 1), static_cast<float>(z), g_useFaceColors ? u : 1.0f, 1.0f,     // Top-right
+                            static_cast<float>(x),     static_cast<float>(y),     static_cast<float>(z), u, 0.0f,     // Bottom-left
+                            static_cast<float>(x + 1), static_cast<float>(y + 1), static_cast<float>(z), g_useFaceColors ? u : 1.0f, 1.0f,     // Top-right
+                            static_cast<float>(x),     static_cast<float>(y + 1), static_cast<float>(z), g_useFaceColors ? u : 0.0f, 1.0f      // Top-left
                         });
                     }
-                    // Back face (+Z), clockwise from back
+                    // Back face (+Z), clockwise from back - Yellow (debug) or textured
                     if (getBlock(x, y, z + 1).type == BlockType::AIR) {
-                        if (g_showDebug) std::cout << "Exposing back face at (" << x << ", " << y << ", " << z + 1 << ")" << std::endl;
+                        float u = g_useFaceColors ? 5.0f : 0.0f; // Face ID 5 for debug
                         mesh.insert(mesh.end(), {
-                            static_cast<float>(x),     static_cast<float>(y),     static_cast<float>(z + 1), 0.0f, 0.0f,     // v0
-                            static_cast<float>(x + 1), static_cast<float>(y + 1), static_cast<float>(z + 1), 1.0f, 1.0f,     // v1
-                            static_cast<float>(x + 1), static_cast<float>(y),     static_cast<float>(z + 1), 1.0f, 0.0f,     // v2
-                            static_cast<float>(x),     static_cast<float>(y),     static_cast<float>(z + 1), 0.0f, 0.0f,     // v0
-                            static_cast<float>(x),     static_cast<float>(y + 1), static_cast<float>(z + 1), 0.0f, 1.0f,     // v3
-                            static_cast<float>(x + 1), static_cast<float>(y + 1), static_cast<float>(z + 1), 1.0f, 1.0f      // v1
+                            static_cast<float>(x),     static_cast<float>(y),     static_cast<float>(z + 1), u, 0.0f,     // Bottom-left
+                            static_cast<float>(x + 1), static_cast<float>(y + 1), static_cast<float>(z + 1), g_useFaceColors ? u : 1.0f, 1.0f,     // Top-right
+                            static_cast<float>(x + 1), static_cast<float>(y),     static_cast<float>(z + 1), g_useFaceColors ? u : 1.0f, 0.0f,     // Bottom-right
+                            static_cast<float>(x),     static_cast<float>(y),     static_cast<float>(z + 1), u, 0.0f,     // Bottom-left
+                            static_cast<float>(x),     static_cast<float>(y + 1), static_cast<float>(z + 1), g_useFaceColors ? u : 0.0f, 1.0f,     // Top-left
+                            static_cast<float>(x + 1), static_cast<float>(y + 1), static_cast<float>(z + 1), g_useFaceColors ? u : 1.0f, 1.0f      // Top-right
                         });
                     }
                 }
             }
         }
-    }
-    if (g_showDebug && !mesh.empty()) {
-        std::cout << "Chunk (" << chunkX << ", " << chunkZ << ") mesh size: " << mesh.size() / 5 << " vertices" << std::endl;
     }
 }
 

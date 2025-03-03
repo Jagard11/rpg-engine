@@ -1,4 +1,4 @@
-// ./src/Rendering/Renderer.cpp
+// src/Rendering/Renderer.cpp
 #include <GL/glew.h>
 #include "Rendering/Renderer.hpp"
 #include <GLFW/glfw3.h>
@@ -10,6 +10,8 @@
 
 extern float g_fov;
 extern bool g_showVoxelEdges;
+extern bool g_enableCulling;
+extern bool g_useFaceColors;
 
 Renderer::Renderer() {
     if (!glfwGetCurrentContext()) {
@@ -37,31 +39,31 @@ Renderer::~Renderer() {
     glDeleteTextures(1, &texture);
 }
 
-void Renderer::render(const World& world, const Player& player, const glm::ivec3& /*voxelPos*/) {
+void Renderer::render(const World& world, const Player& player) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glClearColor(0.2f, 0.3f, 0.8f, 1.0f);
 
     glEnable(GL_DEPTH_TEST);
-    glEnable(GL_CULL_FACE);
-    glCullFace(GL_BACK);
-    glFrontFace(GL_CCW);
+    if (g_enableCulling) {
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
+        glFrontFace(GL_CW);
+    } else {
+        glDisable(GL_CULL_FACE);
+    }
 
     glUseProgram(shaderProgram);
     glBindVertexArray(vao);
     glBindTexture(GL_TEXTURE_2D, texture);
 
     glm::mat4 proj = glm::perspective(glm::radians(g_fov), 800.0f / 600.0f, 0.1f, 2000.0f);
-    float playerHeight = 1.75f; // From Movement.hpp default
+    float playerHeight = 1.75f;
     glm::vec3 eyePos = player.position + player.up * playerHeight;
     glm::vec3 lookAtPos = eyePos + player.cameraDirection;
     glm::mat4 view = glm::lookAt(eyePos, lookAtPos, player.up);
-    if (g_showDebug) {
-        std::cout << "Eye Pos: " << eyePos.x << ", " << eyePos.y << ", " << eyePos.z << std::endl;
-        std::cout << "LookAt Pos: " << lookAtPos.x << ", " << lookAtPos.y << ", " << lookAtPos.z << std::endl;
-        std::cout << "Up: " << player.up.x << ", " << player.up.y << ", " << player.up.z << std::endl;
-    }
     glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "proj"), 1, GL_FALSE, &proj[0][0]);
     glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "view"), 1, GL_FALSE, &view[0][0]);
+    glUniform1i(glGetUniformLocation(shaderProgram, "useFaceColors"), g_useFaceColors);
 
     for (const auto& [pos, chunk] : world.getChunks()) {
         int face = pos.first / 1000;
@@ -91,7 +93,7 @@ void Renderer::renderVoxelEdges(const World& world, const Player& player) {
     glBindVertexArray(edgeVao);
 
     glm::mat4 proj = glm::perspective(glm::radians(g_fov), 800.0f / 600.0f, 0.1f, 2000.0f);
-    float playerHeight = 1.75f; // From Movement.hpp default
+    float playerHeight = 1.75f;
     glm::vec3 eyePos = player.position + player.up * playerHeight;
     glm::vec3 lookAtPos = eyePos + player.cameraDirection;
     glm::mat4 view = glm::lookAt(eyePos, lookAtPos, player.up);
@@ -154,8 +156,19 @@ void Renderer::loadShader() {
         in vec2 TexCoord;
         out vec4 FragColor;
         uniform sampler2D tex;
+        uniform bool useFaceColors;
         void main() {
-            FragColor = texture(tex, TexCoord);
+            if (useFaceColors) {
+                float faceId = floor(TexCoord.x + 0.5); // Round to nearest integer
+                if (faceId == 0.0) FragColor = vec4(1.0, 1.0, 1.0, 1.0); // Top: White
+                else if (faceId == 1.0) FragColor = vec4(0.0, 0.0, 0.0, 1.0); // Bottom: Black
+                else if (faceId == 2.0) FragColor = vec4(1.0, 0.0, 0.0, 1.0); // Left: Red
+                else if (faceId == 3.0) FragColor = vec4(0.0, 1.0, 0.0, 1.0); // Right: Green
+                else if (faceId == 4.0) FragColor = vec4(0.5, 0.0, 0.5, 1.0); // Front: Purple
+                else if (faceId == 5.0) FragColor = vec4(1.0, 1.0, 0.0, 1.0); // Back: Yellow
+            } else {
+                FragColor = texture(tex, TexCoord); // Normal textured rendering
+            }
         }
     )";
     GLuint vert = glCreateShader(GL_VERTEX_SHADER);

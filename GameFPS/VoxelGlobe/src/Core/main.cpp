@@ -13,10 +13,13 @@
 #include "imgui_impl_opengl3.h"
 #include <iostream>
 
-bool g_showDebug = false;
+// Debug globals
+bool g_showDebug = true; // Enabled by default
 bool g_showMenu = false;
 bool g_showVoxelEdges = false;
 float g_fov = 70.0f;
+bool g_enableCulling = true;
+bool g_useFaceColors = false;
 
 int main() {
     if (!glfwInit()) return -1;
@@ -48,7 +51,6 @@ int main() {
     InventoryUI inventoryUI;
     VoxelHighlightUI voxelHighlightUI;
 
-    // Set World pointer for all initial chunks
     for (auto& [key, chunk] : world.getChunks()) {
         chunk.setWorld(&world);
     }
@@ -56,19 +58,22 @@ int main() {
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
     int lastEscapeState = GLFW_RELEASE;
-    int lastF8State = GLFW_RELEASE;
     int lastF12State = GLFW_RELEASE;
     int lastLeftClickState = GLFW_RELEASE;
     int lastRightClickState = GLFW_RELEASE;
+    int lastF7State = GLFW_RELEASE; // Culling toggle
+    int lastF8State = GLFW_RELEASE; // Face colors toggle
 
     double lastTime = glfwGetTime();
     static bool firstFrame = true;
+    bool debugSettingsChanged = false; // Track changes to force mesh update
 
     while (!glfwWindowShouldClose(window)) {
         double currentTime = glfwGetTime();
         float deltaTime = static_cast<float>(currentTime - lastTime);
         lastTime = currentTime;
 
+        // Input handling
         int escapeState = glfwGetKey(window, GLFW_KEY_ESCAPE);
         if (escapeState == GLFW_PRESS && lastEscapeState == GLFW_RELEASE) {
             g_showMenu = !g_showMenu;
@@ -76,19 +81,28 @@ int main() {
         }
         lastEscapeState = escapeState;
 
-        int f8State = glfwGetKey(window, GLFW_KEY_F8);
-        if (f8State == GLFW_PRESS && lastF8State == GLFW_RELEASE) {
-            g_showDebug = !g_showDebug;
-            std::cout << "Debug toggled: " << (g_showDebug ? "ON" : "OFF") << std::endl;
-        }
-        lastF8State = f8State;
-
         int f12State = glfwGetKey(window, GLFW_KEY_F12);
         if (f12State == GLFW_PRESS && lastF12State == GLFW_RELEASE) {
             g_showVoxelEdges = !g_showVoxelEdges;
             std::cout << "Voxel Edges toggled: " << (g_showVoxelEdges ? "ON" : "OFF") << std::endl;
         }
         lastF12State = f12State;
+
+        int f7State = glfwGetKey(window, GLFW_KEY_F7);
+        if (f7State == GLFW_PRESS && lastF7State == GLFW_RELEASE) {
+            g_enableCulling = !g_enableCulling;
+            std::cout << "Culling toggled: " << (g_enableCulling ? "ON" : "OFF") << std::endl;
+            debugSettingsChanged = true;
+        }
+        lastF7State = f7State;
+
+        int f8State = glfwGetKey(window, GLFW_KEY_F8);
+        if (f8State == GLFW_PRESS && lastF8State == GLFW_RELEASE) {
+            g_useFaceColors = !g_useFaceColors;
+            std::cout << "Face Colors toggled: " << (g_useFaceColors ? "ON" : "OFF") << std::endl;
+            debugSettingsChanged = true;
+        }
+        lastF8State = f8State;
 
         if (!g_showMenu) {
             player.update(window, deltaTime);
@@ -107,10 +121,14 @@ int main() {
         }
 
         world.update(player.position);
-        // Set World pointer for all chunks after update (new chunks may have been added)
         for (auto& [key, chunk] : world.getChunks()) {
             chunk.setWorld(&world);
+            if (debugSettingsChanged) {
+                chunk.regenerateMesh(); // Update mesh only when settings change
+            }
         }
+        debugSettingsChanged = false; // Reset flag after update
+
         if (!firstFrame) {
             // Gravity handled in Player::update()
         }
@@ -130,10 +148,14 @@ int main() {
         ImGui::NewFrame();
 
         if (g_showDebug) {
-            ImGui::Begin("Debug Info");
+            ImGui::Begin("Debug Tools");
             ImGui::Text("Player Pos: %.2f, %.2f, %.2f", player.position.x, player.position.y, player.position.z);
             ImGui::Text("Camera Dir: %.2f, %.2f, %.2f", player.cameraDirection.x, player.cameraDirection.y, player.cameraDirection.z);
-            ImGui::Text("Up: %.2f, %.2f, %.2f", player.up.x, player.up.y, player.up.z);
+            ImGui::Separator();
+            ImGui::Checkbox("Enable Culling (F7)", &g_enableCulling);
+            ImGui::Text("Culling State: %s", g_enableCulling ? "ON" : "OFF");
+            ImGui::Checkbox("Use Face Colors (F8)", &g_useFaceColors);
+            ImGui::Text("Face Colors: %s", g_useFaceColors ? "ON" : "OFF");
             ImGui::End();
         }
 
