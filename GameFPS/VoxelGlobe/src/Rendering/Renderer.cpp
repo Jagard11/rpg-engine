@@ -24,19 +24,7 @@ Renderer::Renderer() {
     glGenBuffers(1, &edgeVbo);
     loadEdgeShader();
 
-    glGenVertexArrays(1, &highlightVao);
-    glGenBuffers(1, &highlightVbo);
-    std::cout << "Generated highlightVao: " << highlightVao << ", highlightVbo: " << highlightVbo << std::endl;
-    loadHighlightShader();
-
-    glBindVertexArray(highlightVao);
-    glBindBuffer(GL_ARRAY_BUFFER, highlightVbo);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-    glBindVertexArray(0);
-
     loadTexture();
-    lastHighlightedVoxel = glm::ivec3(-9999, -9999, -9999);
 }
 
 Renderer::~Renderer() {
@@ -46,13 +34,10 @@ Renderer::~Renderer() {
     glDeleteVertexArrays(1, &edgeVao);
     glDeleteBuffers(1, &edgeVbo);
     glDeleteProgram(edgeShaderProgram);
-    glDeleteVertexArrays(1, &highlightVao);
-    glDeleteBuffers(1, &highlightVbo);
-    glDeleteProgram(highlightShaderProgram);
     glDeleteTextures(1, &texture);
 }
 
-void Renderer::render(const World& world, const Player& player, const glm::ivec3& voxelPos) {
+void Renderer::render(const World& world, const Player& player, const glm::ivec3& /*voxelPos*/) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glClearColor(0.2f, 0.3f, 0.8f, 1.0f);
 
@@ -66,7 +51,6 @@ void Renderer::render(const World& world, const Player& player, const glm::ivec3
     glBindTexture(GL_TEXTURE_2D, texture);
 
     glm::mat4 proj = glm::perspective(glm::radians(g_fov), 800.0f / 600.0f, 0.1f, 2000.0f);
-    // Use a fixed height value since Player doesn't have height; ideally expose via Movement
     float playerHeight = 1.75f; // From Movement.hpp default
     glm::vec3 eyePos = player.position + player.up * playerHeight;
     glm::vec3 lookAtPos = eyePos + player.cameraDirection;
@@ -99,10 +83,6 @@ void Renderer::render(const World& world, const Player& player, const glm::ivec3
 
     if (g_showVoxelEdges) {
         renderVoxelEdges(world, player);
-    }
-
-    if (voxelPos != glm::ivec3(-1, -1, -1)) { // Only render if a valid voxel position is provided
-        renderHighlightedVoxel(voxelPos, player);
     }
 }
 
@@ -155,73 +135,6 @@ void Renderer::renderVoxelEdges(const World& world, const Player& player) {
     glEnableVertexAttribArray(0);
     glLineWidth(2.0f);
     glDrawArrays(GL_LINES, 0, edgeVertices.size() / 3);
-}
-
-void Renderer::renderHighlightedVoxel(const glm::ivec3& voxelPos, const Player& player) {
-    if (voxelPos == lastHighlightedVoxel || voxelPos == glm::ivec3(-9999, -9999, -9999)) return;
-    lastHighlightedVoxel = voxelPos;
-
-    if (g_showDebug) {
-        std::cout << "Rendering highlight at: " << voxelPos.x << ", " << voxelPos.y << ", " << voxelPos.z << std::endl;
-    }
-
-    while (glGetError() != GL_NO_ERROR) {}
-
-    glDisable(GL_CULL_FACE);
-    glDisable(GL_DEPTH_TEST);
-
-    glUseProgram(highlightShaderProgram);
-    glBindVertexArray(highlightVao);
-    glBindBuffer(GL_ARRAY_BUFFER, highlightVbo);
-
-    std::vector<float> vertices = {
-        0.0f, 0.0f, 0.0f,  1.0f, 0.0f, 0.0f,
-        1.0f, 0.0f, 0.0f,  1.0f, 1.0f, 0.0f,
-        1.0f, 1.0f, 0.0f,  0.0f, 1.0f, 0.0f,
-        0.0f, 1.0f, 0.0f,  0.0f, 0.0f, 0.0f,
-        0.0f, 0.0f, 1.0f,  1.0f, 0.0f, 1.0f,
-        1.0f, 0.0f, 1.0f,  1.0f, 1.0f, 1.0f,
-        1.0f, 1.0f, 1.0f,  0.0f, 1.0f, 1.0f,
-        0.0f, 1.0f, 1.0f,  0.0f, 0.0f, 1.0f,
-        0.0f, 0.0f, 0.0f,  0.0f, 0.0f, 1.0f,
-        1.0f, 0.0f, 0.0f,  1.0f, 0.0f, 1.0f,
-        1.0f, 1.0f, 0.0f,  1.0f, 1.0f, 1.0f,
-        0.0f, 1.0f, 0.0f,  0.0f, 1.0f, 1.0f
-    };
-
-    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-
-    GLint projLoc = glGetUniformLocation(highlightShaderProgram, "proj");
-    GLint viewLoc = glGetUniformLocation(highlightShaderProgram, "view");
-    GLint modelLoc = glGetUniformLocation(highlightShaderProgram, "model");
-
-    glm::mat4 proj = glm::perspective(glm::radians(g_fov), 800.0f / 600.0f, 0.1f, 2000.0f);
-    float playerHeight = 1.75f; // From Movement.hpp default
-    glm::vec3 eyePos = player.position + player.up * playerHeight;
-    glm::vec3 lookAtPos = eyePos + player.cameraDirection;
-    glm::mat4 view = glm::lookAt(eyePos, lookAtPos, player.up);
-    glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(voxelPos));
-
-    if (g_showDebug) {
-        std::cout << "Highlight model position: (" << voxelPos.x << ", " << voxelPos.y << ", " << voxelPos.z << ")" << std::endl;
-    }
-
-    glUniformMatrix4fv(projLoc, 1, GL_FALSE, &proj[0][0]);
-    glUniformMatrix4fv(viewLoc, 1, GL_FALSE, &view[0][0]);
-    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, &model[0][0]);
-
-    glLineWidth(3.0f);
-    glDrawArrays(GL_LINES, 0, vertices.size() / 3);
-
-    glEnable(GL_CULL_FACE);
-    glEnable(GL_DEPTH_TEST);
-
-    GLenum err = glGetError();
-    if (err != GL_NO_ERROR) {
-        std::cerr << "OpenGL error after highlighting: " << err << std::endl;
-    }
 }
 
 void Renderer::loadShader() {
@@ -318,53 +231,6 @@ void Renderer::loadEdgeShader() {
     if (!success) {
         glGetProgramInfoLog(edgeShaderProgram, 512, NULL, infoLog);
         std::cerr << "Edge Shader Program Link Error: " << infoLog << std::endl;
-    }
-    glDeleteShader(vert);
-    glDeleteShader(frag);
-}
-
-void Renderer::loadHighlightShader() {
-    const char* vertSrc = R"(
-        #version 330 core
-        layout(location = 0) in vec3 pos;
-        uniform mat4 model, view, proj;
-        void main() {
-            gl_Position = proj * view * model * vec4(pos, 1.0);
-        }
-    )";
-    const char* fragSrc = R"(
-        #version 330 core
-        out vec4 FragColor;
-        void main() {
-            FragColor = vec4(1.0, 1.0, 1.0, 1.0);
-        }
-    )";
-    GLuint vert = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vert, 1, &vertSrc, NULL);
-    glCompileShader(vert);
-    GLint success;
-    GLchar infoLog[512];
-    glGetShaderiv(vert, GL_COMPILE_STATUS, &success);
-    if (!success) {
-        glGetShaderInfoLog(vert, 512, NULL, infoLog);
-        std::cerr << "Highlight Vertex Shader Error: " << infoLog << std::endl;
-    }
-    GLuint frag = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(frag, 1, &fragSrc, NULL);
-    glCompileShader(frag);
-    glGetShaderiv(frag, GL_COMPILE_STATUS, &success);
-    if (!success) {
-        glGetShaderInfoLog(frag, 512, NULL, infoLog);
-        std::cerr << "Highlight Fragment Shader Error: " << infoLog << std::endl;
-    }
-    highlightShaderProgram = glCreateProgram();
-    glAttachShader(highlightShaderProgram, vert);
-    glAttachShader(highlightShaderProgram, frag);
-    glLinkProgram(highlightShaderProgram);
-    glGetProgramiv(highlightShaderProgram, GL_LINK_STATUS, &success);
-    if (!success) {
-        glGetProgramInfoLog(highlightShaderProgram, 512, NULL, infoLog);
-        std::cerr << "Highlight Shader Program Link Error: " << infoLog << std::endl;
     }
     glDeleteShader(vert);
     glDeleteShader(frag);

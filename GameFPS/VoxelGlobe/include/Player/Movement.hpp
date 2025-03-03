@@ -23,6 +23,7 @@ private:
     glm::vec3& up;
     float speed = 5.0f;
     float height = 1.75f;
+    bool checkCollision(const glm::vec3& newPos) const; // Added declaration
 };
 
 #endif

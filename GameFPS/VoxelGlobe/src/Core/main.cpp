@@ -7,6 +7,7 @@
 #include "Rendering/Renderer.hpp"
 #include "VoxelManipulator.hpp"
 #include "UI/Inventory/InventoryUI.hpp"
+#include "UI/VoxelHighlightUI.hpp"
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
@@ -45,6 +46,12 @@ int main() {
     Renderer renderer;
     VoxelManipulator voxelManip(world);
     InventoryUI inventoryUI;
+    VoxelHighlightUI voxelHighlightUI;
+
+    // Set World pointer for all initial chunks
+    for (auto& [key, chunk] : world.getChunks()) {
+        chunk.setWorld(&world);
+    }
 
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
@@ -100,18 +107,22 @@ int main() {
         }
 
         world.update(player.position);
+        // Set World pointer for all chunks after update (new chunks may have been added)
+        for (auto& [key, chunk] : world.getChunks()) {
+            chunk.setWorld(&world);
+        }
         if (!firstFrame) {
-            // Gravity now handled in Player::update()
+            // Gravity handled in Player::update()
         }
         firstFrame = false;
 
+        renderer.render(world, player);
+
         glm::ivec3 hitPos;
         glm::vec3 hitNormal;
-        glm::vec3 eyePos = player.position + player.up * player.getHeight(); // Use getHeight() for consistency
-        if (voxelManip.raycast(eyePos, player.cameraDirection, 5.0f, hitPos, hitNormal)) {
-            renderer.render(world, player, hitPos);
-        } else {
-            renderer.render(world, player);
+        glm::vec3 eyePos = player.position + player.up * player.getHeight();
+        if (voxelManip.raycast(eyePos, player.cameraDirection, 5.0f, hitPos, hitNormal, ToolType::NONE)) {
+            voxelHighlightUI.render(player, hitPos);
         }
 
         ImGui_ImplOpenGL3_NewFrame();

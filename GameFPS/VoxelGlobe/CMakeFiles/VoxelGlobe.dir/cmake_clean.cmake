@@ -11,6 +11,8 @@ file(REMOVE_RECURSE
   "CMakeFiles/VoxelGlobe.dir/src/UI/Inventory/Inventory.cpp.o.d"
   "CMakeFiles/VoxelGlobe.dir/src/UI/Inventory/InventoryUI.cpp.o"
   "CMakeFiles/VoxelGlobe.dir/src/UI/Inventory/InventoryUI.cpp.o.d"
+  "CMakeFiles/VoxelGlobe.dir/src/UI/VoxelHighlightUI.cpp.o"
+  "CMakeFiles/VoxelGlobe.dir/src/UI/VoxelHighlightUI.cpp.o.d"
   "CMakeFiles/VoxelGlobe.dir/src/VoxelManipulator.cpp.o"
   "CMakeFiles/VoxelGlobe.dir/src/VoxelManipulator.cpp.o.d"
   "CMakeFiles/VoxelGlobe.dir/src/World/Block.cpp.o"

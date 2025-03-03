@@ -7,39 +7,78 @@
 Movement::Movement(const World& w, glm::vec3& pos, glm::vec3& camDir, glm::vec3& moveDir, glm::vec3& u)
     : world(w), position(pos), cameraDirection(camDir), movementDirection(moveDir), up(u) {}
 
-void Movement::moveForward(float deltaTime) { position += movementDirection * speed * deltaTime; }
-void Movement::moveBackward(float deltaTime) { position -= movementDirection * speed * deltaTime; }
+bool Movement::checkCollision(const glm::vec3& newPos) const {
+    // Check player's bounding box (simplified: 0.5 width, 1.75 height)
+    int minX = static_cast<int>(floor(newPos.x - 0.25f));
+    int maxX = static_cast<int>(floor(newPos.x + 0.25f));
+    int minY = static_cast<int>(floor(newPos.y));
+    int maxY = static_cast<int>(floor(newPos.y + height));
+    int minZ = static_cast<int>(floor(newPos.z - 0.25f));
+    int maxZ = static_cast<int>(floor(newPos.z + 0.25f));
+
+    for (int x = minX; x <= maxX; x++) {
+        for (int y = minY; y <= maxY; y++) {
+            for (int z = minZ; z <= maxZ; z++) {
+                if (world.getBlock(x, y, z).type != BlockType::AIR) {
+                    if (g_showDebug) {
+                        std::cout << "Collision detected at (" << x << ", " << y << ", " << z << ")" << std::endl;
+                    }
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+void Movement::moveForward(float deltaTime) {
+    glm::vec3 newPos = position + movementDirection * speed * deltaTime;
+    if (!checkCollision(newPos)) {
+        position = newPos;
+    }
+}
+
+void Movement::moveBackward(float deltaTime) {
+    glm::vec3 newPos = position - movementDirection * speed * deltaTime;
+    if (!checkCollision(newPos)) {
+        position = newPos;
+    }
+}
+
 void Movement::moveLeft(float deltaTime) {
     glm::vec3 right = glm::normalize(glm::cross(movementDirection, up));
-    position -= right * speed * deltaTime;
+    glm::vec3 newPos = position - right * speed * deltaTime;
+    if (!checkCollision(newPos)) {
+        position = newPos;
+    }
 }
+
 void Movement::moveRight(float deltaTime) {
     glm::vec3 right = glm::normalize(glm::cross(movementDirection, up));
-    position += right * speed * deltaTime;
+    glm::vec3 newPos = position + right * speed * deltaTime;
+    if (!checkCollision(newPos)) {
+        position = newPos;
+    }
 }
 
 void Movement::applyGravity(float deltaTime) {
-    glm::vec3 toCenter = (glm::length(position) > 0.001f) ? -glm::normalize(position) : -up;
     float gravity = 9.81f;
-    glm::vec3 newPosition = position + toCenter * gravity * deltaTime;
+    glm::vec3 newPos = position - glm::vec3(0.0f, gravity * deltaTime, 0.0f);
 
-    int chunkX = static_cast<int>(position.x / Chunk::SIZE);
-    int chunkZ = static_cast<int>(position.z / Chunk::SIZE);
-    chunkX = glm::clamp(chunkX, -1000, 1000);
-    chunkZ = glm::clamp(chunkZ, -1000, 1000);
-    float terrainHeight = world.findSurfaceHeight(chunkX, chunkZ) + 1.0f + 1.0f;
+    // Check block directly beneath player's feet
+    int worldX = static_cast<int>(floor(newPos.x));
+    int worldZ = static_cast<int>(floor(newPos.z));
+    int floorY = static_cast<int>(floor(newPos.y - 0.01f)); // Slightly below feet
+    Block blockBelow = world.getBlock(worldX, floorY, worldZ);
 
-    position.x = newPosition.x;
-    position.z = newPosition.z;
-    if (newPosition.y <= terrainHeight) {
-        position.y = terrainHeight;
-    } else {
-        position.y = newPosition.y;
+    if (blockBelow.type != BlockType::AIR) {
+        newPos.y = static_cast<float>(floorY + 1); // Stand on block
+        if (g_showDebug) std::cout << "Landed on block at y = " << floorY << std::endl;
     }
-    up = (glm::length(position) > 0.001f) ? glm::normalize(position) : glm::vec3(0.0f, 1.0f, 0.0f);
+
+    position = newPos;
 
     if (g_showDebug) {
-        std::cout << "terrainHeight: " << terrainHeight << ", newPosition.y: " << newPosition.y << std::endl;
         std::cout << "Gravity applied, Pos: " << position.x << ", " << position.y << ", " << position.z << std::endl;
         std::cout << "Eye Pos (pos.y + height): " << position.x << ", " << (position.y + height) << ", " << position.z << std::endl;
     }

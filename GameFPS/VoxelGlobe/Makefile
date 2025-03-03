@@ -273,6 +273,30 @@ src/UI/Inventory/InventoryUI.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/UI/Inventory/InventoryUI.cpp.s
 .PHONY : src/UI/Inventory/InventoryUI.cpp.s
 
+src/UI/VoxelHighlightUI.o: src/UI/VoxelHighlightUI.cpp.o
+.PHONY : src/UI/VoxelHighlightUI.o
+
+# target to build an object file
+src/UI/VoxelHighlightUI.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/UI/VoxelHighlightUI.cpp.o
+.PHONY : src/UI/VoxelHighlightUI.cpp.o
+
+src/UI/VoxelHighlightUI.i: src/UI/VoxelHighlightUI.cpp.i
+.PHONY : src/UI/VoxelHighlightUI.i
+
+# target to preprocess a source file
+src/UI/VoxelHighlightUI.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/UI/VoxelHighlightUI.cpp.i
+.PHONY : src/UI/VoxelHighlightUI.cpp.i
+
+src/UI/VoxelHighlightUI.s: src/UI/VoxelHighlightUI.cpp.s
+.PHONY : src/UI/VoxelHighlightUI.s
+
+# target to generate assembly for a file
+src/UI/VoxelHighlightUI.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/UI/VoxelHighlightUI.cpp.s
+.PHONY : src/UI/VoxelHighlightUI.cpp.s
+
 src/VoxelManipulator.o: src/VoxelManipulator.cpp.o
 .PHONY : src/VoxelManipulator.o
 
@@ -564,6 +588,9 @@ help:
 	@echo "... src/UI/Inventory/InventoryUI.o"
 	@echo "... src/UI/Inventory/InventoryUI.i"
 	@echo "... src/UI/Inventory/InventoryUI.s"
+	@echo "... src/UI/VoxelHighlightUI.o"
+	@echo "... src/UI/VoxelHighlightUI.i"
+	@echo "... src/UI/VoxelHighlightUI.s"
 	@echo "... src/VoxelManipulator.o"
 	@echo "... src/VoxelManipulator.i"
 	@echo "... src/VoxelManipulator.s"

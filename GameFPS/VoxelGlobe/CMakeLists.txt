@@ -34,6 +34,7 @@ add_executable(VoxelGlobe
     src/Player/Movement.cpp
     src/UI/Inventory/Inventory.cpp
     src/UI/Inventory/InventoryUI.cpp
+    src/UI/VoxelHighlightUI.cpp  # Added this line
     src/Rendering/Renderer.cpp
     src/World/World.cpp
     src/World/Chunk.cpp
