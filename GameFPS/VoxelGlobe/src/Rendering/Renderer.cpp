@@ -34,7 +34,7 @@ Renderer::~Renderer() {
     glDeleteTextures(1, &texture);
 }
 
-void Renderer::render(const World& world, const Player& player, float fov) {
+void Renderer::render(const World& world, const Player& player, const GraphicsSettings& settings) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glClearColor(0.2f, 0.3f, 0.8f, 1.0f);
 
@@ -51,7 +51,7 @@ void Renderer::render(const World& world, const Player& player, float fov) {
     glBindVertexArray(vao);
     glBindTexture(GL_TEXTURE_2D, texture);
 
-    glm::mat4 proj = glm::perspective(glm::radians(fov), 800.0f / 600.0f, 0.1f, 2000.0f);
+    glm::mat4 proj = glm::perspective(glm::radians(70.0f), static_cast<float>(settings.getWidth()) / settings.getHeight(), 0.1f, 2000.0f);
     float playerHeight = 1.75f;
     glm::vec3 eyePos = player.position + player.up * playerHeight;
     glm::vec3 lookAtPos = eyePos + player.cameraDirection;
@@ -79,15 +79,15 @@ void Renderer::render(const World& world, const Player& player, float fov) {
     }
 
     if (DebugManager::getInstance().showVoxelEdges()) {
-        renderVoxelEdges(world, player, fov);
+        renderVoxelEdges(world, player, settings);
     }
 }
 
-void Renderer::renderVoxelEdges(const World& world, const Player& player, float fov) {
+void Renderer::renderVoxelEdges(const World& world, const Player& player, const GraphicsSettings& settings) {
     glUseProgram(edgeShaderProgram);
     glBindVertexArray(edgeVao);
 
-    glm::mat4 proj = glm::perspective(glm::radians(fov), 800.0f / 600.0f, 0.1f, 2000.0f);
+    glm::mat4 proj = glm::perspective(glm::radians(70.0f), static_cast<float>(settings.getWidth()) / settings.getHeight(), 0.1f, 2000.0f);
     float playerHeight = 1.75f;
     glm::vec3 eyePos = player.position + player.up * playerHeight;
     glm::vec3 lookAtPos = eyePos + player.cameraDirection;
@@ -154,7 +154,7 @@ void Renderer::loadShader() {
         uniform bool useFaceColors;
         void main() {
             if (useFaceColors) {
-                float faceId = floor(TexCoord.x + 0.5); // Round to nearest integer
+                float faceId = floor(TexCoord.x + 0.5);
                 if (faceId == 0.0) FragColor = vec4(1.0, 1.0, 1.0, 1.0); // Top: White
                 else if (faceId == 1.0) FragColor = vec4(0.0, 0.0, 0.0, 1.0); // Bottom: Black
                 else if (faceId == 2.0) FragColor = vec4(1.0, 0.0, 0.0, 1.0); // Left: Red
@@ -162,7 +162,7 @@ void Renderer::loadShader() {
                 else if (faceId == 4.0) FragColor = vec4(0.5, 0.0, 0.5, 1.0); // Front: Purple
                 else if (faceId == 5.0) FragColor = vec4(1.0, 1.0, 0.0, 1.0); // Back: Yellow
             } else {
-                FragColor = texture(tex, TexCoord); // Normal textured rendering
+                FragColor = texture(tex, TexCoord);
             }
         }
     )";

@@ -9,6 +9,7 @@
 #include "VoxelManipulator.hpp"
 #include "UI/Inventory/InventoryUI.hpp"
 #include "UI/VoxelHighlightUI.hpp"
+#include "Graphics/GraphicsSettings.hpp"
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
@@ -45,8 +46,9 @@ int main() {
     VoxelHighlightUI voxelHighlightUI;
     DebugManager& debugManager = DebugManager::getInstance();
     DebugWindow debugWindow(debugManager);
+    GraphicsSettings graphicsSettings(window);
 
-    float fov = 70.0f; // FOV now lives here
+    float fov = 70.0f;
 
     for (auto& [key, chunk] : world.getChunks()) {
         chunk.setWorld(&world);
@@ -55,7 +57,7 @@ int main() {
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
     int lastEscapeState = GLFW_RELEASE;
-    int lastF8State = GLFW_RELEASE; // Changed to F8
+    int lastF8State = GLFW_RELEASE;
     int lastLeftClickState = GLFW_RELEASE;
     int lastRightClickState = GLFW_RELEASE;
     bool showEscapeMenu = false;
@@ -68,18 +70,19 @@ int main() {
         float deltaTime = static_cast<float>(currentTime - lastTime);
         lastTime = currentTime;
 
-        // Input handling
         int escapeState = glfwGetKey(window, GLFW_KEY_ESCAPE);
         if (escapeState == GLFW_PRESS && lastEscapeState == GLFW_RELEASE) {
             showEscapeMenu = !showEscapeMenu;
-            glfwSetInputMode(window, GLFW_CURSOR, showEscapeMenu || debugWindow.isVisible() ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED);
+            glfwSetInputMode(window, GLFW_CURSOR, showEscapeMenu || debugWindow.isVisible() ? GLFW_CURSOR_NORMAL : 
+                             (graphicsSettings.getMode() == DisplayMode::FULLSCREEN_WINDOWED ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL));
         }
         lastEscapeState = escapeState;
 
         int f8State = glfwGetKey(window, GLFW_KEY_F8);
         if (f8State == GLFW_PRESS && lastF8State == GLFW_RELEASE) {
             debugWindow.toggleVisibility();
-            glfwSetInputMode(window, GLFW_CURSOR, debugWindow.isVisible() || showEscapeMenu ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED);
+            glfwSetInputMode(window, GLFW_CURSOR, debugWindow.isVisible() || showEscapeMenu ? GLFW_CURSOR_NORMAL : 
+                             (graphicsSettings.getMode() == DisplayMode::FULLSCREEN_WINDOWED ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL));
         }
         lastF8State = f8State;
 
@@ -109,13 +112,13 @@ int main() {
         }
         firstFrame = false;
 
-        renderer.render(world, player, fov);
+        renderer.render(world, player, graphicsSettings);
 
         glm::ivec3 hitPos;
         glm::vec3 hitNormal;
         glm::vec3 eyePos = player.position + player.up * player.getHeight();
         if (voxelManip.raycast(eyePos, player.cameraDirection, 5.0f, hitPos, hitNormal, ToolType::NONE)) {
-            voxelHighlightUI.render(player, hitPos, fov);
+            voxelHighlightUI.render(player, hitPos, graphicsSettings);
         }
 
         ImGui_ImplOpenGL3_NewFrame();
@@ -127,9 +130,11 @@ int main() {
         if (showEscapeMenu) {
             ImGui::Begin("Menu", &showEscapeMenu, ImGuiWindowFlags_AlwaysAutoResize);
             ImGui::SliderFloat("FOV", &fov, 30.0f, 110.0f, "%.1f");
+            graphicsSettings.renderUI();
             if (ImGui::Button("Close")) {
                 showEscapeMenu = false;
-                glfwSetInputMode(window, GLFW_CURSOR, debugWindow.isVisible() ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED);
+                glfwSetInputMode(window, GLFW_CURSOR, debugWindow.isVisible() ? GLFW_CURSOR_NORMAL : 
+                                 (graphicsSettings.getMode() == DisplayMode::FULLSCREEN_WINDOWED ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL));
             }
             ImGui::End();
         }

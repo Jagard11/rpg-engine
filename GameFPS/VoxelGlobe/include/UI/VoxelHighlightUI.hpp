@@ -5,12 +5,13 @@
 #include <GL/glew.h>
 #include <glm/glm.hpp>
 #include "Player/Player.hpp"
+#include "Graphics/GraphicsSettings.hpp" // Added
 
 class VoxelHighlightUI {
 public:
     VoxelHighlightUI();
     ~VoxelHighlightUI();
-    void render(const Player& player, const glm::ivec3& voxelPos, float fov); // Added fov parameter
+    void render(const Player& player, const glm::ivec3& voxelPos, const GraphicsSettings& settings); // Updated parameter
 
 private:
     GLuint vao, vbo, shaderProgram;

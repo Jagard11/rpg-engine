@@ -26,7 +26,7 @@ VoxelHighlightUI::~VoxelHighlightUI() {
     glDeleteProgram(shaderProgram);
 }
 
-void VoxelHighlightUI::render(const Player& player, const glm::ivec3& voxelPos, float fov) {
+void VoxelHighlightUI::render(const Player& player, const glm::ivec3& voxelPos, const GraphicsSettings& settings) {
     if (voxelPos == lastHighlightedVoxel || voxelPos.x == -1) return;
     lastHighlightedVoxel = voxelPos;
 
@@ -55,7 +55,7 @@ void VoxelHighlightUI::render(const Player& player, const glm::ivec3& voxelPos, 
 
     glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
 
-    glm::mat4 proj = glm::perspective(glm::radians(fov), 800.0f / 600.0f, 0.1f, 2000.0f);
+    glm::mat4 proj = glm::perspective(glm::radians(70.0f), static_cast<float>(settings.getWidth()) / settings.getHeight(), 0.1f, 2000.0f);
     glm::vec3 eyePos = player.position + player.up * player.getHeight();
     glm::vec3 lookAtPos = eyePos + player.cameraDirection;
     glm::mat4 view = glm::lookAt(eyePos, lookAtPos, player.up);

@@ -201,6 +201,30 @@ src/Debug/DebugWindow.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Debug/DebugWindow.cpp.s
 .PHONY : src/Debug/DebugWindow.cpp.s
 
+src/Graphics/GraphicsSettings.o: src/Graphics/GraphicsSettings.cpp.o
+.PHONY : src/Graphics/GraphicsSettings.o
+
+# target to build an object file
+src/Graphics/GraphicsSettings.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Graphics/GraphicsSettings.cpp.o
+.PHONY : src/Graphics/GraphicsSettings.cpp.o
+
+src/Graphics/GraphicsSettings.i: src/Graphics/GraphicsSettings.cpp.i
+.PHONY : src/Graphics/GraphicsSettings.i
+
+# target to preprocess a source file
+src/Graphics/GraphicsSettings.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Graphics/GraphicsSettings.cpp.i
+.PHONY : src/Graphics/GraphicsSettings.cpp.i
+
+src/Graphics/GraphicsSettings.s: src/Graphics/GraphicsSettings.cpp.s
+.PHONY : src/Graphics/GraphicsSettings.s
+
+# target to generate assembly for a file
+src/Graphics/GraphicsSettings.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Graphics/GraphicsSettings.cpp.s
+.PHONY : src/Graphics/GraphicsSettings.cpp.s
+
 src/Player/Movement.o: src/Player/Movement.cpp.o
 .PHONY : src/Player/Movement.o
 
@@ -627,6 +651,9 @@ help:
 	@echo "... src/Debug/DebugWindow.o"
 	@echo "... src/Debug/DebugWindow.i"
 	@echo "... src/Debug/DebugWindow.s"
+	@echo "... src/Graphics/GraphicsSettings.o"
+	@echo "... src/Graphics/GraphicsSettings.i"
+	@echo "... src/Graphics/GraphicsSettings.s"
 	@echo "... src/Player/Movement.o"
 	@echo "... src/Player/Movement.i"
 	@echo "... src/Player/Movement.s"
