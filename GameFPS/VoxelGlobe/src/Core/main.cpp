@@ -45,7 +45,7 @@ int main() {
     InventoryUI inventoryUI;
     VoxelHighlightUI voxelHighlightUI;
     DebugManager& debugManager = DebugManager::getInstance();
-    DebugWindow debugWindow(debugManager);
+    DebugWindow debugWindow(debugManager, player); // Pass Player reference
     GraphicsSettings graphicsSettings(window);
 
     float fov = 70.0f;
@@ -125,7 +125,7 @@ int main() {
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        debugWindow.render(player);
+        debugWindow.render();
 
         if (showEscapeMenu) {
             ImGui::Begin("Menu", &showEscapeMenu, ImGuiWindowFlags_AlwaysAutoResize);

@@ -8,14 +8,16 @@
 
 class DebugWindow {
 public:
-    DebugWindow(DebugManager& debugMgr);
-    void render(const Player& player);
+    DebugWindow(DebugManager& debugMgr, Player& player); // Updated to take Player reference
+    void render();
     bool isVisible() const { return visible; }
     void toggleVisibility() { visible = !visible; }
 
 private:
     DebugManager& debugManager;
+    Player& player; // Added Player reference
     bool visible;
+    float teleportCoords[3] = {0.0f, 1510.0f, 0.0f}; // Default teleport coordinates
 };
 
 #endif

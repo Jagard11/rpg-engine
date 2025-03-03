@@ -2,9 +2,10 @@
 #include "Debug/DebugWindow.hpp"
 #include <iostream>
 
-DebugWindow::DebugWindow(DebugManager& debugMgr) : debugManager(debugMgr), visible(false) {}
+DebugWindow::DebugWindow(DebugManager& debugMgr, Player& p) 
+    : debugManager(debugMgr), player(p), visible(false) {}
 
-void DebugWindow::render(const Player& player) {
+void DebugWindow::render() {
     if (!visible) return;
 
     ImGui::Begin("Debug Tools", &visible, ImGuiWindowFlags_AlwaysAutoResize);
@@ -56,9 +57,20 @@ void DebugWindow::render(const Player& player) {
         debugManager.setLogCollision(logCollision);
     }
 
-    bool logInventory = debugManager.logInventory(); // Added new toggle
+    bool logInventory = debugManager.logInventory();
     if (ImGui::Checkbox("Log Inventory", &logInventory)) {
         debugManager.setLogInventory(logInventory);
+    }
+
+    // Teleport tool
+    ImGui::Separator();
+    ImGui::Text("Teleport Tool");
+    ImGui::InputFloat3("Coordinates (X, Y, Z)", teleportCoords);
+    if (ImGui::Button("Teleport")) {
+        player.position = glm::vec3(teleportCoords[0], teleportCoords[1], teleportCoords[2]);
+        if (debugManager.logPlayerInfo()) {
+            std::cout << "Teleported to (" << player.position.x << ", " << player.position.y << ", " << player.position.z << ")" << std::endl;
+        }
     }
 
     // Display player info if enabled
