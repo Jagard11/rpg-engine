@@ -2,6 +2,7 @@
 #include "VoxelManipulator.hpp"
 #include "Debug/DebugManager.hpp"
 #include <iostream>
+#include <glm/geometric.hpp>
 
 VoxelManipulator::VoxelManipulator(World& world) : worldRef(world) {}
 
@@ -11,162 +12,158 @@ bool VoxelManipulator::placeBlock(const Player& player, BlockType type) {
     glm::vec3 eyePos = player.position + player.up * player.getHeight();
     glm::ivec3 hitPos;
     glm::vec3 hitNormal;
-
+    
     if (raycast(eyePos, player.cameraDirection, MAX_REACH, hitPos, hitNormal)) {
-        glm::ivec3 placePos = hitPos + glm::ivec3(hitNormal);
-
-        // Convert local to global coordinates
-        glm::ivec3 globalPlacePos = placePos + glm::ivec3(floor(player.position.x), floor(player.position.y), floor(player.position.z));
-        if (globalPlacePos.y < FLOOR_HEIGHT || globalPlacePos.y > CEILING_HEIGHT) {
-            if (DebugManager::getInstance().logBlockPlacement()) {
-                std::cout << "Placement out of height bounds: y = " << globalPlacePos.y << std::endl;
-            }
-            return false;
-        }
-
-        if (!isAdjacentToSolid(placePos)) {
-            if (DebugManager::getInstance().logBlockPlacement()) {
-                std::cout << "Placement failed: No adjacent solid block at (" 
-                          << placePos.x << ", " << placePos.y << ", " << placePos.z << ")" << std::endl;
-            }
-            return false;
-        }
-
-        worldRef.setBlock(globalPlacePos.x, globalPlacePos.y, globalPlacePos.z, type);
+        // Placement position is adjacent to the hit face
+        glm::ivec3 placePos = hitPos + glm::ivec3(round(hitNormal.x), round(hitNormal.y), round(hitNormal.z));
+        
+        // Place the block
+        worldRef.setBlock(placePos.x, placePos.y, placePos.z, type);
+        
         if (DebugManager::getInstance().logBlockPlacement()) {
-            std::cout << "Placed block at (" << globalPlacePos.x << ", " << globalPlacePos.y << ", " << globalPlacePos.z 
+            std::cout << "Placed block at (" << placePos.x << ", " << placePos.y << ", " << placePos.z 
                       << ") Type: " << static_cast<int>(type) << std::endl;
         }
         return true;
     }
+    
     return false;
 }
 
 bool VoxelManipulator::removeBlock(const Player& player) {
+    // Get eye position (camera position)
     glm::vec3 eyePos = player.position + player.up * player.getHeight();
     glm::ivec3 hitPos;
     glm::vec3 hitNormal;
 
+    // Use raycast to find where the player is looking
+    if (DebugManager::getInstance().logBlockPlacement()) {
+        std::cout << "Attempting to remove block, eye position: " << eyePos.x << ", " << eyePos.y << ", " << eyePos.z << std::endl;
+    }
+    
     if (raycast(eyePos, player.cameraDirection, MAX_REACH, hitPos, hitNormal)) {
-        // Convert local to global coordinates
-        glm::ivec3 globalHitPos = hitPos + glm::ivec3(floor(player.position.x), floor(player.position.y), floor(player.position.z));
-        if (globalHitPos.y < FLOOR_HEIGHT || globalHitPos.y > CEILING_HEIGHT) {
-            if (DebugManager::getInstance().logBlockPlacement()) {
-                std::cout << "Removal out of height bounds: y = " << globalHitPos.y << std::endl;
-            }
-            return false;
+        // Get the block at the hit position
+        Block block = worldRef.getBlock(hitPos.x, hitPos.y, hitPos.z);
+        
+        if (DebugManager::getInstance().logBlockPlacement()) {
+            std::cout << "Raycast hit at " << hitPos.x << ", " << hitPos.y << ", " << hitPos.z << std::endl;
+            std::cout << "Block type: " << static_cast<int>(block.type) << std::endl;
         }
-
-        Block block = worldRef.getBlock(globalHitPos.x, globalHitPos.y, globalHitPos.z);
+        
         if (block.type == BlockType::AIR) {
             if (DebugManager::getInstance().logBlockPlacement()) {
-                std::cout << "Cannot remove air at (" << globalHitPos.x << ", " << globalHitPos.y << ", " << globalHitPos.z << ")" << std::endl;
+                std::cout << "Cannot remove air at (" << hitPos.x << ", " << hitPos.y << ", " << hitPos.z << ")" << std::endl;
             }
             return false;
         }
 
-        worldRef.setBlock(globalHitPos.x, globalHitPos.y, globalHitPos.z, BlockType::AIR);
+        // Remove the block (set to air)
+        worldRef.setBlock(hitPos.x, hitPos.y, hitPos.z, BlockType::AIR);
         if (DebugManager::getInstance().logBlockPlacement()) {
-            std::cout << "Removed block at (" << globalHitPos.x << ", " << globalHitPos.y << ", " << globalHitPos.z << ")" << std::endl;
+            std::cout << "Removed block at (" << hitPos.x << ", " << hitPos.y << ", " << hitPos.z << ")" << std::endl;
         }
         return true;
+    } else if (DebugManager::getInstance().logBlockPlacement()) {
+        std::cout << "Raycast didn't hit anything" << std::endl;
     }
     return false;
 }
 
 bool VoxelManipulator::raycast(const glm::vec3& origin, const glm::vec3& direction, float maxDistance, 
-                               glm::ivec3& hitPos, glm::vec3& hitNormal, ToolType tool) const {
+                              glm::ivec3& hitPos, glm::vec3& hitNormal, ToolType tool) const {
+    // Normalize the direction vector
     glm::vec3 dir = glm::normalize(direction);
-    glm::vec3 rayStart = origin;
-    glm::ivec3 currentVoxel = glm::ivec3(floor(rayStart.x), floor(rayStart.y), floor(rayStart.z));
-    glm::vec3 deltaDist = glm::vec3(
-        dir.x == 0 ? FLT_MAX : fabs(1.0f / dir.x),
-        dir.y == 0 ? FLT_MAX : fabs(1.0f / dir.y),
-        dir.z == 0 ? FLT_MAX : fabs(1.0f / dir.z)
+    
+    // Using DDA algorithm for more precise raycasting
+    glm::ivec3 mapPos = glm::ivec3(floor(origin.x), floor(origin.y), floor(origin.z));
+    
+    // Direction to step in (+1 or -1 for each axis)
+    glm::ivec3 stepDir = glm::ivec3(
+        dir.x > 0 ? 1 : (dir.x < 0 ? -1 : 0),
+        dir.y > 0 ? 1 : (dir.y < 0 ? -1 : 0),
+        dir.z > 0 ? 1 : (dir.z < 0 ? -1 : 0)
     );
-    glm::ivec3 step = glm::ivec3(
-        dir.x > 0 ? 1 : -1,
-        dir.y > 0 ? 1 : -1,
-        dir.z > 0 ? 1 : -1
-    );
+    
+    // Distance from current position to next voxel boundary
     glm::vec3 sideDist = glm::vec3(
-        (dir.x > 0 ? currentVoxel.x + 1 - rayStart.x : rayStart.x - currentVoxel.x) * deltaDist.x,
-        (dir.y > 0 ? currentVoxel.y + 1 - rayStart.y : rayStart.y - currentVoxel.y) * deltaDist.y,
-        (dir.z > 0 ? currentVoxel.z + 1 - rayStart.z : rayStart.z - currentVoxel.z) * deltaDist.z
+        stepDir.x > 0 ? (floor(origin.x) + 1.0f - origin.x) : (origin.x - floor(origin.x)),
+        stepDir.y > 0 ? (floor(origin.y) + 1.0f - origin.y) : (origin.y - floor(origin.y)),
+        stepDir.z > 0 ? (floor(origin.z) + 1.0f - origin.z) : (origin.z - floor(origin.z))
     );
-
-    float t = 0.0f;
-    while (t <= maxDistance) {
-        // Convert local to global coordinates
-        glm::ivec3 globalVoxel = currentVoxel + worldRef.getLocalOrigin();
-        if (globalVoxel.y < FLOOR_HEIGHT || globalVoxel.y > CEILING_HEIGHT) {
-            if (DebugManager::getInstance().logRaycast()) {
-                std::cout << "Raycast out of bounds at (" << globalVoxel.x << ", " << globalVoxel.y << ", " << globalVoxel.z << ")" << std::endl;
-            }
-            return false;
+    
+    // Avoid division by zero
+    sideDist.x = (dir.x == 0) ? INFINITY : sideDist.x / std::abs(dir.x);
+    sideDist.y = (dir.y == 0) ? INFINITY : sideDist.y / std::abs(dir.y);
+    sideDist.z = (dir.z == 0) ? INFINITY : sideDist.z / std::abs(dir.z);
+    
+    // Delta distances (distance between voxel boundaries)
+    glm::vec3 deltaDist = glm::vec3(
+        (dir.x == 0) ? INFINITY : std::abs(1.0f / dir.x),
+        (dir.y == 0) ? INFINITY : std::abs(1.0f / dir.y),
+        (dir.z == 0) ? INFINITY : std::abs(1.0f / dir.z)
+    );
+    
+    float distance = 0.0f;
+    
+    // Main raycast loop
+    while (distance < maxDistance) {
+        // Find axis with closest boundary
+        int axis = 0;
+        if (sideDist.y < sideDist.x && sideDist.y < sideDist.z) {
+            axis = 1;
+        } else if (sideDist.z < sideDist.x && sideDist.z < sideDist.y) {
+            axis = 2;
         }
-
-        Block block = worldRef.getBlock(globalVoxel.x, globalVoxel.y, globalVoxel.z);
-
-        if (DebugManager::getInstance().logRaycast()) {
-            std::cout << "Checking block at (" << globalVoxel.x << ", " << globalVoxel.y << ", " << globalVoxel.z 
-                      << ") Type: " << (int)block.type << std::endl;
+        
+        // Step to next voxel
+        if (axis == 0) {
+            mapPos.x += stepDir.x;
+            distance = sideDist.x;
+            sideDist.x += deltaDist.x;
+        } else if (axis == 1) {
+            mapPos.y += stepDir.y;
+            distance = sideDist.y;
+            sideDist.y += deltaDist.y;
+        } else {
+            mapPos.z += stepDir.z;
+            distance = sideDist.z;
+            sideDist.z += deltaDist.z;
         }
-
-        if (tool == ToolType::NONE && (block.type == BlockType::DIRT || block.type == BlockType::GRASS)) {
-            hitPos = currentVoxel; // Return local coordinates
-            glm::vec3 hitPoint = origin + dir * t;
-            glm::vec3 blockCenter = glm::vec3(currentVoxel.x + 0.5f, currentVoxel.y + 0.5f, currentVoxel.z + 0.5f);
-            glm::vec3 diff = hitPoint - blockCenter;
+        
+        // Check if hit a block
+        Block block = worldRef.getBlock(mapPos.x, mapPos.y, mapPos.z);
+        if (block.type != BlockType::AIR) {
+            hitPos = mapPos;
+            
+            // Set normal based on which face we hit
             hitNormal = glm::vec3(0.0f);
-            float maxDiff = 0.0f;
-            if (fabs(diff.x) > fabs(maxDiff)) { maxDiff = diff.x; hitNormal = glm::vec3(diff.x > 0 ? 1 : -1, 0, 0); }
-            if (fabs(diff.y) > fabs(maxDiff)) { maxDiff = diff.y; hitNormal = glm::vec3(0, diff.y > 0 ? 1 : -1, 0); }
-            if (fabs(diff.z) > fabs(maxDiff)) { hitNormal = glm::vec3(0, 0, diff.z > 0 ? 1 : -1); }
-
+            if (axis == 0) hitNormal.x = -stepDir.x;
+            else if (axis == 1) hitNormal.y = -stepDir.y;
+            else hitNormal.z = -stepDir.z;
+            
             if (DebugManager::getInstance().logRaycast()) {
-                std::cout << "Raycast hit at (" << hitPos.x << ", " << hitPos.y << ", " << hitPos.z 
-                          << ") Normal: (" << hitNormal.x << ", " << hitNormal.y << ", " << hitNormal.z 
-                          << ") Pos: (" << hitPoint.x << ", " << hitPoint.y << ", " << hitPoint.z << ")" << std::endl;
+                std::cout << "Raycast hit block at " << hitPos.x << ", " << hitPos.y << ", " << hitPos.z 
+                          << " with normal " << hitNormal.x << ", " << hitNormal.y << ", " << hitNormal.z << std::endl;
             }
+            
             return true;
         }
-
-        if (sideDist.x < sideDist.y && sideDist.x < sideDist.z) {
-            t = sideDist.x;
-            sideDist.x += deltaDist.x;
-            currentVoxel.x += step.x;
-        } else if (sideDist.y < sideDist.z) {
-            t = sideDist.y;
-            sideDist.y += deltaDist.y;
-            currentVoxel.y += step.y;
-        } else {
-            t = sideDist.z;
-            sideDist.z += deltaDist.z;
-            currentVoxel.z += step.z;
-        }
     }
-
-    if (DebugManager::getInstance().logRaycast()) {
-        glm::vec3 endPos = origin + dir * t;
-        std::cout << "Raycast ended at t = " << t << " Pos: (" << endPos.x << ", " << endPos.y << ", " << endPos.z << ")" << std::endl;
-    }
+    
     return false;
 }
 
 bool VoxelManipulator::isAdjacentToSolid(const glm::ivec3& pos) const {
+    // Check all 6 adjacent positions
     const glm::ivec3 directions[6] = {
         {1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}
     };
 
     for (const auto& dir : directions) {
         glm::ivec3 neighbor = pos + dir;
-        glm::ivec3 globalNeighbor = neighbor + worldRef.getLocalOrigin();
-        if (globalNeighbor.y >= FLOOR_HEIGHT && globalNeighbor.y <= CEILING_HEIGHT) {
-            Block block = worldRef.getBlock(globalNeighbor.x, globalNeighbor.y, globalNeighbor.z);
-            if (block.type == BlockType::GRASS || block.type == BlockType::DIRT) {
-                return true;
-            }
+        Block block = worldRef.getBlock(neighbor.x, neighbor.y, neighbor.z);
+        if (block.type == BlockType::GRASS || block.type == BlockType::DIRT) {
+            return true;
         }
     }
     return false;

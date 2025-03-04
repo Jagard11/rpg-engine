@@ -3,148 +3,231 @@
 #include <cmath>
 #include <iostream>
 #include "Debug/DebugManager.hpp"
-
-World::World() : radius(6371000.0f), localOrigin(0, 0, 0) {}
+#include <vector>
+#include <algorithm>
 
 void World::update(const glm::vec3& playerPos) {
-    localOrigin = glm::ivec3(floor(playerPos.x / Chunk::SIZE) * Chunk::SIZE, 
-                             floor(playerPos.y / Chunk::SIZE) * Chunk::SIZE, 
-                             floor(playerPos.z / Chunk::SIZE) * Chunk::SIZE);
-    int px = static_cast<int>(playerPos.x / Chunk::SIZE);
-    int pz = static_cast<int>(playerPos.z / Chunk::SIZE);
-    int renderDist = 64; // Increased to ~1000 units for visibility
+    static int frameCounter = 0;
+    frameCounter++;
 
-    px = glm::clamp(px, -1000, 1000);
-    pz = glm::clamp(pz, -1000, 1000);
+    // For debugging, calculate integer chunk coordinates based directly on player position
+    // This simpler mapping helps isolate coordinate system issues
+    int px = static_cast<int>(floor(playerPos.x / Chunk::SIZE));
+    int py = static_cast<int>(floor((playerPos.y) / Chunk::SIZE)); // No radius offset for now
+    int pz = static_cast<int>(floor(playerPos.z / Chunk::SIZE));
 
-    std::unordered_map<std::pair<int, int>, Chunk, pair_hash> newChunks;
-    for (int face = 0; face < 6; face++) {
-        for (int x = px - renderDist; x <= px + renderDist; x++) {
-            for (int z = pz - renderDist; z <= pz + renderDist; z++) {
-                auto key = std::make_pair(x + face * 1000, z);
-                auto it = chunks.find(key);
-                if (it != chunks.end()) {
-                    newChunks.emplace(key, std::move(it->second));
-                } else {
-                    newChunks.emplace(key, Chunk(x, z));
-                }
+    // Store the origin for relative coordinates
+    localOrigin = glm::ivec3(px, py, pz);
+
+    // Debug log player position
+    if (DebugManager::getInstance().logPlayerInfo() && frameCounter % 60 == 0) {
+        std::cout << "Player position: " << playerPos.x << ", " << playerPos.y << ", " << playerPos.z << std::endl;
+        std::cout << "Player chunk coords: " << px << ", " << py << ", " << pz << std::endl;
+    }
+
+    std::vector<std::tuple<int, int, int, int, float>> chunkCandidates;
+
+    // Generate the 3x3x3 grid (27 chunks) around player
+    const int renderDistance = 1; // 1 chunk in each direction = 3x3x3 grid
+    for (int x = px - renderDistance; x <= px + renderDistance; x++) {
+        for (int y = py - renderDistance; y <= py + renderDistance; y++) {
+            for (int z = pz - renderDistance; z <= pz + renderDistance; z++) {
+                float dist = sqrt(pow(x - px, 2) + pow(y - py, 2) + pow(z - pz, 2));
+                chunkCandidates.emplace_back(x, y, z, 1, dist); // mergeFactor = 1 for full detail
             }
         }
     }
+
+    // Sort by distance from player
+    std::sort(chunkCandidates.begin(), chunkCandidates.end(),
+              [](const auto& a, const auto& b) { return std::get<4>(a) < std::get<4>(b); });
+
+    // Create new chunk map
+    std::unordered_map<std::tuple<int, int, int, int>, std::unique_ptr<Chunk>, quad_hash> newChunks;
+    bool firstLoad = chunks.empty();
+    
+    // Process the 27 closest chunks
+    for (const auto& candidate : chunkCandidates) {
+        auto [x, y, z, mf, dist] = candidate;
+        auto key = std::make_tuple(x, y, z, mf);
+        auto it = chunks.find(key);
+
+        if (it != chunks.end()) {
+            // Move existing chunk to newChunks
+            newChunks.emplace(key, std::move(it->second));
+        } else {
+            // Create new chunk
+            newChunks[key] = std::make_unique<Chunk>(x, y, z, mf);
+            newChunks[key]->setWorld(this);
+            newChunks[key]->generateTerrain();
+            
+            if (DebugManager::getInstance().logChunkUpdates()) {
+                std::cout << "Created new chunk at (" << x << ", " << y << ", " << z << ")" << std::endl;
+            }
+        }
+
+        // Force terrain generation to ensure chunks have content
+        auto& chunk = newChunks[key];
+        chunk->generateTerrain();
+        chunk->markMeshDirty();
+        chunk->regenerateMesh();
+    }
+
+    // Replace old chunks with new ones
     chunks = std::move(newChunks);
 
-    if (DebugManager::getInstance().logChunkUpdates()) {
-        std::cout << "Chunks updated, count: " << chunks.size() << " around player (" << playerPos.x << ", " << playerPos.y << ", " << playerPos.z << ")" << std::endl;
+    // Debug output
+    if (DebugManager::getInstance().logChunkUpdates() && frameCounter % 60 == 0) {
+        size_t totalMemory = 0;
+        for (const auto& [key, chunk] : chunks) {
+            totalMemory += chunk->getMesh().size() * sizeof(float) +
+                           (chunk->getMergeFactor() == 1 ? Chunk::SIZE * Chunk::SIZE * Chunk::SIZE * sizeof(Block) : 0);
+            std::cout << "Loaded chunk (" << std::get<0>(key) << ", " << std::get<1>(key) << ", " << std::get<2>(key)
+                      << "), MergeFactor: " << chunk->getMergeFactor() << ", Vertices: " << chunk->getMesh().size() / 5 << std::endl;
+        }
+        std::cout << "Chunks updated, count: " << chunks.size()
+                  << ", Est. Memory: " << totalMemory / (1024.0f * 1024.0f) << " MB" << std::endl;
+        std::cout << "Player chunk coords: (" << px << ", " << py << ", " << pz << ")" << std::endl;
     }
 }
 
 glm::vec3 World::cubeToSphere(int face, int x, int z, float y) const {
-    float scale = Chunk::SIZE;
-    float bx = x * scale;
-    float bz = z * scale;
-    float by = y; // Simplified: no radius offset, keep local to player
-    glm::vec3 pos;
-
-    // Simplified mapping: place chunks in a flat grid for now, adjust later
-    switch (face) {
-        case 0: pos = glm::vec3(bx, by, bz); break; // Top face as flat plane
-        case 1: pos = glm::vec3(bx, by - 16.0f, bz); break; // Bottom
-        case 2: pos = glm::vec3(bx + 16.0f, by, bz); break; // Right
-        case 3: pos = glm::vec3(bx - 16.0f, by, bz); break; // Left
-        case 4: pos = glm::vec3(bx, by, bz + 16.0f); break; // Front
-        case 5: pos = glm::vec3(bx, by, bz - 16.0f); break; // Back
-    }
-
-    if (DebugManager::getInstance().logChunkUpdates()) {
-        std::cout << "Chunk mapped: face=" << face << ", x=" << x << ", z=" << z << ", pos=(" << pos.x << ", " << pos.y << ", " << pos.z << ")" << std::endl;
-    }
-    return pos;
+    // For debugging, just return cartesian coordinates directly
+    // This simplifies debugging and helps isolate coordinate system issues
+    return glm::vec3(x, y, z);
 }
 
 float World::findSurfaceHeight(float chunkX, float chunkZ) const {
-    int intChunkX = static_cast<int>(chunkX);
-    int intChunkZ = static_cast<int>(chunkZ);
-    auto it = chunks.find(std::make_pair(intChunkX, intChunkZ));
-    if (it == chunks.end()) {
-        return 8.0f; // Default surface height
-    }
-    const Chunk& chunk = it->second;
-    for (int y = Chunk::SIZE - 1; y >= 0; --y) {
-        BlockType type = chunk.getBlock(8, y, 8).type;
-        if (type != BlockType::AIR) {
-            return y;
-        }
-    }
-    return 8.0f;
+    // Return fixed surface height for simplicity (around y=1599.55)
+    return radius + 8.0f;
 }
 
 void World::setBlock(int worldX, int worldY, int worldZ, BlockType type) {
-    int chunkX = worldX / Chunk::SIZE;
-    int chunkZ = worldZ / Chunk::SIZE;
-    int localX = worldX % Chunk::SIZE;
-    int localZ = worldZ % Chunk::SIZE;
-    int localY = worldY % Chunk::SIZE;
+    // Simple mapping to chunk coordinates
+    int chunkX = static_cast<int>(floor(worldX / static_cast<float>(Chunk::SIZE)));
+    int chunkY = static_cast<int>(floor(worldY / static_cast<float>(Chunk::SIZE)));
+    int chunkZ = static_cast<int>(floor(worldZ / static_cast<float>(Chunk::SIZE)));
+    
+    // Calculate local block position within chunk
+    int localX = worldX - chunkX * Chunk::SIZE;
+    int localY = worldY - chunkY * Chunk::SIZE;
+    int localZ = worldZ - chunkZ * Chunk::SIZE;
+    
     if (localX < 0) { localX += Chunk::SIZE; chunkX--; }
+    if (localY < 0) { localY += Chunk::SIZE; chunkY--; }
     if (localZ < 0) { localZ += Chunk::SIZE; chunkZ--; }
-    if (localY < 0) { localY += Chunk::SIZE; }
 
-    auto key = std::make_pair(chunkX, chunkZ);
+    std::cout << "Setting block at world (" << worldX << ", " << worldY << ", " << worldZ 
+              << ") -> chunk (" << chunkX << ", " << chunkY << ", " << chunkZ 
+              << ") local (" << localX << ", " << localY << ", " << localZ << ")" << std::endl;
+
+    // Find or create the chunk
+    auto key = std::make_tuple(chunkX, chunkY, chunkZ, 1);
     auto it = chunks.find(key);
     if (it == chunks.end()) {
-        auto result = chunks.emplace(key, Chunk(chunkX, chunkZ));
+        // Chunk doesn't exist yet, create it
+        std::cout << "Creating new chunk for block placement" << std::endl;
+        auto result = chunks.emplace(key, std::make_unique<Chunk>(chunkX, chunkY, chunkZ, 1));
+        result.first->second->setWorld(this);
+        result.first->second->generateTerrain();
         it = result.first;
     }
-    it->second.setBlock(localX, localY, localZ, type);
+    
+    // Set the block
+    it->second->setBlock(localX, localY, localZ, type);
+    it->second->markMeshDirty();  // Make sure the mesh gets updated
+    it->second->regenerateMesh(); // Force immediate mesh update
 
-    it->second.regenerateMesh(0);
-
-    if (localX == 0) {
-        auto neighborKey = std::make_pair(chunkX - 1, chunkZ);
-        auto neighbor = chunks.find(neighborKey);
-        if (neighbor != chunks.end()) neighbor->second.regenerateMesh(0);
-        else chunks.emplace(neighborKey, Chunk(chunkX - 1, chunkZ)).first->second.regenerateMesh(0);
+    // Mark neighboring chunks as dirty if the block is on a boundary
+    for (int dx = -1; dx <= 1; dx += 2) {
+        auto neighborKey = std::make_tuple(chunkX + dx, chunkY, chunkZ, 1);
+        if (localX == (dx == -1 ? 0 : Chunk::SIZE - 1)) {
+            auto neighbor = chunks.find(neighborKey);
+            if (neighbor != chunks.end()) {
+                neighbor->second->markMeshDirty();
+                neighbor->second->regenerateMesh();
+            }
+            else {
+                auto result = chunks.emplace(neighborKey, std::make_unique<Chunk>(chunkX + dx, chunkY, chunkZ, 1));
+                result.first->second->setWorld(this);
+                result.first->second->generateTerrain();
+                result.first->second->markMeshDirty();
+                result.first->second->regenerateMesh();
+            }
+        }
     }
-    if (localX == Chunk::SIZE - 1) {
-        auto neighborKey = std::make_pair(chunkX + 1, chunkZ);
-        auto neighbor = chunks.find(neighborKey);
-        if (neighbor != chunks.end()) neighbor->second.regenerateMesh(0);
-        else chunks.emplace(neighborKey, Chunk(chunkX + 1, chunkZ)).first->second.regenerateMesh(0);
+    for (int dy = -1; dy <= 1; dy += 2) {
+        auto neighborKey = std::make_tuple(chunkX, chunkY + dy, chunkZ, 1);
+        if (localY == (dy == -1 ? 0 : Chunk::SIZE - 1)) {
+            auto neighbor = chunks.find(neighborKey);
+            if (neighbor != chunks.end()) {
+                neighbor->second->markMeshDirty();
+                neighbor->second->regenerateMesh();
+            }
+            else {
+                auto result = chunks.emplace(neighborKey, std::make_unique<Chunk>(chunkX, chunkY + dy, chunkZ, 1));
+                result.first->second->setWorld(this);
+                result.first->second->generateTerrain();
+                result.first->second->markMeshDirty();
+                result.first->second->regenerateMesh();
+            }
+        }
     }
-    if (localZ == 0) {
-        auto neighborKey = std::make_pair(chunkX, chunkZ - 1);
-        auto neighbor = chunks.find(neighborKey);
-        if (neighbor != chunks.end()) neighbor->second.regenerateMesh(0);
-        else chunks.emplace(neighborKey, Chunk(chunkX, chunkZ - 1)).first->second.regenerateMesh(0);
-    }
-    if (localZ == Chunk::SIZE - 1) {
-        auto neighborKey = std::make_pair(chunkX, chunkZ + 1);
-        auto neighbor = chunks.find(neighborKey);
-        if (neighbor != chunks.end()) neighbor->second.regenerateMesh(0);
-        else chunks.emplace(neighborKey, Chunk(chunkX, chunkZ + 1)).first->second.regenerateMesh(0);
+    for (int dz = -1; dz <= 1; dz += 2) {
+        auto neighborKey = std::make_tuple(chunkX, chunkY, chunkZ + dz, 1);
+        if (localZ == (dz == -1 ? 0 : Chunk::SIZE - 1)) {
+            auto neighbor = chunks.find(neighborKey);
+            if (neighbor != chunks.end()) {
+                neighbor->second->markMeshDirty();
+                neighbor->second->regenerateMesh();
+            }
+            else {
+                auto result = chunks.emplace(neighborKey, std::make_unique<Chunk>(chunkX, chunkY, chunkZ + dz, 1));
+                result.first->second->setWorld(this);
+                result.first->second->generateTerrain();
+                result.first->second->markMeshDirty();
+                result.first->second->regenerateMesh();
+            }
+        }
     }
 }
 
 Block World::getBlock(int worldX, int worldY, int worldZ) const {
-    int chunkX = worldX / Chunk::SIZE;
-    int chunkZ = worldZ / Chunk::SIZE;
-    int localX = worldX % Chunk::SIZE;
-    int localZ = worldZ % Chunk::SIZE;
-    int localY = worldY % Chunk::SIZE;
+    // Simple mapping to chunk coordinates
+    int chunkX = static_cast<int>(floor(worldX / static_cast<float>(Chunk::SIZE)));
+    int chunkY = static_cast<int>(floor(worldY / static_cast<float>(Chunk::SIZE)));
+    int chunkZ = static_cast<int>(floor(worldZ / static_cast<float>(Chunk::SIZE)));
+    
+    // Calculate local block position within chunk
+    int localX = worldX - chunkX * Chunk::SIZE;
+    int localY = worldY - chunkY * Chunk::SIZE;
+    int localZ = worldZ - chunkZ * Chunk::SIZE;
+    
     if (localX < 0) { localX += Chunk::SIZE; chunkX--; }
+    if (localY < 0) { localY += Chunk::SIZE; chunkY--; }
     if (localZ < 0) { localZ += Chunk::SIZE; chunkZ--; }
-    if (localY < 0) { localY += Chunk::SIZE; }
 
-    auto it = chunks.find(std::make_pair(chunkX, chunkZ));
-    if (it != chunks.end() && localY >= 0 && localY < Chunk::SIZE) {
-        return it->second.getBlock(localX, localY, localZ);
+    // Find the chunk
+    auto it = chunks.find(std::make_tuple(chunkX, chunkY, chunkZ, 1));
+    if (it != chunks.end()) {
+        return it->second->getBlock(localX, localY, localZ);
+    }
+    
+    // If chunk doesn't exist, determine block type based on fixed height
+    float surfaceHeight = radius + 8.0f; // ~1599.55
+    
+    if (worldY < surfaceHeight - 1.0f) {
+        return Block(BlockType::DIRT);
+    } else if (worldY < surfaceHeight) {
+        return Block(BlockType::GRASS);
     }
     return Block(BlockType::AIR);
 }
 
-glm::ivec3 World::getLocalOrigin() const {
-    return localOrigin;
+std::unordered_map<std::tuple<int, int, int, int>, std::unique_ptr<Chunk>, quad_hash>& World::getChunks() {
+    return chunks;
 }
 
-float World::getRadius() const {
-    return radius;
+const std::unordered_map<std::tuple<int, int, int, int>, std::unique_ptr<Chunk>, quad_hash>& World::getChunks() const {
+    return chunks;
 }

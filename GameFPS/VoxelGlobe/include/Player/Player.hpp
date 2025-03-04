@@ -12,7 +12,8 @@ public:
     Player(const World& world);
     void update(GLFWwindow* window, float deltaTime);
     float getHeight() const { return 1.75f; }
-    const World& getWorld() const { return world; } // Added accessor method
+    const World& getWorld() const { return world; }
+    void finishLoading(); // New method to signal loading complete
 
     glm::vec3 position;
     glm::vec3 cameraDirection;
@@ -24,6 +25,7 @@ public:
 private:
     const World& world;
     Movement movement;
+    bool isLoading; // New flag
 };
 
 #endif

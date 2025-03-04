@@ -12,7 +12,7 @@ class Renderer {
 public:
     Renderer();
     ~Renderer();
-    void render(const World& world, const Player& player, const GraphicsSettings& settings);
+    void render(World& world, const Player& player, const GraphicsSettings& settings);
 
 private:
     void renderVoxelEdges(const World& world, const Player& player, const GraphicsSettings& settings);
@@ -20,11 +20,14 @@ private:
     void loadEdgeShader();
     void loadTexture();
 
-    GLuint vao, vbo, ebo; // Added ebo
+    GLuint vao, vbo, ebo;
     GLuint edgeVao, edgeVbo;
     GLuint shaderProgram;
     GLuint edgeShaderProgram;
     GLuint texture;
+    
+    // Frame counter for debug output
+    int frameCounter;
 };
 
 #endif

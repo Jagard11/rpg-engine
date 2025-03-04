@@ -6,31 +6,62 @@
 #include <glm/glm.hpp>
 #include <unordered_map>
 #include <utility>
+#include <memory>
 
-struct pair_hash {
-    template <class T1, class T2>
-    std::size_t operator()(const std::pair<T1, T2>& p) const {
-        return std::hash<T1>{}(p.first) ^ std::hash<T2>{}(p.second);
+// Custom hash function for tuple keys (chunkX, chunkY, chunkZ, mergeFactor)
+struct quad_hash {
+    std::size_t operator()(const std::tuple<int, int, int, int>& t) const {
+        return std::hash<int>{}(std::get<0>(t)) ^ 
+               (std::hash<int>{}(std::get<1>(t)) << 1) ^ 
+               (std::hash<int>{}(std::get<2>(t)) << 2) ^ 
+               (std::hash<int>{}(std::get<3>(t)) << 3);
     }
 };
 
 class World {
 public:
-    World();
+    // Constructor with default radius (approximately Earth radius in voxel units)
+    World() : radius(1591.55f), localOrigin(0, 0, 0) {}
+    
+    // Update chunks around the player
     void update(const glm::vec3& playerPos);
-    std::unordered_map<std::pair<int, int>, Chunk, pair_hash>& getChunks() { return chunks; }
-    const std::unordered_map<std::pair<int, int>, Chunk, pair_hash>& getChunks() const { return chunks; }
+    
+    // Access the chunk map (mutable)
+    std::unordered_map<std::tuple<int, int, int, int>, std::unique_ptr<Chunk>, quad_hash>& getChunks();
+    
+    // Access the chunk map (const)
+    const std::unordered_map<std::tuple<int, int, int, int>, std::unique_ptr<Chunk>, quad_hash>& getChunks() const;
+    
+    // Convert cube coordinates to sphere coordinates
     glm::vec3 cubeToSphere(int face, int x, int z, float y) const;
+    
+    // Find the height of the surface at a given position
     float findSurfaceHeight(float chunkX, float chunkZ) const;
+    
+    // Set a block in the world
     void setBlock(int worldX, int worldY, int worldZ, BlockType type);
+    
+    // Get a block from the world
     Block getBlock(int worldX, int worldY, int worldZ) const;
-    glm::ivec3 getLocalOrigin() const; // Added
-    float getRadius() const; // Added
+    
+    // Get the planet radius
+    float getRadius() const { return radius; }
+    
+    // Get the local origin (used for chunk coordinate system)
+    glm::ivec3 getLocalOrigin() const { return localOrigin; }
 
 private:
-    std::unordered_map<std::pair<int, int>, Chunk, pair_hash> chunks;
+    // Map of all loaded chunks, keyed by (chunkX, chunkY, chunkZ, mergeFactor)
+    std::unordered_map<std::tuple<int, int, int, int>, std::unique_ptr<Chunk>, quad_hash> chunks;
+    
+    // Radius of the planet in voxel units
     float radius;
-    glm::ivec3 localOrigin; // Added for local coordinate system
+    
+    // Local origin for chunk coordinates (typically centered on player)
+    glm::ivec3 localOrigin;
+    
+    // Frame counter for logging
+    int frameCounter = 0;
 };
 
-#endif
+#endif // WORLD_HPP
