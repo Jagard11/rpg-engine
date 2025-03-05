@@ -71,6 +71,17 @@ void renderLoadingScreen(GLFWwindow* window, float progress) {
     glfwPollEvents();
 }
 
+// Helper function to consistently manage cursor state
+void updateCursorMode(GLFWwindow* window, bool showEscapeMenu, bool showDebugWindow, DisplayMode displayMode) {
+    if (showEscapeMenu || showDebugWindow) {
+        // Always show cursor when menus are open
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    } else {
+        // Always disable cursor in gameplay - regardless of display mode
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    }
+}
+
 int main() {
     // Initialize GLFW
     if (!glfwInit()) {
@@ -113,6 +124,7 @@ int main() {
     debugManager.setLogChunkUpdates(true);
     debugManager.setLogPlayerInfo(true);
     debugManager.setLogBlockPlacement(true);
+    debugManager.setLogRaycast(true);
     
     // Initialize core game components
     std::cout << "Creating world..." << std::endl;
@@ -159,8 +171,8 @@ int main() {
     std::cout << "Loading complete, enabling physics" << std::endl;
     player.finishLoading();
     
-    // Hide cursor for first-person controls
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    // Initialize cursor to disabled state
+    updateCursorMode(window, false, false, graphicsSettings.getMode());
     
     // Track keyboard/mouse states
     int lastEscapeState = GLFW_RELEASE;
@@ -202,8 +214,7 @@ int main() {
         int escapeState = glfwGetKey(window, GLFW_KEY_ESCAPE);
         if (escapeState == GLFW_PRESS && lastEscapeState == GLFW_RELEASE) {
             showEscapeMenu = !showEscapeMenu;
-            glfwSetInputMode(window, GLFW_CURSOR, showEscapeMenu || debugWindow.isVisible() ? GLFW_CURSOR_NORMAL :
-                             (graphicsSettings.getMode() == DisplayMode::FULLSCREEN_WINDOWED ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL));
+            updateCursorMode(window, showEscapeMenu, debugWindow.isVisible(), graphicsSettings.getMode());
         }
         lastEscapeState = escapeState;
         
@@ -211,8 +222,7 @@ int main() {
         int f8State = glfwGetKey(window, GLFW_KEY_F8);
         if (f8State == GLFW_PRESS && lastF8State == GLFW_RELEASE) {
             debugWindow.toggleVisibility();
-            glfwSetInputMode(window, GLFW_CURSOR, debugWindow.isVisible() || showEscapeMenu ? GLFW_CURSOR_NORMAL :
-                             (graphicsSettings.getMode() == DisplayMode::FULLSCREEN_WINDOWED ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL));
+            updateCursorMode(window, showEscapeMenu, debugWindow.isVisible(), graphicsSettings.getMode());
         }
         lastF8State = f8State;
         
@@ -223,14 +233,25 @@ int main() {
             // Handle block placement (left click)
             int leftClickState = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT);
             if (leftClickState == GLFW_PRESS && lastLeftClickState == GLFW_RELEASE) {
-                voxelManip.placeBlock(player, player.inventory.slots[player.inventory.selectedSlot]);
+                BlockType selectedBlock = player.inventory.slots[player.inventory.selectedSlot];
+                if (selectedBlock != BlockType::AIR) {
+                    if (voxelManip.placeBlock(player, selectedBlock)) {
+                        std::cout << "Block placed successfully: " << static_cast<int>(selectedBlock) << std::endl;
+                    } else {
+                        std::cout << "Failed to place block" << std::endl;
+                    }
+                }
             }
             lastLeftClickState = leftClickState;
             
             // Handle block removal (right click)
             int rightClickState = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT);
             if (rightClickState == GLFW_PRESS && lastRightClickState == GLFW_RELEASE) {
-                voxelManip.removeBlock(player);
+                if (voxelManip.removeBlock(player)) {
+                    std::cout << "Block removed successfully" << std::endl;
+                } else {
+                    std::cout << "Failed to remove block" << std::endl;
+                }
             }
             lastRightClickState = rightClickState;
         }
@@ -270,8 +291,7 @@ int main() {
             graphicsSettings.renderUI();
             if (ImGui::Button("Close")) {
                 showEscapeMenu = false;
-                glfwSetInputMode(window, GLFW_CURSOR, debugWindow.isVisible() ? GLFW_CURSOR_NORMAL :
-                                 (graphicsSettings.getMode() == DisplayMode::FULLSCREEN_WINDOWED ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL));
+                updateCursorMode(window, false, debugWindow.isVisible(), graphicsSettings.getMode());
             }
             ImGui::End();
         }
@@ -286,6 +306,11 @@ int main() {
         // Swap buffers and poll events
         glfwSwapBuffers(window);
         glfwPollEvents();
+        
+        // Periodically check cursor state to ensure consistency
+        if (!firstFrame && frameCount % 30 == 0) {
+            updateCursorMode(window, showEscapeMenu, debugWindow.isVisible(), graphicsSettings.getMode());
+        }
         
         // Limit frame rate if needed for testing
         if (deltaTime < 0.016) { // Cap at ~60 FPS during debugging

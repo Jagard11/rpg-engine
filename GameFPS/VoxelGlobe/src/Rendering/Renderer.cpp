@@ -86,15 +86,28 @@ void Renderer::render(World& world, const Player& player, const GraphicsSettings
     }
 
     // Setup projection and view matrices
-    glm::mat4 proj = glm::perspective(glm::radians(70.0f), static_cast<float>(settings.getWidth()) / settings.getHeight(), 0.1f, 8000.0f);
+    // Use a smaller near plane and larger far plane for better precision
+    glm::mat4 proj = glm::perspective(glm::radians(70.0f), 
+                                      static_cast<float>(settings.getWidth()) / settings.getHeight(), 
+                                      0.01f,  // Smaller near plane (was 0.1f)
+                                      10000.0f); // Larger far plane (was 8000.0f)
+    
     float playerHeight = player.getHeight();
     glm::vec3 eyePos = player.position + player.up * playerHeight;
     glm::vec3 lookAtPos = eyePos + player.cameraDirection;
-    glm::mat4 view = glm::lookAt(eyePos, lookAtPos, player.up);
+    
+    // Ensure up vector is orthogonal to view direction for correct camera orientation
+    // This is crucial for proper camera rotation as player moves around the globe
+    glm::vec3 viewDir = glm::normalize(lookAtPos - eyePos);
+    glm::vec3 rightDir = glm::normalize(glm::cross(viewDir, player.up));
+    glm::vec3 upDir = glm::normalize(glm::cross(rightDir, viewDir));
+    
+    // Use the corrected up vector for the lookAt matrix
+    glm::mat4 view = glm::lookAt(eyePos, lookAtPos, upDir);
     glm::mat4 vp = proj * view;
     
-    // TEMPORARILY DISABLE FRUSTUM CULLING for debugging
-    // Frustum frustum(vp);
+    // Create frustum for culling
+    Frustum frustum(vp);
 
     // Activate shader and texture
     glUseProgram(shaderProgram);
@@ -102,6 +115,11 @@ void Renderer::render(World& world, const Player& player, const GraphicsSettings
     glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "proj"), 1, GL_FALSE, &proj[0][0]);
     glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "view"), 1, GL_FALSE, &view[0][0]);
     glUniform1i(glGetUniformLocation(shaderProgram, "useFaceColors"), DebugManager::getInstance().useFaceColors());
+
+    // Add support for using local origin to avoid precision issues
+    glm::ivec3 localOrigin = world.getLocalOrigin();
+    glm::vec3 localOriginOffset(localOrigin.x * Chunk::SIZE, localOrigin.y * Chunk::SIZE, localOrigin.z * Chunk::SIZE);
+    glUniform3fv(glGetUniformLocation(shaderProgram, "localOriginOffset"), 1, &localOriginOffset[0]);
 
     // Tracking rendering statistics
     int renderedChunks = 0;
@@ -114,8 +132,15 @@ void Renderer::render(World& world, const Player& player, const GraphicsSettings
     if (printDebug) {
         std::cout << "------- RENDERING FRAME " << frameCounter << " -------" << std::endl;
         std::cout << "Player at: " << player.position.x << ", " << player.position.y << ", " << player.position.z << std::endl;
+        std::cout << "Up vector: " << player.up.x << ", " << player.up.y << ", " << player.up.z << std::endl;
+        std::cout << "Camera dir: " << player.cameraDirection.x << ", " << player.cameraDirection.y << ", " << player.cameraDirection.z << std::endl;
+        std::cout << "Local origin: " << localOrigin.x << ", " << localOrigin.y << ", " << localOrigin.z << std::endl;
         std::cout << "Total chunks: " << world.getChunks().size() << std::endl;
     }
+    
+    // Get planet radius for distance culling
+    float planetRadius = world.getRadius();
+    float maxRenderDistance = planetRadius * 0.25f; // 1/4 of planet radius is visible
     
     // Render all chunks
     for (auto& [key, chunk] : world.getChunks()) {
@@ -140,13 +165,14 @@ void Renderer::render(World& world, const Player& player, const GraphicsSettings
                       << ") center: " << chunkCenter.x << ", " << chunkCenter.y << ", " << chunkCenter.z << std::endl;
         }
         
-        // TEMPORARILY DISABLE DISTANCE CULLING for debugging
-        // float dist = glm::length(chunkCenter - eyePos);
-        // bool inFrustum = frustum.isSphereInFrustum(chunkCenter, chunkSize * 0.866f);
-        // if (dist > 500.0f || !inFrustum) {
-        //     skippedChunks++;
-        //     continue;
-        // }
+        // Apply distance and frustum culling
+        float dist = glm::length(chunkCenter - eyePos);
+        bool inFrustum = frustum.isSphereInFrustum(chunkCenter, chunkSize * 0.866f);
+        
+        if (dist > maxRenderDistance || !inFrustum) {
+            skippedChunks++;
+            continue;
+        }
         
         // If mesh is dirty, regenerate it
         if (chunk->isMeshDirty()) {
@@ -170,12 +196,14 @@ void Renderer::render(World& world, const Player& player, const GraphicsSettings
         }
         
         // Set up model matrix and render the chunk
+        // CRITICAL: Use pure translation without any additional scaling
         glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(
             chunkX * Chunk::SIZE,
             chunkY * Chunk::SIZE,
             chunkZ * Chunk::SIZE
         ));
         
+        // Apply model matrix without any scaling factor
         glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model"), 1, GL_FALSE, &model[0][0]);
         
         // Bind VAO and draw
@@ -200,13 +228,24 @@ void Renderer::renderVoxelEdges(const World& world, const Player& player, const 
     glUseProgram(edgeShaderProgram);
     glBindVertexArray(edgeVao);
 
-    glm::mat4 proj = glm::perspective(glm::radians(70.0f), static_cast<float>(settings.getWidth()) / settings.getHeight(), 0.1f, 8000.0f);
+    glm::mat4 proj = glm::perspective(glm::radians(70.0f), static_cast<float>(settings.getWidth()) / settings.getHeight(), 0.01f, 10000.0f);
     float playerHeight = player.getHeight();
     glm::vec3 eyePos = player.position + player.up * playerHeight;
     glm::vec3 lookAtPos = eyePos + player.cameraDirection;
-    glm::mat4 view = glm::lookAt(eyePos, lookAtPos, player.up);
+    
+    // Use corrected up vector for edge rendering too
+    glm::vec3 viewDir = glm::normalize(lookAtPos - eyePos);
+    glm::vec3 rightDir = glm::normalize(glm::cross(viewDir, player.up));
+    glm::vec3 upDir = glm::normalize(glm::cross(rightDir, viewDir));
+    
+    glm::mat4 view = glm::lookAt(eyePos, lookAtPos, upDir);
     glUniformMatrix4fv(glGetUniformLocation(edgeShaderProgram, "proj"), 1, GL_FALSE, &proj[0][0]);
     glUniformMatrix4fv(glGetUniformLocation(edgeShaderProgram, "view"), 1, GL_FALSE, &view[0][0]);
+
+    // Add support for local origin
+    glm::ivec3 localOrigin = world.getLocalOrigin();
+    glm::vec3 localOriginOffset(localOrigin.x * Chunk::SIZE, localOrigin.y * Chunk::SIZE, localOrigin.z * Chunk::SIZE);
+    glUniform3fv(glGetUniformLocation(edgeShaderProgram, "localOriginOffset"), 1, &localOriginOffset[0]);
 
     std::vector<float> edgeVertices;
     float radius = 100.0f; // Increased from 5.0f * Chunk::SIZE for debugging
@@ -272,17 +311,24 @@ void Renderer::loadShader() {
         layout(location = 1) in vec2 uv;
         out vec2 TexCoord;
         uniform mat4 model, view, proj;
+        uniform vec3 localOriginOffset;
+        
         void main() {
-            gl_Position = proj * view * model * vec4(pos, 1.0);
+            // Apply transformations without any extra scaling
+            // Use local origin offset for better precision
+            vec3 worldPos = (model * vec4(pos, 1.0)).xyz - localOriginOffset;
+            gl_Position = proj * view * vec4(worldPos, 1.0);
             TexCoord = uv;
         }
     )";
+    
     const char* fragSrc = R"(
         #version 330 core
         in vec2 TexCoord;
         out vec4 FragColor;
         uniform sampler2D tex;
         uniform bool useFaceColors;
+        
         void main() {
             if (useFaceColors) {
                 float faceId = floor(TexCoord.x + 0.5);
@@ -297,6 +343,7 @@ void Renderer::loadShader() {
             }
         }
     )";
+    
     GLuint vert = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vert, 1, &vertSrc, NULL);
     glCompileShader(vert);
@@ -307,6 +354,7 @@ void Renderer::loadShader() {
         glGetShaderInfoLog(vert, 512, NULL, infoLog);
         std::cerr << "Vertex Shader Error: " << infoLog << std::endl;
     }
+    
     GLuint frag = glCreateShader(GL_FRAGMENT_SHADER);
     glShaderSource(frag, 1, &fragSrc, NULL);
     glCompileShader(frag);
@@ -315,6 +363,7 @@ void Renderer::loadShader() {
         glGetShaderInfoLog(frag, 512, NULL, infoLog);
         std::cerr << "Fragment Shader Error: " << infoLog << std::endl;
     }
+    
     shaderProgram = glCreateProgram();
     glAttachShader(shaderProgram, vert);
     glAttachShader(shaderProgram, frag);
@@ -324,6 +373,7 @@ void Renderer::loadShader() {
         glGetProgramInfoLog(shaderProgram, 512, NULL, infoLog);
         std::cerr << "Shader Program Link Error: " << infoLog << std::endl;
     }
+    
     glDeleteShader(vert);
     glDeleteShader(frag);
 }
@@ -333,10 +383,15 @@ void Renderer::loadEdgeShader() {
         #version 330 core
         layout(location = 0) in vec3 pos;
         uniform mat4 view, proj;
+        uniform vec3 localOriginOffset;
+        
         void main() {
-            gl_Position = proj * view * vec4(pos, 1.0);
+            // Apply the local origin offset for better precision
+            vec3 worldPos = pos - localOriginOffset;
+            gl_Position = proj * view * vec4(worldPos, 1.0);
         }
     )";
+    
     const char* fragSrc = R"(
         #version 330 core
         out vec4 FragColor;
@@ -344,6 +399,7 @@ void Renderer::loadEdgeShader() {
             FragColor = vec4(1.0, 0.0, 0.0, 1.0);
         }
     )";
+    
     GLuint vert = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vert, 1, &vertSrc, NULL);
     glCompileShader(vert);

@@ -1,4 +1,3 @@
-// ./include/VoxelManipulator.hpp
 #ifndef VOXEL_MANIPULATOR_HPP
 #define VOXEL_MANIPULATOR_HPP
 
@@ -23,10 +22,14 @@ public:
 
 private:
     World& worldRef;
-    static constexpr int FLOOR_HEIGHT = 1500;    // Configurable floor height (world Y)
-    static constexpr int CEILING_HEIGHT = 1755;  // Configurable ceiling height (world Y, 255 above floor)
-    static constexpr float MAX_REACH = 5.0f;     // Maximum reach distance (5 meters)
+    // Increased reach to match the larger world scale
+    static constexpr float MAX_REACH = 100.0f;  // Increased from 5.0f to 100.0f
+    
+    // New methods for block placement validation and collision updating
+    bool isValidPlacementPosition(const glm::ivec3& pos) const;
+    bool isValidRemovalPosition(const glm::ivec3& pos) const;
     bool isAdjacentToSolid(const glm::ivec3& pos) const;
+    void updateChunkCollisions(const glm::ivec3& blockPos);
 };
 
 #endif

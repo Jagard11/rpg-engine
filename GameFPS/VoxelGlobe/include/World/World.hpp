@@ -1,4 +1,3 @@
-// ./include/World/World.hpp
 #ifndef WORLD_HPP
 #define WORLD_HPP
 
@@ -20,8 +19,9 @@ struct quad_hash {
 
 class World {
 public:
-    // Constructor with default radius (approximately Earth radius in voxel units)
-    World() : radius(1591.55f), localOrigin(0, 0, 0) {}
+    // Reduced radius to avoid floating point precision issues
+    // 6371.0f is closer to Earth's radius in kilometers
+    World() : radius(6371.0f), localOrigin(0, 0, 0) {}
     
     // Update chunks around the player
     void update(const glm::vec3& playerPos);
@@ -46,6 +46,9 @@ public:
     
     // Get the planet radius
     float getRadius() const { return radius; }
+    
+    // Get the surface radius (planet radius + offset)
+    float getSurfaceRadius() const;
     
     // Get the local origin (used for chunk coordinate system)
     glm::ivec3 getLocalOrigin() const { return localOrigin; }

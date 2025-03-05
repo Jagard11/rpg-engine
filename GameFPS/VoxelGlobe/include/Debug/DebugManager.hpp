@@ -8,28 +8,32 @@ public:
     static DebugManager& getInstance();
 
     // General debug toggles
-    bool showVoxelEdges() const { return showVoxelEdges_; }
-    bool isCullingEnabled() const { return enableCulling; }
-    bool useFaceColors() const { return useFaceColors_; }
+    bool showVoxelEdges() const;
+    bool isCullingEnabled() const;
+    bool useFaceColors() const;
 
     // Specific log toggles
-    bool logPlayerInfo() const { return logPlayerInfo_; }
-    bool logRaycast() const { return logRaycast_; }
-    bool logChunkUpdates() const { return logChunkUpdates_; }
-    bool logBlockPlacement() const { return logBlockPlacement_; }
-    bool logCollision() const { return logCollision_; }
-    bool logInventory() const { return logInventory_; } // Added new toggle
+    bool logPlayerInfo() const;
+    bool logRaycast() const;
+    bool logChunkUpdates() const;
+    bool logBlockPlacement() const;
+    bool logCollision() const;
+    bool logInventory() const;
+    
+    // Mesh debugging options
+    bool debugVertexScaling() const;
 
     // Setters
-    void setShowVoxelEdges(bool enabled) { showVoxelEdges_ = enabled; }
-    void setCullingEnabled(bool enabled) { enableCulling = enabled; }
-    void setUseFaceColors(bool enabled) { useFaceColors_ = enabled; }
-    void setLogPlayerInfo(bool enabled) { logPlayerInfo_ = enabled; }
-    void setLogRaycast(bool enabled) { logRaycast_ = enabled; }
-    void setLogChunkUpdates(bool enabled) { logChunkUpdates_ = enabled; }
-    void setLogBlockPlacement(bool enabled) { logBlockPlacement_ = enabled; }
-    void setLogCollision(bool enabled) { logCollision_ = enabled; }
-    void setLogInventory(bool enabled) { logInventory_ = enabled; } // Added new setter
+    void setShowVoxelEdges(bool enabled);
+    void setCullingEnabled(bool enabled);
+    void setUseFaceColors(bool enabled);
+    void setLogPlayerInfo(bool enabled);
+    void setLogRaycast(bool enabled);
+    void setLogChunkUpdates(bool enabled);
+    void setLogBlockPlacement(bool enabled);
+    void setLogCollision(bool enabled);
+    void setLogInventory(bool enabled);
+    void setDebugVertexScaling(bool enabled);
 
 private:
     bool showVoxelEdges_;
@@ -40,7 +44,8 @@ private:
     bool logChunkUpdates_;
     bool logBlockPlacement_;
     bool logCollision_;
-    bool logInventory_; // Added new member
+    bool logInventory_;
+    bool debugVertexScaling_; // Flag for controlling visual vertex scaling debugging
 };
 
 #endif

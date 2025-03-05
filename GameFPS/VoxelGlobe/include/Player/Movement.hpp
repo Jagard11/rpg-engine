@@ -30,6 +30,9 @@ private:
     bool isSprinting = false; // Added
     static constexpr float sprintMultiplier = 2.0f; // Added
     bool checkCollision(const glm::vec3& newPos) const;
+    
+    // Added to reduce log spam
+    int frameCounter = 0;
 };
 
 #endif
