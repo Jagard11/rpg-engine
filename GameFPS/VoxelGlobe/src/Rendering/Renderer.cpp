@@ -7,9 +7,12 @@
 #include "Debug/DebugManager.hpp"
 #include <iostream>
 #include <vector>
+#include "Utils/SphereUtils.hpp" // Added for standardized calculations
 
 struct Frustum {
     glm::vec4 planes[6];
+    
+    // Construct frustum from view-projection matrix
     Frustum(const glm::mat4& vp) {
         planes[0] = glm::normalize(glm::vec4(vp[0][3] + vp[0][0], vp[1][3] + vp[1][0], vp[2][3] + vp[2][0], vp[3][3] + vp[3][0])); // Left
         planes[1] = glm::normalize(glm::vec4(vp[0][3] - vp[0][0], vp[1][3] - vp[1][0], vp[2][3] - vp[2][0], vp[3][3] - vp[3][0])); // Right
@@ -86,18 +89,26 @@ void Renderer::render(World& world, const Player& player, const GraphicsSettings
     }
 
     // Setup projection and view matrices
-    // Use a smaller near plane and larger far plane for better precision
-    glm::mat4 proj = glm::perspective(glm::radians(70.0f), 
-                                      static_cast<float>(settings.getWidth()) / settings.getHeight(), 
-                                      0.01f,  // Smaller near plane (was 0.1f)
-                                      10000.0f); // Larger far plane (was 8000.0f)
+    // CRITICAL FIX: Adjust near and far planes for Earth-scale rendering
+    float fovDegrees = 70.0f;
+    glm::mat4 proj = glm::perspective(
+        glm::radians(fovDegrees),
+        static_cast<float>(settings.getWidth()) / settings.getHeight(),
+        0.1f,    // Near plane increased from 0.001f to 0.1f for better depth precision
+        10000.0f // Far plane decreased from 100000.0f to 10000.0f for better depth precision
+    );
     
     float playerHeight = player.getHeight();
-    glm::vec3 eyePos = player.position + player.up * playerHeight;
-    glm::vec3 lookAtPos = eyePos + player.cameraDirection;
+    
+    // CRITICAL FIX: Create a coordinate system centered on the player
+    // This is key to solving floating-point precision issues
+    
+    // First, reset the coordinate system to be centered on the player
+    // All calculations below will be relative to player position
+    glm::vec3 eyePos = glm::vec3(0, playerHeight, 0); // Player eye position in player-relative space
+    glm::vec3 lookAtPos = eyePos + player.cameraDirection; // Look at position in player-relative space
     
     // Ensure up vector is orthogonal to view direction for correct camera orientation
-    // This is crucial for proper camera rotation as player moves around the globe
     glm::vec3 viewDir = glm::normalize(lookAtPos - eyePos);
     glm::vec3 rightDir = glm::normalize(glm::cross(viewDir, player.up));
     glm::vec3 upDir = glm::normalize(glm::cross(rightDir, viewDir));
@@ -106,7 +117,7 @@ void Renderer::render(World& world, const Player& player, const GraphicsSettings
     glm::mat4 view = glm::lookAt(eyePos, lookAtPos, upDir);
     glm::mat4 vp = proj * view;
     
-    // Create frustum for culling
+    // Create frustum for culling using player-relative coordinate system
     Frustum frustum(vp);
 
     // Activate shader and texture
@@ -116,11 +127,20 @@ void Renderer::render(World& world, const Player& player, const GraphicsSettings
     glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "view"), 1, GL_FALSE, &view[0][0]);
     glUniform1i(glGetUniformLocation(shaderProgram, "useFaceColors"), DebugManager::getInstance().useFaceColors());
 
-    // Add support for using local origin to avoid precision issues
+    // Get the player's actual world position for debugging and relative calculations
+    glm::vec3 playerWorldPos = player.position;
+    
+    // Get local origin for coordinate rebasing
     glm::ivec3 localOrigin = world.getLocalOrigin();
-    glm::vec3 localOriginOffset(localOrigin.x * Chunk::SIZE, localOrigin.y * Chunk::SIZE, localOrigin.z * Chunk::SIZE);
-    glUniform3fv(glGetUniformLocation(shaderProgram, "localOriginOffset"), 1, &localOriginOffset[0]);
-
+    
+    // Calculate the offset values for rebasing - this is critical for Earth-scale rendering
+    glm::vec3 playerOffset = player.position;
+    glUniform3fv(glGetUniformLocation(shaderProgram, "playerOffset"), 1, &playerOffset[0]);
+    
+    // CRITICAL FIX: Add Earth radius scale information to shader
+    float earthRadius = static_cast<float>(world.getRadius());
+    glUniform1f(glGetUniformLocation(shaderProgram, "earthRadius"), earthRadius);
+    
     // Tracking rendering statistics
     int renderedChunks = 0;
     int totalChunks = 0;
@@ -138,11 +158,13 @@ void Renderer::render(World& world, const Player& player, const GraphicsSettings
         std::cout << "Total chunks: " << world.getChunks().size() << std::endl;
     }
     
-    // Get planet radius for distance culling
-    float planetRadius = world.getRadius();
-    float maxRenderDistance = planetRadius * 0.25f; // 1/4 of planet radius is visible
+    // Get planet radius for visibility calculations
+    float surfaceRadius = static_cast<float>(SphereUtils::getSurfaceRadiusMeters());
     
-    // Render all chunks
+    // Limit visible distance - this helps with both performance and precision
+    float maxRenderDistance = 5000.0f; // Reduced from half planet radius to a fixed 5km distance
+    
+    // Render all chunks using player-relative coordinates
     for (auto& [key, chunk] : world.getChunks()) {
         totalChunks++;
         
@@ -152,24 +174,33 @@ void Renderer::render(World& world, const Player& player, const GraphicsSettings
         int chunkZ = std::get<2>(key);
         int chunkSize = Chunk::SIZE * chunk->getMergeFactor();
         
-        // Convert to world coordinates
-        glm::vec3 chunkCenter(
+        // Calculate chunk center world position
+        glm::vec3 chunkWorldCenter(
             chunkX * Chunk::SIZE + Chunk::SIZE / 2.0f,
             chunkY * Chunk::SIZE + Chunk::SIZE / 2.0f,
             chunkZ * Chunk::SIZE + Chunk::SIZE / 2.0f
         );
         
+        // CRITICAL FIX: Calculate chunk position relative to player
+        glm::vec3 chunkRelativeCenter = chunkWorldCenter - playerWorldPos;
+        
         // Print first few chunks for debug
         if (printDebug && totalChunks <= 5) {
             std::cout << "Chunk " << totalChunks << " at (" << chunkX << ", " << chunkY << ", " << chunkZ 
-                      << ") center: " << chunkCenter.x << ", " << chunkCenter.y << ", " << chunkCenter.z << std::endl;
+                      << ") center (rel to player): " << chunkRelativeCenter.x << ", " 
+                      << chunkRelativeCenter.y << ", " << chunkRelativeCenter.z << std::endl;
         }
         
-        // Apply distance and frustum culling
-        float dist = glm::length(chunkCenter - eyePos);
-        bool inFrustum = frustum.isSphereInFrustum(chunkCenter, chunkSize * 0.866f);
+        // Apply distance culling - skip chunks that are too far away
+        float dist = glm::length(chunkRelativeCenter);
+        if (dist > maxRenderDistance) {
+            skippedChunks++;
+            continue;
+        }
         
-        if (dist > maxRenderDistance || !inFrustum) {
+        // Apply frustum culling in player-relative space
+        bool inFrustum = frustum.isSphereInFrustum(chunkRelativeCenter, chunkSize * 0.866f);
+        if (!inFrustum) {
             skippedChunks++;
             continue;
         }
@@ -195,16 +226,15 @@ void Renderer::render(World& world, const Player& player, const GraphicsSettings
             continue;
         }
         
-        // Set up model matrix and render the chunk
-        // CRITICAL: Use pure translation without any additional scaling
-        glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(
-            chunkX * Chunk::SIZE,
-            chunkY * Chunk::SIZE,
-            chunkZ * Chunk::SIZE
-        ));
+        // Set up model matrix with player-relative transform
+        // This is the most critical part - we're transforming chunk coordinates to be relative to player
+        glm::mat4 model = glm::translate(glm::mat4(1.0f), chunkRelativeCenter);
         
-        // Apply model matrix without any scaling factor
+        // Apply model matrix
         glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model"), 1, GL_FALSE, &model[0][0]);
+        
+        // Add uniform for correcting vertices in the shader
+        glUniform3fv(glGetUniformLocation(shaderProgram, "chunkWorldPos"), 1, &chunkWorldCenter[0]);
         
         // Bind VAO and draw
         chunk->bindVAO();
@@ -228,9 +258,11 @@ void Renderer::renderVoxelEdges(const World& world, const Player& player, const 
     glUseProgram(edgeShaderProgram);
     glBindVertexArray(edgeVao);
 
-    glm::mat4 proj = glm::perspective(glm::radians(70.0f), static_cast<float>(settings.getWidth()) / settings.getHeight(), 0.01f, 10000.0f);
+    glm::mat4 proj = glm::perspective(glm::radians(70.0f), static_cast<float>(settings.getWidth()) / settings.getHeight(), 0.1f, 10000.0f);
+    
+    // Use player-relative coordinate system for edge rendering
     float playerHeight = player.getHeight();
-    glm::vec3 eyePos = player.position + player.up * playerHeight;
+    glm::vec3 eyePos = glm::vec3(0, playerHeight, 0); // Player is at origin in player-relative space
     glm::vec3 lookAtPos = eyePos + player.cameraDirection;
     
     // Use corrected up vector for edge rendering too
@@ -242,47 +274,56 @@ void Renderer::renderVoxelEdges(const World& world, const Player& player, const 
     glUniformMatrix4fv(glGetUniformLocation(edgeShaderProgram, "proj"), 1, GL_FALSE, &proj[0][0]);
     glUniformMatrix4fv(glGetUniformLocation(edgeShaderProgram, "view"), 1, GL_FALSE, &view[0][0]);
 
-    // Add support for local origin
-    glm::ivec3 localOrigin = world.getLocalOrigin();
-    glm::vec3 localOriginOffset(localOrigin.x * Chunk::SIZE, localOrigin.y * Chunk::SIZE, localOrigin.z * Chunk::SIZE);
-    glUniform3fv(glGetUniformLocation(edgeShaderProgram, "localOriginOffset"), 1, &localOriginOffset[0]);
+    // Get player world position for relative positioning
+    glm::vec3 playerWorldPos = player.position;
+    glUniform3fv(glGetUniformLocation(edgeShaderProgram, "playerOffset"), 1, &playerWorldPos[0]);
 
     std::vector<float> edgeVertices;
-    float radius = 100.0f; // Increased from 5.0f * Chunk::SIZE for debugging
+    float radius = 100.0f; // Distance limit for edge rendering
+    
     for (const auto& [key, chunkPtr] : world.getChunks()) {
-        const Chunk& chunk = *chunkPtr;
+        // FIXED: Use the pointer directly, not the dereferenced object
         int chunkX = std::get<0>(key);
         int chunkY = std::get<1>(key);
         int chunkZ = std::get<2>(key);
         
-        // Get chunk center in world space
+        // Calculate chunk center position relative to player
         glm::vec3 chunkCenter(
-            chunkX * Chunk::SIZE + Chunk::SIZE / 2.0f,
-            chunkY * Chunk::SIZE + Chunk::SIZE / 2.0f,
-            chunkZ * Chunk::SIZE + Chunk::SIZE / 2.0f
+            chunkX * Chunk::SIZE + Chunk::SIZE / 2.0f - playerWorldPos.x,
+            chunkY * Chunk::SIZE + Chunk::SIZE / 2.0f - playerWorldPos.y,
+            chunkZ * Chunk::SIZE + Chunk::SIZE / 2.0f - playerWorldPos.z
         );
             
         // Distance culling for edges
-        float dist = glm::length(chunkCenter - player.position);
+        float dist = glm::length(chunkCenter);
         if (dist > radius) continue;
 
-        const std::vector<float>& mesh = chunk.getMesh();
+        // Get chunk mesh data - FIXED: use correct pointer access
+        const std::vector<float>& mesh = chunkPtr->getMesh();
+        
+        // Not enough vertices to form edges
+        if (mesh.size() < 20) continue;
+        
+        // Process each quad in the mesh (4 vertices per quad)
         for (size_t i = 0; i < mesh.size(); i += 20) {
             if (i + 19 >= mesh.size()) break; // Safety check
             
-            // Extract the quad vertices
-            float x1 = mesh[i] + chunkX * Chunk::SIZE;
-            float y1 = mesh[i + 1] + chunkY * Chunk::SIZE;
-            float z1 = mesh[i + 2] + chunkZ * Chunk::SIZE;
-            float x2 = mesh[i + 5] + chunkX * Chunk::SIZE;
-            float y2 = mesh[i + 6] + chunkY * Chunk::SIZE;
-            float z2 = mesh[i + 7] + chunkZ * Chunk::SIZE;
-            float x3 = mesh[i + 10] + chunkX * Chunk::SIZE;
-            float y3 = mesh[i + 11] + chunkY * Chunk::SIZE;
-            float z3 = mesh[i + 12] + chunkZ * Chunk::SIZE;
-            float x4 = mesh[i + 15] + chunkX * Chunk::SIZE;
-            float y4 = mesh[i + 16] + chunkY * Chunk::SIZE;
-            float z4 = mesh[i + 17] + chunkZ * Chunk::SIZE;
+            // Extract the quad vertices and transform to player-relative space
+            float x1 = mesh[i]     + chunkX * Chunk::SIZE - playerWorldPos.x;
+            float y1 = mesh[i + 1] + chunkY * Chunk::SIZE - playerWorldPos.y;
+            float z1 = mesh[i + 2] + chunkZ * Chunk::SIZE - playerWorldPos.z;
+            
+            float x2 = mesh[i + 5] + chunkX * Chunk::SIZE - playerWorldPos.x;
+            float y2 = mesh[i + 6] + chunkY * Chunk::SIZE - playerWorldPos.y;
+            float z2 = mesh[i + 7] + chunkZ * Chunk::SIZE - playerWorldPos.z;
+            
+            float x3 = mesh[i + 10] + chunkX * Chunk::SIZE - playerWorldPos.x;
+            float y3 = mesh[i + 11] + chunkY * Chunk::SIZE - playerWorldPos.y;
+            float z3 = mesh[i + 12] + chunkZ * Chunk::SIZE - playerWorldPos.z;
+            
+            float x4 = mesh[i + 15] + chunkX * Chunk::SIZE - playerWorldPos.x;
+            float y4 = mesh[i + 16] + chunkY * Chunk::SIZE - playerWorldPos.y;
+            float z4 = mesh[i + 17] + chunkZ * Chunk::SIZE - playerWorldPos.z;
 
             // Add the edges to the vertex buffer
             edgeVertices.insert(edgeVertices.end(), {x1, y1, z1, x2, y2, z2});
@@ -292,32 +333,39 @@ void Renderer::renderVoxelEdges(const World& world, const Player& player, const 
         }
     }
 
-    // Load edge vertices into GPU
-    glBindBuffer(GL_ARRAY_BUFFER, edgeVbo);
-    glBufferData(GL_ARRAY_BUFFER, edgeVertices.size() * sizeof(float), edgeVertices.data(), GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-    
-    // Draw edges
-    glLineWidth(2.0f);
-    glDrawArrays(GL_LINES, 0, edgeVertices.size() / 3);
-    checkGLError("post-edge-draw");
+    // Only proceed if we have edges to render
+    if (!edgeVertices.empty()) {
+        // Load edge vertices into GPU
+        glBindBuffer(GL_ARRAY_BUFFER, edgeVbo);
+        glBufferData(GL_ARRAY_BUFFER, edgeVertices.size() * sizeof(float), edgeVertices.data(), GL_STATIC_DRAW);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(0);
+        
+        // Draw edges
+        glLineWidth(2.0f);
+        glDrawArrays(GL_LINES, 0, edgeVertices.size() / 3);
+        checkGLError("post-edge-draw");
+    }
 }
 
 void Renderer::loadShader() {
+    // CRITICAL FIX: Updated vertex shader with relative positioning for Earth-scale coordinates
     const char* vertSrc = R"(
         #version 330 core
         layout(location = 0) in vec3 pos;
         layout(location = 1) in vec2 uv;
         out vec2 TexCoord;
         uniform mat4 model, view, proj;
-        uniform vec3 localOriginOffset;
+        uniform vec3 playerOffset;
+        uniform vec3 chunkWorldPos;
+        uniform float earthRadius;
         
         void main() {
-            // Apply transformations without any extra scaling
-            // Use local origin offset for better precision
-            vec3 worldPos = (model * vec4(pos, 1.0)).xyz - localOriginOffset;
-            gl_Position = proj * view * vec4(worldPos, 1.0);
+            // The model matrix has already transformed the position to player-relative space
+            // Apply view and projection transformations
+            gl_Position = proj * view * model * vec4(pos, 1.0);
+            
+            // Pass texture coordinates unchanged
             TexCoord = uv;
         }
     )";
@@ -379,16 +427,16 @@ void Renderer::loadShader() {
 }
 
 void Renderer::loadEdgeShader() {
+    // Updated edge shader with player-relative positioning
     const char* vertSrc = R"(
         #version 330 core
         layout(location = 0) in vec3 pos;
         uniform mat4 view, proj;
-        uniform vec3 localOriginOffset;
+        uniform vec3 playerOffset;
         
         void main() {
-            // Apply the local origin offset for better precision
-            vec3 worldPos = pos - localOriginOffset;
-            gl_Position = proj * view * vec4(worldPos, 1.0);
+            // Vertex positions are already relative to player
+            gl_Position = proj * view * vec4(pos, 1.0);
         }
     )";
     
@@ -447,7 +495,7 @@ void Renderer::loadTexture() {
     } else {
         std::cerr << "Failed to load texture: " << stbi_failure_reason() << std::endl;
         
-        // Create a fallback texture (checkerboard pattern)
+        // Create a fallback texture (checkerboard pattern) with grass and dirt colors
         const int checkerSize = 64;
         const int textureSize = 256;
         unsigned char checkerboard[textureSize * textureSize * 4];

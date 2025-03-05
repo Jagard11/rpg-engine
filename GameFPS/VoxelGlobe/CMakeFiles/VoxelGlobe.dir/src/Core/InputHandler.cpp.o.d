@@ -302,7 +302,7 @@ CMakeFiles/VoxelGlobe.dir/src/Core/InputHandler.cpp.o: \
  /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/World/Chunk.hpp \
  /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/World/Block.hpp \
  /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/Core/Types.hpp \
- /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/Graphics/MeshGenerator.hpp \
+ /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/Utils/CoordinateSystem.hpp \
  /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/Utils/SphereUtils.hpp \
  /usr/include/c++/11/iostream /usr/include/c++/11/ostream \
  /usr/include/c++/11/ios /usr/include/c++/11/exception \
@@ -325,7 +325,9 @@ CMakeFiles/VoxelGlobe.dir/src/Core/InputHandler.cpp.o: \
  /usr/include/c++/11/bits/locale_facets.tcc \
  /usr/include/c++/11/bits/basic_ios.tcc \
  /usr/include/c++/11/bits/ostream.tcc /usr/include/c++/11/istream \
- /usr/include/c++/11/bits/istream.tcc /usr/include/c++/11/memory \
+ /usr/include/c++/11/bits/istream.tcc \
+ /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/Utils/PlanetConfig.hpp \
+ /usr/include/c++/11/memory \
  /usr/include/c++/11/bits/stl_raw_storage_iter.h \
  /usr/include/c++/11/bits/align.h /usr/include/c++/11/bit \
  /usr/include/c++/11/bits/unique_ptr.h \

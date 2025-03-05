@@ -6,17 +6,35 @@
 #include <vector>
 #include <algorithm>
 #include <set>
+#include "Utils/SphereUtils.hpp"
 
-// Define surface radius offset directly here to avoid requiring DebugHelper.hpp
-const float SURFACE_RADIUS_OFFSET = 8.0f;
+World::World() 
+    : radius(EARTH_RADIUS_METERS), 
+      localOrigin(0, 0, 0), 
+      coordSystem(EARTH_RADIUS_METERS),
+      frameCounter(0) {}
 
-// Get the surface radius consistently
-float World::getSurfaceRadius() const {
-    return radius + SURFACE_RADIUS_OFFSET;
+// Get the surface radius consistently using the standardized method
+double World::getSurfaceRadius() const {
+    return SphereUtils::getSurfaceRadiusMeters();
+}
+
+// Get the voxel width at a given distance from center
+double World::getVoxelWidthAt(double distanceFromCenter) const {
+    return SphereUtils::getVoxelWidthAt(distanceFromCenter);
+}
+
+// Transform a world position to relative-to-player coordinates (reduces floating point errors)
+glm::dvec3 World::worldToLocalSpace(const glm::dvec3& worldPos) const {
+    return coordSystem.worldToLocal(worldPos, Chunk::SIZE);
+}
+
+// Transform a local position back to world coordinates
+glm::dvec3 World::localToWorldSpace(const glm::dvec3& localPos) const {
+    return coordSystem.localToWorld(localPos, Chunk::SIZE);
 }
 
 void World::update(const glm::vec3& playerPos) {
-    static int frameCounter = 0;
     frameCounter++;
 
     // Calculate integer chunk coordinates based on player position
@@ -26,9 +44,12 @@ void World::update(const glm::vec3& playerPos) {
 
     // Store the origin for relative coordinates
     localOrigin = glm::ivec3(px, py, pz);
+    
+    // Update coordinate system with new origin
+    coordSystem.setOriginChunk(px, py, pz);
 
     // Add chunk loading limit to prevent excessive regeneration
-    const int MAX_NEW_CHUNKS_PER_FRAME = 2; // Increased from 1 to 2 chunks per frame
+    const int MAX_NEW_CHUNKS_PER_FRAME = 2;
     int newChunksCreated = 0;
 
     // Debug log player position
@@ -44,14 +65,13 @@ void World::update(const glm::vec3& playerPos) {
         double distFromCenter = sqrt(px_d*px_d + py_d*py_d + pz_d*pz_d);
         std::cout << "Player distance from center: " << distFromCenter 
                  << ", Surface at: " << getSurfaceRadius() 
-                 << ", Height above surface: " << (distFromCenter - getSurfaceRadius()) << std::endl;
+                 << ", Height above surface: " << (distFromCenter - getSurfaceRadius()) << " meters" << std::endl;
     }
 
-    // Create a list of chunks to create/update, ordered by priority
+    // Create a list of chunks to process, ordered by priority
     std::vector<std::tuple<int, int, int, int, float>> chunkCandidates;
 
     // Generate the 3x3x3 grid (27 chunks) around player
-    // Use a strict 3x3x3 grid without any distance-based criteria
     for (int x = px - 1; x <= px + 1; x++) {
         for (int y = py - 1; y <= py + 1; y++) {
             for (int z = pz - 1; z <= pz + 1; z++) {
@@ -81,6 +101,9 @@ void World::update(const glm::vec3& playerPos) {
         if (it != chunks.end()) {
             // Move existing chunk to newChunks
             newChunks.emplace(key, std::move(it->second));
+            
+            // Update the chunk's relative position based on the new origin
+            newChunks[key]->updateRelativePosition(px, py, pz);
         } else {
             // Skip creating too many chunks in one frame
             if (newChunksCreated >= MAX_NEW_CHUNKS_PER_FRAME) {
@@ -96,6 +119,9 @@ void World::update(const glm::vec3& playerPos) {
                 // Create new chunk
                 newChunks[key] = std::make_unique<Chunk>(x, y, z, mf);
                 newChunks[key]->setWorld(this);
+                
+                // Update the chunk's relative position based on the new origin
+                newChunks[key]->updateRelativePosition(px, py, pz);
                 
                 // Generate terrain in a try block
                 try {
@@ -156,16 +182,18 @@ void World::update(const glm::vec3& playerPos) {
         int chunksWithMesh = 0;
         
         for (const auto& [key, chunk] : chunks) {
-            totalMemory += chunk->getMesh().size() * sizeof(float) +
+            const std::vector<float>& chunkMesh = chunk->getMesh();
+            totalMemory += chunkMesh.size() * sizeof(float) +
                            (chunk->getMergeFactor() == 1 ? Chunk::SIZE * Chunk::SIZE * Chunk::SIZE * sizeof(Block) : 0);
             
-            if (chunk->getMesh().size() > 0) {
+            if (chunkMesh.size() > 0) {
                 chunksWithMesh++;
             }
             
             if (DebugManager::getInstance().logChunkUpdates() && chunksWithMesh < 5) {
                 std::cout << "Loaded chunk (" << std::get<0>(key) << ", " << std::get<1>(key) << ", " << std::get<2>(key)
-                      << "), MergeFactor: " << chunk->getMergeFactor() << ", Vertices: " << chunk->getMesh().size() / 5 << std::endl;
+                      << "), MergeFactor: " << chunk->getMergeFactor() 
+                      << ", Vertices: " << chunkMesh.size() / 5 << std::endl;
             }
         }
         std::cout << "Chunks updated, count: " << chunks.size() 
@@ -173,33 +201,6 @@ void World::update(const glm::vec3& playerPos) {
                   << ", Est. Memory: " << totalMemory / (1024.0f * 1024.0f) << " MB" << std::endl;
         std::cout << "Player chunk coords: (" << px << ", " << py << ", " << pz << ")" << std::endl;
     }
-}
-
-glm::vec3 World::cubeToSphere(int face, int x, int z, float y) const {
-    // Convert from cube coordinates to spherical coordinates
-    // Calculate normalized coordinates in the range [-1, 1]
-    float nx = x / (radius * 0.5f);
-    float ny = y / (radius * 0.5f);
-    float nz = z / (radius * 0.5f);
-    
-    // Calculate the distance from the origin in cube space
-    float cubeLength = std::max(std::max(std::abs(nx), std::abs(ny)), std::abs(nz));
-    
-    // Project onto sphere surface by normalizing and scaling by radius
-    if (cubeLength > 0) {
-        float sphereX = nx / cubeLength * radius;
-        float sphereY = ny / cubeLength * radius;
-        float sphereZ = nz / cubeLength * radius;
-        return glm::vec3(sphereX, sphereY, sphereZ);
-    }
-    
-    // Fallback to original coordinates if at origin
-    return glm::vec3(x, y, z);
-}
-
-float World::findSurfaceHeight(float chunkX, float chunkZ) const {
-    // Return fixed surface height using our consistent method
-    return getSurfaceRadius();
 }
 
 void World::setBlock(int worldX, int worldY, int worldZ, BlockType type) {
@@ -223,24 +224,22 @@ void World::setBlock(int worldX, int worldY, int worldZ, BlockType type) {
                 << ") -> chunk (" << chunkX << ", " << chunkY << ", " << chunkZ 
                 << ") local (" << localX << ", " << localY << ", " << localZ << ")" << std::endl;
                 
-        // Add debug info about current local origin
-        std::cout << "Current local origin: (" << localOrigin.x << ", " << localOrigin.y << ", " << localOrigin.z << ")" << std::endl;
-        
         // Log distance from center for validation
         double wx = static_cast<double>(worldX);
         double wy = static_cast<double>(worldY);
         double wz = static_cast<double>(worldZ);
         double dist = sqrt(wx*wx + wy*wy + wz*wz);
-        std::cout << "Block world position distance from center: " << dist << std::endl;
+        std::cout << "Block world position distance from center: " << dist << " meters" << std::endl;
         
         // Calculate and log the planet-relative height
-        float surfaceHeight = getSurfaceRadius();
-        std::cout << "Block height relative to surface: " << (dist - surfaceHeight) << std::endl;
+        double surfaceHeight = getSurfaceRadius();
+        std::cout << "Block height relative to surface: " << (dist - surfaceHeight) << " meters" << std::endl;
         
         // Check if the position is valid for editing based on distance from center
-        bool isValidRange = (dist >= radius - 5.0f) && (dist <= getSurfaceRadius() + 15.0f);
+        bool isValidRange = SphereUtils::isWithinBuildRange(glm::dvec3(worldX, worldY, worldZ));
         std::cout << "Is valid edit range: " << (isValidRange ? "Yes" : "No") 
-                  << " (valid range: " << (radius - 5.0f) << " to " << (getSurfaceRadius() + 15.0f) << ")" << std::endl;
+                  << " (valid range: " << (getSurfaceRadius() - PlanetConfig::TERRAIN_DEPTH_METERS) << " to " 
+                  << (getSurfaceRadius() + PlanetConfig::MAX_BUILD_HEIGHT_METERS) << ")" << std::endl;
     }
 
     // Track all chunks that need to be updated
@@ -282,23 +281,17 @@ void World::setBlock(int worldX, int worldY, int worldZ, BlockType type) {
     }
     
     // Verify the block position is within the valid editing range
-    // This ensures players can only edit from below crust to 15km above surface
-    double wx = static_cast<double>(worldX);
-    double wy = static_cast<double>(worldY);
-    double wz = static_cast<double>(worldZ);
-    double dist = sqrt(wx*wx + wy*wy + wz*wz);
-    float surfaceHeight = getSurfaceRadius();
-    
-    if (dist < radius - 5.0f || dist > surfaceHeight + 15.0f) {
-        std::cerr << "Block position outside valid editing range: " << dist 
-                 << " (valid range: " << (radius - 5.0f) << " to " << (surfaceHeight + 15.0f) << ")" << std::endl;
+    if (!SphereUtils::isWithinBuildRange(glm::dvec3(worldX, worldY, worldZ))) {
+        std::cerr << "Block position outside valid editing range" << std::endl;
         return;
     }
     
     // Set the block in the primary chunk
     try {
-        std::cout << "Setting block in chunk at local (" << localX << ", " << localY << ", " << localZ 
-                  << ") to type " << static_cast<int>(type) << std::endl;
+        if (DebugManager::getInstance().logBlockPlacement()) {
+            std::cout << "Setting block in chunk at local (" << localX << ", " << localY << ", " << localZ 
+                      << ") to type " << static_cast<int>(type) << std::endl;
+        }
         it->second->setBlock(localX, localY, localZ, type);
     } catch (const std::exception& e) {
         std::cerr << "Exception setting block: " << e.what() << std::endl;
@@ -315,8 +308,10 @@ void World::setBlock(int worldX, int worldY, int worldZ, BlockType type) {
         
         if (it != chunks.end()) {
             try {
-                std::cout << "Updating chunk at " << std::get<0>(chunkCoords) << ", " 
-                          << std::get<1>(chunkCoords) << ", " << std::get<2>(chunkCoords) << std::endl;
+                if (DebugManager::getInstance().logBlockPlacement()) {
+                    std::cout << "Updating chunk at " << std::get<0>(chunkCoords) << ", " 
+                              << std::get<1>(chunkCoords) << ", " << std::get<2>(chunkCoords) << std::endl;
+                }
                 
                 // Force immediate mesh regeneration
                 it->second->markMeshDirty();
@@ -328,11 +323,6 @@ void World::setBlock(int worldX, int worldY, int worldZ, BlockType type) {
                 } else {
                     it->second->initializeBuffers();
                 }
-                
-                std::cout << "Updated collision geometry for chunk (" 
-                         << std::get<0>(chunkCoords) << ", " 
-                         << std::get<1>(chunkCoords) << ", " 
-                         << std::get<2>(chunkCoords) << ")" << std::endl;
             } catch (const std::exception& e) {
                 std::cerr << "Exception updating chunk: " << e.what() << std::endl;
             } catch (...) {
@@ -369,24 +359,6 @@ Block World::getBlock(int worldX, int worldY, int worldZ) const {
     if (localY < 0) { localY += Chunk::SIZE; chunkY--; }
     if (localZ < 0) { localZ += Chunk::SIZE; chunkZ--; }
 
-    // Sanity check for extreme coordinates
-    if (abs(chunkX) > 10000 || abs(chunkY) > 10000 || abs(chunkZ) > 10000) {
-        // If coordinates are extremely large, use double precision distance calculation
-        double wx = static_cast<double>(worldX);
-        double wy = static_cast<double>(worldY);
-        double wz = static_cast<double>(worldZ);
-        double distFromCenter = sqrt(wx*wx + wy*wy + wz*wz);
-        float surfaceHeight = getSurfaceRadius();
-        
-        // Return block type based on distance from center
-        if (distFromCenter < surfaceHeight - 5.0f) {
-            return Block(BlockType::DIRT);
-        } else if (distFromCenter < surfaceHeight) {
-            return Block(BlockType::GRASS);
-        }
-        return Block(BlockType::AIR);
-    }
-
     // Find the chunk
     auto it = chunks.find(std::make_tuple(chunkX, chunkY, chunkZ, 1));
     if (it != chunks.end()) {
@@ -399,14 +371,10 @@ Block World::getBlock(int worldX, int worldY, int worldZ) const {
     double wy = static_cast<double>(worldY);
     double wz = static_cast<double>(worldZ);
     double distFromCenter = sqrt(wx*wx + wy*wy + wz*wz);
-    float surfaceHeight = getSurfaceRadius();
     
-    if (distFromCenter < surfaceHeight - 5.0f) {
-        return Block(BlockType::DIRT);
-    } else if (distFromCenter < surfaceHeight) {
-        return Block(BlockType::GRASS);
-    }
-    return Block(BlockType::AIR);
+    return Block(static_cast<BlockType>(
+        SphereUtils::getBlockTypeForElevation(distFromCenter)
+    ));
 }
 
 std::unordered_map<std::tuple<int, int, int, int>, std::unique_ptr<Chunk>, quad_hash>& World::getChunks() {

@@ -273,6 +273,30 @@ src/Graphics/GraphicsSettings.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Graphics/GraphicsSettings.cpp.s
 .PHONY : src/Graphics/GraphicsSettings.cpp.s
 
+src/Graphics/MeshGenerator.o: src/Graphics/MeshGenerator.cpp.o
+.PHONY : src/Graphics/MeshGenerator.o
+
+# target to build an object file
+src/Graphics/MeshGenerator.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Graphics/MeshGenerator.cpp.o
+.PHONY : src/Graphics/MeshGenerator.cpp.o
+
+src/Graphics/MeshGenerator.i: src/Graphics/MeshGenerator.cpp.i
+.PHONY : src/Graphics/MeshGenerator.i
+
+# target to preprocess a source file
+src/Graphics/MeshGenerator.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Graphics/MeshGenerator.cpp.i
+.PHONY : src/Graphics/MeshGenerator.cpp.i
+
+src/Graphics/MeshGenerator.s: src/Graphics/MeshGenerator.cpp.s
+.PHONY : src/Graphics/MeshGenerator.s
+
+# target to generate assembly for a file
+src/Graphics/MeshGenerator.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Graphics/MeshGenerator.cpp.s
+.PHONY : src/Graphics/MeshGenerator.cpp.s
+
 src/Graphics/ResourceManager.o: src/Graphics/ResourceManager.cpp.o
 .PHONY : src/Graphics/ResourceManager.o
 
@@ -756,6 +780,9 @@ help:
 	@echo "... src/Graphics/GraphicsSettings.o"
 	@echo "... src/Graphics/GraphicsSettings.i"
 	@echo "... src/Graphics/GraphicsSettings.s"
+	@echo "... src/Graphics/MeshGenerator.o"
+	@echo "... src/Graphics/MeshGenerator.i"
+	@echo "... src/Graphics/MeshGenerator.s"
 	@echo "... src/Graphics/ResourceManager.o"
 	@echo "... src/Graphics/ResourceManager.i"
 	@echo "... src/Graphics/ResourceManager.s"

@@ -5,6 +5,7 @@
 #include "Debug/DebugManager.hpp"
 #include <iostream>
 #include <vector>
+#include "Utils/SphereUtils.hpp"
 
 VoxelHighlightUI::VoxelHighlightUI() {
     glGenVertexArrays(1, &vao);
@@ -26,61 +27,18 @@ VoxelHighlightUI::~VoxelHighlightUI() {
     glDeleteProgram(shaderProgram);
 }
 
-// Improved sphere projection function (matching the one in Chunk.cpp exactly)
-glm::vec3 projectHighlightToSphere(const glm::vec3& worldPos, float surfaceR, bool isInner, int faceType) {
-    // Safety checks for invalid input
-    if (glm::length(worldPos) < 0.001f) {
-        return glm::vec3(0.0f, 0.0f, 0.0f);
-    }
+// Improved sphere projection function for voxel highlight
+glm::vec3 VoxelHighlightUI::projectToSphere(const glm::vec3& pos, float surfaceR, double distFromCenter) const {
+    // Get the normalized direction from center
+    glm::vec3 dirFromCenter = glm::normalize(pos);
     
-    // Get the voxel's integer block position (using floor to ensure consistency)
-    glm::ivec3 blockPos = glm::ivec3(floor(worldPos.x), floor(worldPos.y), floor(worldPos.z));
-    
-    // Calculate block center in world space (always at x.5, y.5, z.5)
-    glm::vec3 blockCenter = glm::vec3(blockPos) + glm::vec3(0.5f);
-    
-    // Get normalized direction from world origin to block center
-    // This ensures all vertices from the same block use the same direction vector
-    glm::vec3 blockDir = glm::normalize(blockCenter);
-    
-    // Calculate distance from center to block center using double precision
-    // This is crucial for maintaining precision far from origin
-    double bx = static_cast<double>(blockCenter.x);
-    double by = static_cast<double>(blockCenter.y);
-    double bz = static_cast<double>(blockCenter.z);
-    double blockDistance = sqrt(bx*bx + by*by + bz*bz);
-    
-    // Calculate height layer using floor to ensure consistent layers
-    int heightLayer = static_cast<int>(floor(blockDistance - surfaceR));
-    
-    // Base radius for this height layer (use precise integer offsets)
-    float baseRadius = surfaceR + static_cast<float>(heightLayer);
-    
-    // Select appropriate radius based on face type
-    float radius;
-    
-    // Face types:
-    // 2 = top face (+Y), 3 = bottom face (-Y), others = side faces
-    if (faceType == 2) { // Top face (+Y)
-        // Exactly 1.0 unit above the base radius
-        radius = baseRadius + 1.0f;
-    } else if (faceType == 3) { // Bottom face (-Y)
-        // Exactly at the base radius
-        radius = baseRadius;
-    } else { // Side faces
-        // For side faces, use exact local Y position (0.0 to 1.0)
-        float localY = worldPos.y - blockPos.y;
-        radius = baseRadius + localY;
-    }
-    
-    // Project the vertex onto the sphere at the calculated radius
-    // Using the block's center direction for all vertices ensures alignment
-    return blockDir * radius;
+    // Project to the correct radius
+    return dirFromCenter * static_cast<float>(distFromCenter);
 }
 
 void VoxelHighlightUI::render(const Player& player, const glm::ivec3& voxelPos, const GraphicsSettings& settings) {
-    // Only skip if there's no valid voxel to highlight
-    if (voxelPos.x == -1) {
+    // Skip if there's no valid voxel to highlight
+    if (voxelPos.x == -1 && voxelPos.y == -1 && voxelPos.z == -1) {
         return;
     }
     
@@ -91,7 +49,7 @@ void VoxelHighlightUI::render(const Player& player, const glm::ivec3& voxelPos, 
     glDisable(GL_CULL_FACE);
     glEnable(GL_DEPTH_TEST);
     
-    // Use depth test but draw slightly offset from actual block
+    // Draw slightly offset from actual blocks to avoid z-fighting
     glEnable(GL_POLYGON_OFFSET_FILL);
     glPolygonOffset(1.0f, 1.0f);
 
@@ -100,115 +58,149 @@ void VoxelHighlightUI::render(const Player& player, const glm::ivec3& voxelPos, 
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
 
     // Get surface radius from world
-    float surfaceR = player.getWorld().getRadius() + 8.0f;
+    float surfaceR = static_cast<float>(SphereUtils::getSurfaceRadiusMeters());
     
-    // Determine if block is below surface using double precision
+    // Calculate distance from center for the voxel
     double vx = static_cast<double>(voxelPos.x);
     double vy = static_cast<double>(voxelPos.y);
     double vz = static_cast<double>(voxelPos.z);
-    double dist = sqrt(vx*vx + vy*vy + vz*vz);
-    bool isInner = (dist < surfaceR);
+    double voxelDistFromCenter = sqrt(vx*vx + vy*vy + vz*vz);
+    
+    // Debug logs
+    if (DebugManager::getInstance().logRaycast()) {
+        std::cout << "Highlighting voxel at (" << voxelPos.x << ", " << voxelPos.y << ", " << voxelPos.z << ")" << std::endl;
+        std::cout << "Voxel distance from center: " << voxelDistFromCenter << ", surface at: " << surfaceR << std::endl;
+    }
+    
+    // EARTH-SCALE FIX: Rebase the voxel position relative to player position
+    // This treats the player as the origin (0,0,0) for rendering
+    glm::vec3 rebasedVoxelPos = glm::vec3(voxelPos) - player.position;
     
     // Define vertices for the cube highlight with a slight expansion for visibility
     float expand = 0.01f; // Expand highlight slightly beyond block bounds
-    std::vector<glm::vec3> cubeVertices = {
-        // Bottom face vertices
-        glm::vec3(0.0f - expand, 0.0f - expand, 0.0f - expand),
-        glm::vec3(1.0f + expand, 0.0f - expand, 0.0f - expand),
-        glm::vec3(1.0f + expand, 0.0f - expand, 1.0f + expand),
-        glm::vec3(0.0f - expand, 0.0f - expand, 1.0f + expand),
-        
-        // Top face vertices
-        glm::vec3(0.0f - expand, 1.0f + expand, 0.0f - expand),
-        glm::vec3(1.0f + expand, 1.0f + expand, 0.0f - expand),
-        glm::vec3(1.0f + expand, 1.0f + expand, 1.0f + expand),
-        glm::vec3(0.0f - expand, 1.0f + expand, 1.0f + expand)
+    
+    // EARTH-SCALE FIX: Use a local coordinate frame aligned with planet surface
+    glm::vec3 upVector = glm::normalize(glm::vec3(voxelPos));  // Up is away from planet center
+    
+    // Create orthogonal basis for the highlighted voxel
+    glm::vec3 refVector = (std::abs(upVector.y) > 0.99f) ? 
+                          glm::vec3(1.0f, 0.0f, 0.0f) : 
+                          glm::vec3(0.0f, 1.0f, 0.0f);
+    
+    glm::vec3 rightVector = glm::normalize(glm::cross(refVector, upVector));
+    glm::vec3 forwardVector = glm::normalize(glm::cross(upVector, rightVector));
+    
+    // Calculate inner and outer distances from center
+    double innerDistance = voxelDistFromCenter - 0.5;
+    double outerDistance = voxelDistFromCenter + 0.5;
+    
+    // Calculate corner positions relative to the voxel center
+    std::vector<glm::vec3> cornerDirections = {
+        upVector * -0.5f - rightVector * 0.5f - forwardVector * 0.5f,  // Bottom, left, back
+        upVector * -0.5f + rightVector * 0.5f - forwardVector * 0.5f,  // Bottom, right, back
+        upVector * -0.5f + rightVector * 0.5f + forwardVector * 0.5f,  // Bottom, right, front
+        upVector * -0.5f - rightVector * 0.5f + forwardVector * 0.5f,  // Bottom, left, front
+        upVector * 0.5f - rightVector * 0.5f - forwardVector * 0.5f,   // Top, left, back
+        upVector * 0.5f + rightVector * 0.5f - forwardVector * 0.5f,   // Top, right, back
+        upVector * 0.5f + rightVector * 0.5f + forwardVector * 0.5f,   // Top, right, front
+        upVector * 0.5f - rightVector * 0.5f + forwardVector * 0.5f    // Top, left, front
     };
     
-    // Project vertices to sphere - with proper face information
-    // First determine which face each vertex belongs to
-    int faceTypes[8] = {
-        3, 3, 3, 3,  // Bottom face vertices (face type 3 = -Y)
-        2, 2, 2, 2   // Top face vertices (face type 2 = +Y)
-    };
-    
+    // Calculate corner positions in player-relative space
+    std::vector<glm::vec3> corners;
     for (int i = 0; i < 8; i++) {
-        // Convert to world coordinate
-        glm::vec3 worldVertex = glm::vec3(voxelPos) + cubeVertices[i];
+        // Apply expansion for visibility
+        cornerDirections[i] *= (1.0f + expand);
         
-        // Project to sphere with proper face type info
-        glm::vec3 projectedVertex = projectHighlightToSphere(worldVertex, surfaceR, isInner, faceTypes[i]);
+        // Adjust the distance from center based on whether this is a top or bottom corner
+        float cornerDist = (i < 4) ? innerDistance : outerDistance;
         
-        // Convert back to local space
-        cubeVertices[i] = projectedVertex - glm::vec3(voxelPos);
+        // Calculate corner position in world space
+        glm::vec3 cornerVoxelPos = rebasedVoxelPos + cornerDirections[i];
+        
+        // Project to correct sphere radius
+        corners.push_back(cornerVoxelPos);
     }
 
-    // Define lines for wireframe cube using the projected vertices
+    // Define lines for wireframe cube 
     std::vector<float> vertices;
     
-    // Bottom face
-    vertices.push_back(cubeVertices[0].x); vertices.push_back(cubeVertices[0].y); vertices.push_back(cubeVertices[0].z);
-    vertices.push_back(cubeVertices[1].x); vertices.push_back(cubeVertices[1].y); vertices.push_back(cubeVertices[1].z);
+    // Bottom face edges
+    vertices.push_back(corners[0].x); vertices.push_back(corners[0].y); vertices.push_back(corners[0].z);
+    vertices.push_back(corners[1].x); vertices.push_back(corners[1].y); vertices.push_back(corners[1].z);
     
-    vertices.push_back(cubeVertices[1].x); vertices.push_back(cubeVertices[1].y); vertices.push_back(cubeVertices[1].z);
-    vertices.push_back(cubeVertices[2].x); vertices.push_back(cubeVertices[2].y); vertices.push_back(cubeVertices[2].z);
+    vertices.push_back(corners[1].x); vertices.push_back(corners[1].y); vertices.push_back(corners[1].z);
+    vertices.push_back(corners[2].x); vertices.push_back(corners[2].y); vertices.push_back(corners[2].z);
     
-    vertices.push_back(cubeVertices[2].x); vertices.push_back(cubeVertices[2].y); vertices.push_back(cubeVertices[2].z);
-    vertices.push_back(cubeVertices[3].x); vertices.push_back(cubeVertices[3].y); vertices.push_back(cubeVertices[3].z);
+    vertices.push_back(corners[2].x); vertices.push_back(corners[2].y); vertices.push_back(corners[2].z);
+    vertices.push_back(corners[3].x); vertices.push_back(corners[3].y); vertices.push_back(corners[3].z);
     
-    vertices.push_back(cubeVertices[3].x); vertices.push_back(cubeVertices[3].y); vertices.push_back(cubeVertices[3].z);
-    vertices.push_back(cubeVertices[0].x); vertices.push_back(cubeVertices[0].y); vertices.push_back(cubeVertices[0].z);
+    vertices.push_back(corners[3].x); vertices.push_back(corners[3].y); vertices.push_back(corners[3].z);
+    vertices.push_back(corners[0].x); vertices.push_back(corners[0].y); vertices.push_back(corners[0].z);
     
-    // Top face
-    vertices.push_back(cubeVertices[4].x); vertices.push_back(cubeVertices[4].y); vertices.push_back(cubeVertices[4].z);
-    vertices.push_back(cubeVertices[5].x); vertices.push_back(cubeVertices[5].y); vertices.push_back(cubeVertices[5].z);
+    // Top face edges
+    vertices.push_back(corners[4].x); vertices.push_back(corners[4].y); vertices.push_back(corners[4].z);
+    vertices.push_back(corners[5].x); vertices.push_back(corners[5].y); vertices.push_back(corners[5].z);
     
-    vertices.push_back(cubeVertices[5].x); vertices.push_back(cubeVertices[5].y); vertices.push_back(cubeVertices[5].z);
-    vertices.push_back(cubeVertices[6].x); vertices.push_back(cubeVertices[6].y); vertices.push_back(cubeVertices[6].z);
+    vertices.push_back(corners[5].x); vertices.push_back(corners[5].y); vertices.push_back(corners[5].z);
+    vertices.push_back(corners[6].x); vertices.push_back(corners[6].y); vertices.push_back(corners[6].z);
     
-    vertices.push_back(cubeVertices[6].x); vertices.push_back(cubeVertices[6].y); vertices.push_back(cubeVertices[6].z);
-    vertices.push_back(cubeVertices[7].x); vertices.push_back(cubeVertices[7].y); vertices.push_back(cubeVertices[7].z);
+    vertices.push_back(corners[6].x); vertices.push_back(corners[6].y); vertices.push_back(corners[6].z);
+    vertices.push_back(corners[7].x); vertices.push_back(corners[7].y); vertices.push_back(corners[7].z);
     
-    vertices.push_back(cubeVertices[7].x); vertices.push_back(cubeVertices[7].y); vertices.push_back(cubeVertices[7].z);
-    vertices.push_back(cubeVertices[4].x); vertices.push_back(cubeVertices[4].y); vertices.push_back(cubeVertices[4].z);
+    vertices.push_back(corners[7].x); vertices.push_back(corners[7].y); vertices.push_back(corners[7].z);
+    vertices.push_back(corners[4].x); vertices.push_back(corners[4].y); vertices.push_back(corners[4].z);
     
     // Connecting edges
-    vertices.push_back(cubeVertices[0].x); vertices.push_back(cubeVertices[0].y); vertices.push_back(cubeVertices[0].z);
-    vertices.push_back(cubeVertices[4].x); vertices.push_back(cubeVertices[4].y); vertices.push_back(cubeVertices[4].z);
+    vertices.push_back(corners[0].x); vertices.push_back(corners[0].y); vertices.push_back(corners[0].z);
+    vertices.push_back(corners[4].x); vertices.push_back(corners[4].y); vertices.push_back(corners[4].z);
     
-    vertices.push_back(cubeVertices[1].x); vertices.push_back(cubeVertices[1].y); vertices.push_back(cubeVertices[1].z);
-    vertices.push_back(cubeVertices[5].x); vertices.push_back(cubeVertices[5].y); vertices.push_back(cubeVertices[5].z);
+    vertices.push_back(corners[1].x); vertices.push_back(corners[1].y); vertices.push_back(corners[1].z);
+    vertices.push_back(corners[5].x); vertices.push_back(corners[5].y); vertices.push_back(corners[5].z);
     
-    vertices.push_back(cubeVertices[2].x); vertices.push_back(cubeVertices[2].y); vertices.push_back(cubeVertices[2].z);
-    vertices.push_back(cubeVertices[6].x); vertices.push_back(cubeVertices[6].y); vertices.push_back(cubeVertices[6].z);
+    vertices.push_back(corners[2].x); vertices.push_back(corners[2].y); vertices.push_back(corners[2].z);
+    vertices.push_back(corners[6].x); vertices.push_back(corners[6].y); vertices.push_back(corners[6].z);
     
-    vertices.push_back(cubeVertices[3].x); vertices.push_back(cubeVertices[3].y); vertices.push_back(cubeVertices[3].z);
-    vertices.push_back(cubeVertices[7].x); vertices.push_back(cubeVertices[7].y); vertices.push_back(cubeVertices[7].z);
+    vertices.push_back(corners[3].x); vertices.push_back(corners[3].y); vertices.push_back(corners[3].z);
+    vertices.push_back(corners[7].x); vertices.push_back(corners[7].y); vertices.push_back(corners[7].z);
 
+    // Load vertices into GPU
     glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
 
-    // Set up view and projection matrices
-    glm::mat4 proj = glm::perspective(glm::radians(70.0f), static_cast<float>(settings.getWidth()) / settings.getHeight(), 0.1f, 5000.0f);
-    glm::vec3 eyePos = player.position + player.up * player.getHeight();
+    // Set up view and projection matrices - using player-relative coordinates
+    glm::mat4 proj = glm::perspective(
+        glm::radians(70.0f), 
+        static_cast<float>(settings.getWidth()) / settings.getHeight(), 
+        0.1f, // Increased near plane for better depth precision
+        1000.0f // Reduced far plane for better depth precision
+    );
+    
+    // EARTH-SCALE FIX: Create a view matrix with player at origin
+    float playerHeight = player.getHeight();
+    glm::vec3 eyePos = glm::vec3(0, playerHeight, 0); // Player is at origin
     glm::vec3 lookAtPos = eyePos + player.cameraDirection;
     
-    // Use corrected up vector for highlight rendering
+    // Calculate orthogonal up vector to ensure proper orientation
     glm::vec3 viewDir = glm::normalize(lookAtPos - eyePos);
     glm::vec3 rightDir = glm::normalize(glm::cross(viewDir, player.up));
     glm::vec3 upDir = glm::normalize(glm::cross(rightDir, viewDir));
     
+    // Create view matrix with player at origin
     glm::mat4 view = glm::lookAt(eyePos, lookAtPos, upDir);
-
-    // Position the highlight at the voxel
-    glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(voxelPos));
+    
+    // No need for model matrix (identity) - all coordinates are already player-relative
+    glm::mat4 model = glm::mat4(1.0f);
     
     // Apply the transformation matrices
     glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "proj"), 1, GL_FALSE, &proj[0][0]);
     glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "view"), 1, GL_FALSE, &view[0][0]);
     glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model"), 1, GL_FALSE, &model[0][0]);
+    
+    // Set highlight color (bright yellow for visibility)
+    glUniform4f(glGetUniformLocation(shaderProgram, "highlightColor"), 1.0f, 1.0f, 0.0f, 1.0f);
 
     // Draw the highlight wireframe
-    glLineWidth(3.0f);
+    glLineWidth(2.0f);
     glDrawArrays(GL_LINES, 0, vertices.size() / 3);
 
     // Restore GL state
@@ -217,7 +209,7 @@ void VoxelHighlightUI::render(const Player& player, const glm::ivec3& voxelPos, 
 }
 
 void VoxelHighlightUI::loadShader() {
-    // Vertex shader for the highlight wireframe
+    // Vertex shader for the highlight wireframe - with player-relative coordinates
     const char* vertSrc = R"(
         #version 330 core
         layout(location = 0) in vec3 pos;
@@ -227,12 +219,13 @@ void VoxelHighlightUI::loadShader() {
         }
     )";
     
-    // Fragment shader - white color for visibility
+    // Fragment shader with configurable highlight color
     const char* fragSrc = R"(
         #version 330 core
         out vec4 FragColor;
+        uniform vec4 highlightColor;
         void main() {
-            FragColor = vec4(1.0, 1.0, 1.0, 1.0); // White highlight
+            FragColor = highlightColor; // Use configurable highlight color
         }
     )";
     

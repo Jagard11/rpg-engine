@@ -3,7 +3,9 @@
 #include <iostream>
 #include "Debug/DebugManager.hpp"
 #include <glm/gtc/matrix_transform.hpp>
+#include "Utils/SphereUtils.hpp"
 
+// Static scrollback function for inventory interaction
 static double scrollY = 0.0;
 static void scrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
     scrollY = yoffset;
@@ -12,7 +14,8 @@ static void scrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
 Player::Player(const World& w) 
     : world(w), 
       movement(w, position, cameraDirection, movementDirection, up),
-      isLoading(false) {  // Start with isLoading = false to enable movement immediately
+      isLoading(true) {
+    
     if (!&w) {
         std::cerr << "Error: World pointer is null in Player constructor" << std::endl;
         position = glm::vec3(0.0f, 10.0f, 0.0f);
@@ -20,12 +23,11 @@ Player::Player(const World& w)
         cameraDirection = glm::vec3(0.0f, 0.0f, -1.0f);
         movementDirection = cameraDirection;
     } else {
-        // Position player close to the origin to avoid floating-point precision issues
-        // But still at the surface of our sphere
-        float surfaceR = w.getRadius() + 8.0f; // Surface radius
+        // CRITICAL FIX: Position player at Earth's surface with proper visual height
+        double surfaceR = SphereUtils::getSurfaceRadiusMeters();
         
         // Position at the "north pole" with a slight offset to see the horizon better
-        float angle = 10.0f * 3.14159f / 180.0f; // 10 degrees in radians
+        float angle = 5.0f * 3.14159f / 180.0f; // 5 degrees in radians
         position = glm::vec3(sin(angle) * surfaceR, cos(angle) * surfaceR, 0.0f);
         
         // Initialize up vector to point away from planet center
@@ -40,20 +42,19 @@ Player::Player(const World& w)
         movementDirection = cameraDirection;
         
         // Ensure player starts at exactly the right height above surface
-        // This prevents falling through on game start
-        float exactHeight = surfaceR + 0.3f; // Position slightly above surface
+        // This prevents falling through on game start and positions for optimal viewing
+        float exactHeight = static_cast<float>(surfaceR + 2.0); // Position 2 meters above surface
         position = glm::normalize(position) * exactHeight;
         
         std::cout << "************ PLAYER INITIALIZATION ************" << std::endl;
-        std::cout << "Sphere radius: " << w.getRadius() << " units" << std::endl;
-        std::cout << "Surface height: " << surfaceR << " units (radius)" << std::endl;
+        std::cout << "Earth radius: " << w.getRadius() << " meters" << std::endl;
+        std::cout << "Surface height: " << surfaceR << " meters (radius)" << std::endl;
         std::cout << "Player at: " << position.x << ", " << position.y << ", " << position.z << std::endl;
         std::cout << "Distance from center: " << glm::length(position) << std::endl;
-        std::cout << "Height above surface: " << glm::length(position) - surfaceR << " units" << std::endl;
+        std::cout << "Height above surface: " << glm::length(position) - surfaceR << " meters" << std::endl;
         std::cout << "********************************************" << std::endl;
     }
 }
-
 
 void Player::update(GLFWwindow* window, float deltaTime) {
     // Set the scroll callback
@@ -74,7 +75,7 @@ void Player::update(GLFWwindow* window, float deltaTime) {
     lastX = mouseX;
     lastY = mouseY;
     
-    // Update up vector to point radially outward from center
+    // Update up vector more responsively for Earth-scale
     // Calculate with double precision to avoid issues far from origin
     double px = static_cast<double>(position.x);
     double py = static_cast<double>(position.y);
@@ -87,15 +88,13 @@ void Player::update(GLFWwindow* window, float deltaTime) {
         double upY = py / posLength;
         double upZ = pz / posLength;
         
-        glm::vec3 targetUp = glm::vec3(upX, upY, upZ);
-        
-        // Use a very small smooth factor (almost instant transition)
-        // Smooth interpolation can cause issues with alignment at the surface
-        float smoothFactor = 0.2f; // Increased from 0.05f for faster update
-        up = glm::normalize(glm::mix(up, targetUp, smoothFactor));
+        // Use immediate transition for Earth-scale
+        // No smooth transition needed - Earth is so big that small position changes
+        // barely affect the up vector direction
+        up = glm::vec3(upX, upY, upZ);
     }
     
-    // IMPORTANT: We pass positive deltaY to movement to make up look up
+    // Update camera orientation - pass positive deltaY to make up look up
     movement.updateOrientation(deltaX, deltaY);
 
     // Process keyboard input for movement
@@ -125,13 +124,13 @@ void Player::update(GLFWwindow* window, float deltaTime) {
         static int frameCounter = 0;
         if (++frameCounter % 60 == 0) {
             std::cout << "Player position: " << position.x << ", " << position.y << ", " << position.z << std::endl;
-            float surfaceR = world.getRadius() + 8.0f;
+            double surfaceR = SphereUtils::getSurfaceRadiusMeters();
             
-            // Reuse px, py, pz from above - don't redeclare
+            // Calculate distance from center with high precision
             double distFromCenter = sqrt(px*px + py*py + pz*pz);
             
             std::cout << "Distance from center: " << distFromCenter << ", height above surface: " 
-                      << (distFromCenter - surfaceR) << std::endl;
+                      << (distFromCenter - surfaceR) << " meters" << std::endl;
             
             // Also log the up vector for debugging orientation issues
             std::cout << "Up vector: " << up.x << ", " << up.y << ", " << up.z 
@@ -146,13 +145,12 @@ void Player::update(GLFWwindow* window, float deltaTime) {
     }
     
     // Extra safety check: ensure player doesn't fall below surface
-    // Reuse the px, py, pz variables from above - don't redeclare
     double distFromCenter = sqrt(px*px + py*py + pz*pz);
-    float surfaceR = world.getRadius() + 8.0f;
+    double surfaceR = SphereUtils::getSurfaceRadiusMeters();
     
     // If player somehow gets below surface, reset to surface
-    if (distFromCenter < surfaceR + 0.1f) {
-        float safeHeight = surfaceR + 0.3f;
+    if (distFromCenter < surfaceR + 0.1) {
+        float safeHeight = static_cast<float>(surfaceR + 2.0); // Set to 2.0 meters above surface
         position = glm::normalize(position) * safeHeight;
         
         if (DebugManager::getInstance().logPlayerInfo()) {
@@ -162,14 +160,13 @@ void Player::update(GLFWwindow* window, float deltaTime) {
 }
 
 void Player::finishLoading() {
-    // IMPORTANT FIX: Changed to false to enable player movement
     isLoading = false;
     std::cout << "Player loading complete, physics enabled" << std::endl;
     std::cout << "Player position: " << position.x << ", " << position.y << ", " << position.z << std::endl;
     
     // Add an extra safety position fix after loading completes
-    float surfaceR = world.getRadius() + 8.0f;
-    float safeHeight = surfaceR + 0.3f;
+    double surfaceR = SphereUtils::getSurfaceRadiusMeters();
+    float safeHeight = static_cast<float>(surfaceR + 2.0); // 2.0 meters above surface
     position = glm::normalize(position) * safeHeight;
     std::cout << "Set player to safe height: " << glm::length(position) 
               << " (surface at: " << surfaceR << ")" << std::endl;

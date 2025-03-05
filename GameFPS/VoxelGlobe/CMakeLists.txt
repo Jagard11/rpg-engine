@@ -62,6 +62,7 @@ add_executable(VoxelGlobe
     src/Graphics/GraphicsSettings.cpp
     src/Graphics/ShaderManager.cpp         # Added
     src/Graphics/ResourceManager.cpp       # Added
+    src/Graphics/MeshGenerator.cpp         # Added new file
     
     # Third-party libraries
     third_party/stb/stb_image_impl.cpp

@@ -3,18 +3,21 @@
 #include <iostream>
 #include "Debug/DebugManager.hpp"
 #include <glm/gtc/matrix_transform.hpp>
+#include "Utils/SphereUtils.hpp"
 
 // Constants for collision and ground detection
 const float COLLISION_OFFSET = 0.25f;  // Increased from 0.15f to prevent sinking
 const float GROUND_OFFSET = 0.3f;      // Increased from 0.2f to keep player higher
 const float STEP_HEIGHT = 0.55f;       // Maximum height player can automatically step up
+const float PLAYER_RADIUS = 0.4f;      // Player collision radius (slightly smaller than a block)
 
 Movement::Movement(const World& w, glm::vec3& pos, glm::vec3& camDir, glm::vec3& moveDir, glm::vec3& u)
-    : world(w), position(pos), cameraDirection(camDir), movementDirection(moveDir), up(u) {}
+    : world(w), position(pos), cameraDirection(camDir), movementDirection(moveDir), up(u),
+      frameCounter(0) {}
 
 bool Movement::checkCollision(const glm::vec3& newPosition) const {
-    // Get surface radius - the actual visible surface where blocks appear
-    float surfaceR = world.getRadius() + 8.0f;
+    // Get surface radius using standardized method
+    float surfaceR = static_cast<float>(SphereUtils::getSurfaceRadiusMeters());
     
     // Calculate distance from center with double precision for accuracy
     double px = static_cast<double>(newPosition.x);
@@ -22,20 +25,18 @@ bool Movement::checkCollision(const glm::vec3& newPosition) const {
     double pz = static_cast<double>(newPosition.z);
     double distFromCenter = sqrt(px*px + py*py + pz*pz);
     
-    // If we're below the surface, we've collided
-    if (distFromCenter < surfaceR + COLLISION_OFFSET) {
+    // If we're below the surface collision radius, we've collided
+    if (distFromCenter < SphereUtils::getCollisionRadiusMeters()) {
         if (DebugManager::getInstance().logCollision()) {
             std::cout << "Surface collision detected - dist: " << distFromCenter 
                       << ", surface at: " << surfaceR 
-                      << ", offset: " << COLLISION_OFFSET << std::endl;
+                      << ", collision radius: " << SphereUtils::getCollisionRadiusMeters() << std::endl;
         }
         return true;
     }
     
     // Check for collisions with specific blocks within bounding box
     // We need to check multiple points to ensure no slipping through cracks
-    // Calculate player bounding box - check a region around the position
-    const float PLAYER_RADIUS = 0.4f; // Slightly smaller than a full block
     
     // Generate test points at player's body corners and edges
     const float VERTICAL_OFFSET = 0.1f; // Check slightly below and above to catch all collisions
@@ -206,8 +207,8 @@ void Movement::applyGravity(float deltaTime) {
     // Calculate gravity direction (toward planet center)
     glm::vec3 gravityDir = -glm::normalize(position);
     
-    // Get surface radius
-    float surfaceR = world.getRadius() + 8.0f;
+    // Get surface radius using standardized method
+    float surfaceR = static_cast<float>(SphereUtils::getSurfaceRadiusMeters());
     
     // Calculate distance from center with double precision for accuracy
     double px = static_cast<double>(position.x);
@@ -317,9 +318,6 @@ void Movement::jump() {
 }
 
 void Movement::updateOrientation(float deltaX, float deltaY) {
-    // NOTE: Mouse camera behavior - moving mouse up should rotate camera up
-    // IMPORTANT: deltaY is POSITIVE when mouse moves UP, and should result in looking UP
-    
     // Ensure up vector is normalized for stable rotations
     up = glm::normalize(up);
     

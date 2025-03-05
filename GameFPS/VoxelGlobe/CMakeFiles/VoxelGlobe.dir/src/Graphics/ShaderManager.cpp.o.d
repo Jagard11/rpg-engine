@@ -140,7 +140,37 @@ CMakeFiles/VoxelGlobe.dir/src/Graphics/ShaderManager.cpp.o: \
  /usr/include/c++/11/bits/enable_special_members.h \
  /usr/include/c++/11/bits/node_handle.h \
  /usr/include/c++/11/bits/unordered_map.h \
- /usr/include/c++/11/bits/erase_if.h /usr/include/glm/glm.hpp \
+ /usr/include/c++/11/bits/erase_if.h /usr/include/c++/11/iostream \
+ /usr/include/c++/11/ostream /usr/include/c++/11/ios \
+ /usr/include/c++/11/exception /usr/include/c++/11/bits/exception_ptr.h \
+ /usr/include/c++/11/bits/cxxabi_init_exception.h \
+ /usr/include/c++/11/typeinfo /usr/include/c++/11/bits/nested_exception.h \
+ /usr/include/c++/11/bits/ios_base.h \
+ /usr/include/c++/11/bits/locale_classes.h \
+ /usr/include/c++/11/bits/locale_classes.tcc \
+ /usr/include/c++/11/system_error \
+ /usr/include/x86_64-linux-gnu/c++/11/bits/error_constants.h \
+ /usr/include/c++/11/stdexcept /usr/include/c++/11/streambuf \
+ /usr/include/c++/11/bits/streambuf.tcc \
+ /usr/include/c++/11/bits/basic_ios.h \
+ /usr/include/c++/11/bits/locale_facets.h /usr/include/c++/11/cwctype \
+ /usr/include/wctype.h /usr/include/x86_64-linux-gnu/bits/wctype-wchar.h \
+ /usr/include/x86_64-linux-gnu/c++/11/bits/ctype_base.h \
+ /usr/include/c++/11/bits/streambuf_iterator.h \
+ /usr/include/x86_64-linux-gnu/c++/11/bits/ctype_inline.h \
+ /usr/include/c++/11/bits/locale_facets.tcc \
+ /usr/include/c++/11/bits/basic_ios.tcc \
+ /usr/include/c++/11/bits/ostream.tcc /usr/include/c++/11/istream \
+ /usr/include/c++/11/bits/istream.tcc /usr/include/c++/11/fstream \
+ /usr/include/c++/11/bits/codecvt.h \
+ /usr/include/x86_64-linux-gnu/c++/11/bits/basic_file.h \
+ /usr/include/x86_64-linux-gnu/c++/11/bits/c++io.h \
+ /usr/include/c++/11/bits/fstream.tcc /usr/include/c++/11/sstream \
+ /usr/include/c++/11/bits/sstream.tcc /usr/include/c++/11/vector \
+ /usr/include/c++/11/bits/stl_uninitialized.h \
+ /usr/include/c++/11/bits/stl_vector.h \
+ /usr/include/c++/11/bits/stl_bvector.h \
+ /usr/include/c++/11/bits/vector.tcc /usr/include/glm/glm.hpp \
  /usr/include/glm/detail/_fixes.hpp /usr/include/c++/11/cmath \
  /usr/include/math.h /usr/include/x86_64-linux-gnu/bits/math-vector.h \
  /usr/include/x86_64-linux-gnu/bits/libm-simd-decl-stubs.h \
@@ -286,25 +316,50 @@ CMakeFiles/VoxelGlobe.dir/src/Graphics/ShaderManager.cpp.o: \
  /usr/include/glm/packing.hpp /usr/include/glm/detail/func_packing.inl \
  /usr/include/glm/detail/type_half.hpp \
  /usr/include/glm/detail/type_half.inl /usr/include/glm/integer.hpp \
- /usr/include/glm/detail/func_integer.inl /usr/include/c++/11/iostream \
- /usr/include/c++/11/ostream /usr/include/c++/11/ios \
- /usr/include/c++/11/exception /usr/include/c++/11/bits/exception_ptr.h \
- /usr/include/c++/11/bits/cxxabi_init_exception.h \
- /usr/include/c++/11/typeinfo /usr/include/c++/11/bits/nested_exception.h \
- /usr/include/c++/11/bits/ios_base.h \
- /usr/include/c++/11/bits/locale_classes.h \
- /usr/include/c++/11/bits/locale_classes.tcc \
- /usr/include/c++/11/system_error \
- /usr/include/x86_64-linux-gnu/c++/11/bits/error_constants.h \
- /usr/include/c++/11/stdexcept /usr/include/c++/11/streambuf \
- /usr/include/c++/11/bits/streambuf.tcc \
- /usr/include/c++/11/bits/basic_ios.h \
- /usr/include/c++/11/bits/locale_facets.h /usr/include/c++/11/cwctype \
- /usr/include/wctype.h /usr/include/x86_64-linux-gnu/bits/wctype-wchar.h \
- /usr/include/x86_64-linux-gnu/c++/11/bits/ctype_base.h \
- /usr/include/c++/11/bits/streambuf_iterator.h \
- /usr/include/x86_64-linux-gnu/c++/11/bits/ctype_inline.h \
- /usr/include/c++/11/bits/locale_facets.tcc \
- /usr/include/c++/11/bits/basic_ios.tcc \
- /usr/include/c++/11/bits/ostream.tcc /usr/include/c++/11/istream \
- /usr/include/c++/11/bits/istream.tcc
+ /usr/include/glm/detail/func_integer.inl \
+ /usr/include/glm/gtc/type_ptr.hpp /usr/include/glm/gtc/quaternion.hpp \
+ /usr/include/glm/gtc/constants.hpp \
+ /usr/include/glm/ext/scalar_constants.hpp \
+ /usr/include/glm/ext/scalar_constants.inl \
+ /usr/include/glm/gtc/constants.inl \
+ /usr/include/glm/gtc/matrix_transform.hpp \
+ /usr/include/glm/ext/matrix_projection.hpp \
+ /usr/include/glm/ext/matrix_projection.inl \
+ /usr/include/glm/ext/matrix_clip_space.hpp \
+ /usr/include/glm/ext/matrix_clip_space.inl \
+ /usr/include/glm/ext/matrix_transform.hpp \
+ /usr/include/glm/ext/matrix_transform.inl \
+ /usr/include/glm/gtc/matrix_transform.inl \
+ /usr/include/glm/ext/vector_relational.hpp \
+ /usr/include/glm/ext/vector_relational.inl \
+ /usr/include/glm/detail/type_float.hpp \
+ /usr/include/glm/ext/quaternion_common.hpp \
+ /usr/include/glm/ext/quaternion_geometric.hpp \
+ /usr/include/glm/ext/quaternion_geometric.inl \
+ /usr/include/glm/ext/quaternion_common.inl \
+ /usr/include/glm/ext/quaternion_float.hpp \
+ /usr/include/glm/detail/type_quat.hpp \
+ /usr/include/glm/ext/quaternion_relational.hpp \
+ /usr/include/glm/ext/quaternion_relational.inl \
+ /usr/include/glm/detail/type_quat.inl \
+ /usr/include/glm/ext/quaternion_float_precision.hpp \
+ /usr/include/glm/ext/quaternion_double.hpp \
+ /usr/include/glm/ext/quaternion_double_precision.hpp \
+ /usr/include/glm/ext/quaternion_trigonometric.hpp \
+ /usr/include/glm/ext/quaternion_trigonometric.inl \
+ /usr/include/glm/ext/quaternion_transform.hpp \
+ /usr/include/glm/ext/quaternion_transform.inl \
+ /usr/include/glm/gtc/quaternion.inl /usr/include/glm/gtc/epsilon.hpp \
+ /usr/include/glm/detail/setup.hpp /usr/include/glm/gtc/epsilon.inl \
+ /usr/include/glm/gtc/vec1.hpp /usr/include/glm/ext/vector_bool1.hpp \
+ /usr/include/glm/ext/vector_bool1_precision.hpp \
+ /usr/include/glm/ext/vector_float1.hpp \
+ /usr/include/glm/ext/vector_float1_precision.hpp \
+ /usr/include/glm/ext/vector_double1.hpp \
+ /usr/include/glm/ext/vector_double1_precision.hpp \
+ /usr/include/glm/ext/vector_int1.hpp \
+ /usr/include/glm/ext/vector_int1_sized.hpp \
+ /usr/include/glm/ext/vector_uint1.hpp \
+ /usr/include/glm/ext/vector_uint1_sized.hpp /usr/include/c++/11/cstring \
+ /usr/include/string.h /usr/include/strings.h \
+ /usr/include/glm/gtc/type_ptr.inl

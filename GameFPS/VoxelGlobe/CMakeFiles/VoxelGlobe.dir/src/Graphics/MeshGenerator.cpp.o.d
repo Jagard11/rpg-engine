@@ -1,8 +1,7 @@
-CMakeFiles/VoxelGlobe.dir/src/World/World.cpp.o: \
- /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/World/World.cpp \
+CMakeFiles/VoxelGlobe.dir/src/Graphics/MeshGenerator.cpp.o: \
+ /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/Graphics/MeshGenerator.cpp \
  /usr/include/stdc-predef.h \
- /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/World/World.hpp \
- /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/World/Chunk.hpp \
+ /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/Graphics/MeshGenerator.hpp \
  /usr/include/GL/glew.h /usr/include/c++/11/cstddef \
  /usr/include/x86_64-linux-gnu/c++/11/bits/c++config.h \
  /usr/include/x86_64-linux-gnu/c++/11/bits/os_defines.h \
@@ -56,14 +55,12 @@ CMakeFiles/VoxelGlobe.dir/src/World/World.cpp.o: \
  /usr/include/c++/11/bits/functional_hash.h \
  /usr/include/c++/11/bits/hash_bytes.h \
  /usr/include/c++/11/bits/range_access.h \
- /usr/include/c++/11/bits/vector.tcc /usr/include/c++/11/array \
+ /usr/include/c++/11/bits/vector.tcc /usr/include/c++/11/tuple \
  /usr/include/c++/11/utility /usr/include/c++/11/bits/stl_relops.h \
- /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/World/Block.hpp \
- /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/Core/Types.hpp \
- /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/Utils/CoordinateSystem.hpp \
- /usr/include/glm/glm.hpp /usr/include/glm/detail/_fixes.hpp \
- /usr/include/c++/11/cmath /usr/include/math.h \
- /usr/include/x86_64-linux-gnu/bits/math-vector.h \
+ /usr/include/c++/11/array /usr/include/c++/11/bits/uses_allocator.h \
+ /usr/include/c++/11/bits/invoke.h /usr/include/glm/glm.hpp \
+ /usr/include/glm/detail/_fixes.hpp /usr/include/c++/11/cmath \
+ /usr/include/math.h /usr/include/x86_64-linux-gnu/bits/math-vector.h \
  /usr/include/x86_64-linux-gnu/bits/libm-simd-decl-stubs.h \
  /usr/include/x86_64-linux-gnu/bits/floatn.h \
  /usr/include/x86_64-linux-gnu/bits/floatn-common.h \
@@ -237,10 +234,11 @@ CMakeFiles/VoxelGlobe.dir/src/World/World.cpp.o: \
  /usr/include/glm/packing.hpp /usr/include/glm/detail/func_packing.inl \
  /usr/include/glm/detail/type_half.hpp \
  /usr/include/glm/detail/type_half.inl /usr/include/glm/integer.hpp \
- /usr/include/glm/detail/func_integer.inl /usr/include/c++/11/tuple \
- /usr/include/c++/11/bits/uses_allocator.h \
- /usr/include/c++/11/bits/invoke.h \
- /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/Utils/SphereUtils.hpp \
+ /usr/include/glm/detail/func_integer.inl \
+ /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/World/Block.hpp \
+ /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/Core/Types.hpp \
+ /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/Utils/PlanetConfig.hpp \
+ /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/Debug/DebugManager.hpp \
  /usr/include/c++/11/iostream /usr/include/c++/11/ostream \
  /usr/include/c++/11/ios /usr/include/c++/11/iosfwd \
  /usr/include/c++/11/bits/stringfwd.h /usr/include/c++/11/bits/postypes.h \
@@ -311,7 +309,10 @@ CMakeFiles/VoxelGlobe.dir/src/World/World.cpp.o: \
  /usr/include/c++/11/bits/basic_ios.tcc \
  /usr/include/c++/11/bits/ostream.tcc /usr/include/c++/11/istream \
  /usr/include/c++/11/bits/istream.tcc \
- /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/Utils/PlanetConfig.hpp \
+ /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/World/World.hpp \
+ /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/World/Chunk.hpp \
+ /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/Utils/CoordinateSystem.hpp \
+ /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/Utils/SphereUtils.hpp \
  /usr/include/c++/11/unordered_map \
  /usr/include/c++/11/ext/aligned_buffer.h \
  /usr/include/c++/11/bits/hashtable.h \
@@ -334,13 +335,15 @@ CMakeFiles/VoxelGlobe.dir/src/World/World.cpp.o: \
  /usr/include/c++/11/backward/auto_ptr.h \
  /usr/include/c++/11/pstl/glue_memory_defs.h \
  /usr/include/c++/11/pstl/execution_defs.h \
- /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/Debug/DebugManager.hpp \
- /usr/include/c++/11/algorithm /usr/include/c++/11/bits/stl_algo.h \
- /usr/include/c++/11/bits/algorithmfwd.h \
- /usr/include/c++/11/bits/stl_heap.h \
- /usr/include/c++/11/bits/uniform_int_dist.h \
- /usr/include/c++/11/pstl/glue_algorithm_defs.h \
- /usr/include/c++/11/functional /usr/include/c++/11/bits/std_function.h \
- /usr/include/c++/11/set /usr/include/c++/11/bits/stl_tree.h \
- /usr/include/c++/11/bits/stl_set.h \
- /usr/include/c++/11/bits/stl_multiset.h
+ /usr/include/glm/gtc/matrix_transform.hpp \
+ /usr/include/glm/ext/matrix_projection.hpp \
+ /usr/include/glm/gtc/constants.hpp \
+ /usr/include/glm/ext/scalar_constants.hpp \
+ /usr/include/glm/ext/scalar_constants.inl \
+ /usr/include/glm/gtc/constants.inl \
+ /usr/include/glm/ext/matrix_projection.inl \
+ /usr/include/glm/ext/matrix_clip_space.hpp \
+ /usr/include/glm/ext/matrix_clip_space.inl \
+ /usr/include/glm/ext/matrix_transform.hpp \
+ /usr/include/glm/ext/matrix_transform.inl \
+ /usr/include/glm/gtc/matrix_transform.inl

@@ -12,7 +12,8 @@
 Chunk::Chunk(int x, int y, int z, int mergeFactor) 
     : chunkX(x), chunkY(y), chunkZ(z), mergeFactor(mergeFactor), 
       blocks(mergeFactor == 1 ? SIZE * SIZE * SIZE : 0), world(nullptr), 
-      buffersDirty(true), meshDirty(true), currentLodLevel(-1), buffersInitialized(false) {
+      buffersDirty(true), meshDirty(true), currentLodLevel(-1), buffersInitialized(false),
+      relativeOffset(0.0f) {
     // Empty constructor - terrain generation happens in generateTerrain()
 }
 
@@ -32,12 +33,6 @@ Block Chunk::getBlock(int x, int y, int z) const {
         int worldX = chunkX * SIZE + x;
         int worldY = chunkY * SIZE + y;
         int worldZ = chunkZ * SIZE + z;
-        
-        // Add validation for extreme world coordinates
-        if (abs(worldX) > 100000 || abs(worldY) > 100000 || abs(worldZ) > 100000) {
-            // Coordinates too extreme, assume air
-            return Block(BlockType::AIR);
-        }
         
         try {
             return world->getBlock(worldX, worldY, worldZ);
@@ -90,21 +85,13 @@ void Chunk::generateTerrain() {
         return;
     }
     
-    // Get the exact surface radius as used in collision - precise consistency is critical
-    float surfaceR = SphereUtils::getSurfaceRadius(world->getRadius());
+    // Get the exact surface radius as used in collision
+    double surfaceR = SphereUtils::getSurfaceRadiusMeters();
     
     // Calculate world coordinates of chunk origin
     int worldOriginX = chunkX * SIZE;
     int worldOriginY = chunkY * SIZE;
     int worldOriginZ = chunkZ * SIZE;
-    
-    // Safety check for extreme coordinates
-    if (abs(worldOriginX) > 100000 || abs(worldOriginY) > 100000 || abs(worldOriginZ) > 100000) {
-        std::cerr << "Warning: Extreme chunk coordinates detected in generateTerrain: (" 
-                 << chunkX << ", " << chunkY << ", " << chunkZ 
-                 << "), skipping terrain generation." << std::endl;
-        return;
-    }
     
     // Track if any blocks are generated
     bool anyBlocksGenerated = false;
@@ -119,17 +106,14 @@ void Chunk::generateTerrain() {
                 int worldZ = worldOriginZ + z;
                 
                 // Create a block center position (x+0.5, y+0.5, z+0.5) - same as in collision
-                glm::vec3 blockCenter = glm::vec3(worldX + 0.5f, worldY + 0.5f, worldZ + 0.5f);
+                glm::dvec3 blockCenter(worldX + 0.5, worldY + 0.5, worldZ + 0.5);
                 
-                // Calculate distance from center using same precision as collision
-                double bx = static_cast<double>(blockCenter.x);
-                double by = static_cast<double>(blockCenter.y);
-                double bz = static_cast<double>(blockCenter.z);
-                double dist = sqrt(bx*bx + by*by + bz*bz);
+                // Calculate distance from center using double precision
+                double dist = glm::length(blockCenter);
                 
                 // Determine block type based on distance from center, using SphereUtils
                 BlockType blockType = static_cast<BlockType>(
-                    SphereUtils::getBlockTypeForElevation(dist, surfaceR)
+                    SphereUtils::getBlockTypeForElevation(dist)
                 );
                 
                 if (blockType != BlockType::AIR) {
@@ -199,26 +183,18 @@ void Chunk::updateBuffers() {
         glBindBuffer(GL_ARRAY_BUFFER, vbo);
         glBufferData(GL_ARRAY_BUFFER, mesh.size() * sizeof(float), mesh.data(), GL_STATIC_DRAW);
 
-        indices.clear();
-        // Only generate indices for complete quads (4 vertices each)
-        size_t numQuads = mesh.size() / 20; // 5 floats per vertex, 4 vertices per quad
-        for (size_t i = 0; i < numQuads; i++) {
-            size_t baseIndex = i * 4;
-            indices.push_back(baseIndex);
-            indices.push_back(baseIndex + 1);
-            indices.push_back(baseIndex + 2);
-            indices.push_back(baseIndex);
-            indices.push_back(baseIndex + 2);
-            indices.push_back(baseIndex + 3);
+        // Only update indices if they're non-empty
+        if (!indices.empty()) {
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+            glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(GLuint), indices.data(), GL_STATIC_DRAW);
         }
-        
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(GLuint), indices.data(), GL_STATIC_DRAW);
 
+        // Set up vertex attributes (position and texture coords)
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
         glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
         glEnableVertexAttribArray(0);
         glEnableVertexAttribArray(1);
+        
         buffersDirty = false;
     } catch (const std::exception& e) {
         std::cerr << "Exception in updateBuffers: " << e.what() << std::endl;
@@ -247,17 +223,17 @@ void Chunk::regenerateMesh(int lodLevel) {
         mesh.clear();
         indices.clear();
         
-        // Use MeshGenerator to generate the chunk mesh
+        // Use MeshGenerator to generate the chunk mesh with proper frustum geometry
         if (mergeFactor == 1) {
             MeshGenerator::MeshData meshData = MeshGenerator::generateChunkMesh(
-                blocks, SIZE, chunkX, chunkY, chunkZ, world->getRadius()
+                blocks, SIZE, chunkX, chunkY, chunkZ
             );
             
             // Copy mesh data to chunk
             mesh = std::move(meshData.vertices);
             indices = std::move(meshData.indices);
         } else {
-            // For merged chunks, create a simple quad using MeshGenerator
+            // For LOD chunks (merged), create a simple quad using MeshGenerator
             MeshGenerator::MeshData meshData = MeshGenerator::generateLODChunkMesh(SIZE, mergeFactor);
             mesh = std::move(meshData.vertices);
             indices = std::move(meshData.indices);
@@ -294,11 +270,29 @@ void Chunk::regenerateMesh() {
     regenerateMesh(0);
 }
 
-const std::vector<float>& Chunk::getMesh() const {
-    return mesh;
-}
-
 void Chunk::markMeshDirty() {
     meshDirty = true;
     buffersDirty = true;  // Ensure buffers get updated too
+}
+
+void Chunk::updateRelativePosition(int originX, int originY, int originZ) {
+    // Calculate the chunk's offset from the current origin in world units
+    relativeOffset = glm::vec3(
+        (chunkX - originX) * SIZE,
+        (chunkY - originY) * SIZE,
+        (chunkZ - originZ) * SIZE
+    );
+}
+
+glm::dvec3 Chunk::getWorldCenter() const {
+    // Calculate the world-space center of this chunk using chunk coordinates
+    return glm::dvec3(
+        chunkX * SIZE + SIZE / 2.0,
+        chunkY * SIZE + SIZE / 2.0,
+        chunkZ * SIZE + SIZE / 2.0
+    );
+}
+
+const std::vector<float>& Chunk::getMesh() const {
+    return mesh;
 }

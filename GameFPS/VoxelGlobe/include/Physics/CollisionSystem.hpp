@@ -32,8 +32,8 @@ public:
      * @return True if position collides with the environment
      */
     bool checkCollision(const glm::vec3& position, const glm::vec3& playerDir) const {
-        // Get surface radius - the actual visible surface where blocks appear
-        float surfaceR = SphereUtils::getSurfaceRadius(world.getRadius());
+        // Get surface radius using standardized method
+        float surfaceR = static_cast<float>(SphereUtils::getSurfaceRadiusMeters());
         
         // Calculate distance from center with double precision for accuracy
         double px = static_cast<double>(position.x);
@@ -41,8 +41,8 @@ public:
         double pz = static_cast<double>(position.z);
         double distFromCenter = sqrt(px*px + py*py + pz*pz);
         
-        // If we're below the surface, we've collided
-        if (distFromCenter < surfaceR + CollisionConfig::COLLISION_OFFSET) {
+        // If we're below the surface, we've collided - USING STANDARD COLLISION RADIUS
+        if (distFromCenter < SphereUtils::getCollisionRadiusMeters()) {
             return true;
         }
         
@@ -113,7 +113,7 @@ public:
      * @return Safe position on the surface
      */
     glm::vec3 findSafeSpawnPosition(const glm::vec3& direction, float playerHeight) const {
-        float surfaceR = SphereUtils::getSurfaceRadius(world.getRadius());
+        float surfaceR = static_cast<float>(SphereUtils::getSurfaceRadiusMeters());
         float targetHeight = surfaceR + CollisionConfig::GROUND_OFFSET;
         
         // Start at exact surface position

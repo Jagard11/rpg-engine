@@ -4,6 +4,7 @@
 #include <iostream>
 #include <glm/geometric.hpp>
 #include "World/Chunk.hpp"
+#include "Utils/SphereUtils.hpp"
 
 VoxelManipulator::VoxelManipulator(World& world) : worldRef(world) {}
 
@@ -39,7 +40,7 @@ bool VoxelManipulator::placeBlock(const Player& player, BlockType type) {
             double py = static_cast<double>(placePos.y);
             double pz = static_cast<double>(placePos.z);
             double dist = sqrt(px*px + py*py + pz*pz);
-            float surfaceR = worldRef.getRadius() + 8.0f;
+            double surfaceR = SphereUtils::getSurfaceRadiusMeters();
             std::cout << "Block distance from center: " << dist << ", surface at: " << surfaceR
                      << ", height above surface: " << (dist - surfaceR) << std::endl;
         }
@@ -104,7 +105,7 @@ bool VoxelManipulator::removeBlock(const Player& player) {
             double hy = static_cast<double>(hitPos.y);
             double hz = static_cast<double>(hitPos.z);
             double dist = sqrt(hx*hx + hy*hy + hz*hz);
-            float surfaceR = worldRef.getRadius() + 8.0f;
+            double surfaceR = SphereUtils::getSurfaceRadiusMeters();
             std::cout << "Block distance from center: " << dist << ", surface at: " << surfaceR
                      << ", height above surface: " << (dist - surfaceR) << std::endl;
         }
@@ -214,105 +215,112 @@ bool VoxelManipulator::raycast(const glm::vec3& origin, const glm::vec3& directi
         std::cout << "Raycast direction: " << dir.x << ", " << dir.y << ", " << dir.z << std::endl;
     }
     
-    // For improved raycast accuracy, use a smaller step size
-    float stepSize = 0.5f;  // Reduced from 1.0f for better precision
-    float distance = 0.0f;
-    glm::vec3 currentPos = origin;
+    // Use planet-centric coordinates for raycast
+    // Get distance of the origin from planet center
+    double distFromCenter = glm::length(origin);
     
     // Get surface radius
-    float surfaceR = worldRef.getRadius() + 8.0f;
+    double surfaceR = SphereUtils::getSurfaceRadiusMeters();
     
-    // Limit maximum distance to a reasonable value
-    maxDistance = glm::min(maxDistance, 100.0f);  // Reduced from 1000.0f
+    // Calculate the surface normal at the player position (points away from center)
+    glm::vec3 surfaceNormal = glm::normalize(origin);
+    
+    // Limit maximum distance to a reasonable value based on player height
+    double heightAboveSurface = distFromCenter - surfaceR;
+    float adaptedMaxDistance = std::min(maxDistance, 
+                                      static_cast<float>(heightAboveSurface) * 2.0f + 20.0f);
+                                      
+    if (DebugManager::getInstance().logRaycast()) {
+        std::cout << "Height above surface: " << heightAboveSurface 
+                  << ", adapted max distance: " << adaptedMaxDistance << std::endl;
+    }
+    
+    // Start raycast from a small initial offset to avoid self-collisions
+    glm::vec3 currentPos = origin + dir * 0.1f;
+    float distance = 0.0f;
+    
+    // For Earth-scale raycast, we need to work in a local coordinate system
+    // Get the player's chunk coordinates to serve as the origin
+    int playerChunkX = static_cast<int>(floor(origin.x / static_cast<float>(Chunk::SIZE)));
+    int playerChunkY = static_cast<int>(floor(origin.y / static_cast<float>(Chunk::SIZE)));
+    int playerChunkZ = static_cast<int>(floor(origin.z / static_cast<float>(Chunk::SIZE)));
+    
+    // Calculate offset to local coordinate system
+    float offsetX = playerChunkX * Chunk::SIZE;
+    float offsetY = playerChunkY * Chunk::SIZE;
+    float offsetZ = playerChunkZ * Chunk::SIZE;
+    
+    // Transform origin to local coordinates
+    glm::vec3 localOrigin = glm::vec3(origin.x - offsetX, origin.y - offsetY, origin.z - offsetZ);
+    glm::vec3 localCurrentPos = glm::vec3(currentPos.x - offsetX, currentPos.y - offsetY, currentPos.z - offsetZ);
     
     // Max iterations to prevent infinite loops
     const int MAX_ITERATIONS = 1000;
     int iterations = 0;
     
-    // Start raycast from a small initial offset to avoid self-collisions
-    currentPos += dir * 0.1f;
+    // Use a shorter initial step size
+    float stepSize = 0.2f;
     
-    // Use the adaptive step size based on distance from surface
-    while (distance < maxDistance && iterations < MAX_ITERATIONS) {
+    while (distance < adaptedMaxDistance && iterations < MAX_ITERATIONS) {
         iterations++;
         
-        // Step along ray
-        currentPos += dir * stepSize;
-        distance += stepSize;
+        // Determine step size based on distance from origin
+        float localStepSize = stepSize;
+        float distFromOrigin = glm::length(localCurrentPos - localOrigin);
+        
+        // Use larger steps when further from origin
+        if (distFromOrigin > 10.0f) localStepSize = 0.5f;
+        if (distFromOrigin > 20.0f) localStepSize = 1.0f;
+        
+        // Step along ray in local coordinates
+        localCurrentPos += dir * localStepSize;
+        distance += localStepSize;
+        
+        // Convert back to world coordinates to check for block
+        glm::vec3 worldPos = glm::vec3(
+            localCurrentPos.x + offsetX,
+            localCurrentPos.y + offsetY,
+            localCurrentPos.z + offsetZ
+        );
         
         // Get current voxel position
-        glm::ivec3 voxelPos = glm::ivec3(floor(currentPos.x), floor(currentPos.y), floor(currentPos.z));
-        
-        // Safety check for extreme coordinates
-        if (abs(voxelPos.x) > 100000 || abs(voxelPos.y) > 100000 || abs(voxelPos.z) > 100000) {
-            if (DebugManager::getInstance().logRaycast()) {
-                std::cerr << "Warning: Extreme coordinates in raycast, stopping early." << std::endl;
-            }
-            return false;
-        }
-        
-        // Calculate distance from center using double precision
-        double vx = static_cast<double>(voxelPos.x);
-        double vy = static_cast<double>(voxelPos.y);
-        double vz = static_cast<double>(voxelPos.z);
-        double distFromCenter = sqrt(vx*vx + vy*vy + vz*vz);
-        double distFromSurface = abs(distFromCenter - surfaceR);
-        
-        // Adjust step size based on distance from surface
-        if (distFromSurface > 100.0) {
-            stepSize = 10.0f; // Larger steps far from surface
-        } else if (distFromSurface > 10.0) {
-            stepSize = 2.0f;  // Medium steps approaching surface
-        } else {
-            stepSize = 0.5f;  // Small steps near surface for accuracy
-        }
+        glm::ivec3 voxelPos = glm::ivec3(floor(worldPos.x), floor(worldPos.y), floor(worldPos.z));
         
         // Check if we hit a non-air block
         Block block = worldRef.getBlock(voxelPos.x, voxelPos.y, voxelPos.z);
         if (block.type != BlockType::AIR) {
-            // Extra verification to avoid floating point imprecision
-            // Recheck adjacent positions to ensure we have the exact block face
+            // Extra verification for exact face hit
             float smallStep = 0.1f;
-            glm::vec3 confirmPos = currentPos - dir * smallStep;
+            glm::vec3 confirmPos = worldPos - dir * smallStep;
             glm::ivec3 confirmVoxel = glm::ivec3(floor(confirmPos.x), floor(confirmPos.y), floor(confirmPos.z));
             
             // If the confirmation position is different, we're on the block boundary
             if (confirmVoxel.x != voxelPos.x || confirmVoxel.y != voxelPos.y || confirmVoxel.z != voxelPos.z) {
-                // We're at a block boundary, determine which face we hit
-                
                 // Find the face normal by comparing the position components
                 glm::vec3 diff = glm::vec3(voxelPos) - confirmPos;
-                glm::vec3 faceNormal = glm::vec3(0.0f);
+                hitNormal = glm::vec3(0.0f);
                 
                 if (abs(diff.x) > abs(diff.y) && abs(diff.x) > abs(diff.z)) {
-                    faceNormal.x = diff.x > 0 ? -1.0f : 1.0f;
+                    hitNormal.x = diff.x > 0 ? -1.0f : 1.0f;
                 } else if (abs(diff.y) > abs(diff.x) && abs(diff.y) > abs(diff.z)) {
-                    faceNormal.y = diff.y > 0 ? -1.0f : 1.0f;
+                    hitNormal.y = diff.y > 0 ? -1.0f : 1.0f;
                 } else {
-                    faceNormal.z = diff.z > 0 ? -1.0f : 1.0f;
+                    hitNormal.z = diff.z > 0 ? -1.0f : 1.0f;
                 }
                 
                 hitPos = voxelPos;
-                hitNormal = faceNormal;
             } else {
-                // We're inside the block, use a more general approach to find the face
-                
-                // Calculate hit normal by checking surrounding blocks
-                // Move slightly back to ensure we're outside the hit block
-                glm::vec3 backPos = currentPos - dir * stepSize * 0.5f;
-                
-                // Check all 6 directions to find which face was hit
+                // We're inside the block, find the closest face
                 const glm::vec3 faceNormals[6] = {
                     {1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}
                 };
                 
-                // Find which face is closest to the hit point
-                float minDist = maxDistance;
+                float minDist = adaptedMaxDistance;
                 int closestFace = 0;
                 
                 for (int i = 0; i < 6; i++) {
                     glm::vec3 faceCenter = glm::vec3(voxelPos) + glm::vec3(0.5f) + faceNormals[i] * 0.5f;
-                    float dist = glm::length(faceCenter - backPos);
+                    float dist = glm::length(faceCenter - worldPos);
                     if (dist < minDist) {
                         minDist = dist;
                         closestFace = i;
@@ -337,7 +345,7 @@ bool VoxelManipulator::raycast(const glm::vec3& origin, const glm::vec3& directi
         if (iterations >= MAX_ITERATIONS) {
             std::cerr << "Warning: Raycast reached maximum iterations" << std::endl;
         } else {
-            std::cout << "Raycast hit nothing (max distance: " << maxDistance << ")" << std::endl;
+            std::cout << "Raycast hit nothing (max distance: " << adaptedMaxDistance << ")" << std::endl;
         }
     }
     
@@ -345,24 +353,25 @@ bool VoxelManipulator::raycast(const glm::vec3& origin, const glm::vec3& directi
 }
 
 bool VoxelManipulator::isValidPlacementPosition(const glm::ivec3& pos) const {
+    // Use SphereUtils to determine if position is within valid building range
     // Calculate distance from center using double precision for accuracy
     double px = static_cast<double>(pos.x);
     double py = static_cast<double>(pos.y);
     double pz = static_cast<double>(pos.z);
     double distFromCenter = sqrt(px*px + py*py + pz*pz);
     
-    float surfaceR = worldRef.getRadius() + 8.0f; // Surface radius
+    // Get standardized surface radius
+    double surfaceR = SphereUtils::getSurfaceRadiusMeters();
     
     // Valid range: From below surface (crust) to 15km above sea level
-    // 5.0f units below surface is the bottom of the crust
-    // 15.0f units above surface is approximately 15km above sea level
-    bool isWithinRange = (distFromCenter >= worldRef.getRadius() - 5.0f) && 
-                        (distFromCenter <= surfaceR + 15.0f);
+    // Using the standardized constants from SphereUtils/PlanetConfig
+    bool isWithinRange = SphereUtils::isWithinBuildRange(glm::dvec3(px, py, pz));
     
     if (DebugManager::getInstance().logBlockPlacement()) {
         std::cout << "Placement position validation: " << pos.x << ", " << pos.y << ", " << pos.z 
                   << " (distance from center: " << distFromCenter << ")" << std::endl;
-        std::cout << "Valid range: " << (worldRef.getRadius() - 5.0f) << " to " << (surfaceR + 15.0f) << std::endl;
+        std::cout << "Valid range: " << (surfaceR - PlanetConfig::TERRAIN_DEPTH_METERS) << " to " 
+                  << (surfaceR + PlanetConfig::MAX_BUILD_HEIGHT_METERS) << std::endl;
         std::cout << "Result: " << (isWithinRange ? "Valid" : "Invalid") << std::endl;
     }
     
