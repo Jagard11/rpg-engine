@@ -58,6 +58,25 @@ public:
 
 private:
     /**
+     * Add a simple cube face to the mesh (for consistent appearance with collision)
+     * 
+     * @param mesh The mesh data to add the face to
+     * @param faceIndex The index of the face (0-5 for each direction)
+     * @param x Local X coordinate of the block within the chunk
+     * @param y Local Y coordinate of the block within the chunk
+     * @param z Local Z coordinate of the block within the chunk
+     * @param blockType The type of the block
+     */
+    static void addCubeFaceToMesh(
+        MeshData& mesh,
+        int faceIndex,
+        float x,
+        float y,
+        float z,
+        int blockType
+    );
+
+    /**
      * Helper function to add a frustum-shaped face to the mesh
      * Creates voxel faces that taper toward the planet core
      * Optimized for Earth-scale rendering with proper block shaping
