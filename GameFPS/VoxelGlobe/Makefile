@@ -129,6 +129,54 @@ VoxelGlobe/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/build
 .PHONY : VoxelGlobe/fast
 
+src/Core/GameStateManager.o: src/Core/GameStateManager.cpp.o
+.PHONY : src/Core/GameStateManager.o
+
+# target to build an object file
+src/Core/GameStateManager.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Core/GameStateManager.cpp.o
+.PHONY : src/Core/GameStateManager.cpp.o
+
+src/Core/GameStateManager.i: src/Core/GameStateManager.cpp.i
+.PHONY : src/Core/GameStateManager.i
+
+# target to preprocess a source file
+src/Core/GameStateManager.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Core/GameStateManager.cpp.i
+.PHONY : src/Core/GameStateManager.cpp.i
+
+src/Core/GameStateManager.s: src/Core/GameStateManager.cpp.s
+.PHONY : src/Core/GameStateManager.s
+
+# target to generate assembly for a file
+src/Core/GameStateManager.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Core/GameStateManager.cpp.s
+.PHONY : src/Core/GameStateManager.cpp.s
+
+src/Core/InputHandler.o: src/Core/InputHandler.cpp.o
+.PHONY : src/Core/InputHandler.o
+
+# target to build an object file
+src/Core/InputHandler.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Core/InputHandler.cpp.o
+.PHONY : src/Core/InputHandler.cpp.o
+
+src/Core/InputHandler.i: src/Core/InputHandler.cpp.i
+.PHONY : src/Core/InputHandler.i
+
+# target to preprocess a source file
+src/Core/InputHandler.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Core/InputHandler.cpp.i
+.PHONY : src/Core/InputHandler.cpp.i
+
+src/Core/InputHandler.s: src/Core/InputHandler.cpp.s
+.PHONY : src/Core/InputHandler.s
+
+# target to generate assembly for a file
+src/Core/InputHandler.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Core/InputHandler.cpp.s
+.PHONY : src/Core/InputHandler.cpp.s
+
 src/Core/main.o: src/Core/main.cpp.o
 .PHONY : src/Core/main.o
 
@@ -224,6 +272,54 @@ src/Graphics/GraphicsSettings.s: src/Graphics/GraphicsSettings.cpp.s
 src/Graphics/GraphicsSettings.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Graphics/GraphicsSettings.cpp.s
 .PHONY : src/Graphics/GraphicsSettings.cpp.s
+
+src/Graphics/ResourceManager.o: src/Graphics/ResourceManager.cpp.o
+.PHONY : src/Graphics/ResourceManager.o
+
+# target to build an object file
+src/Graphics/ResourceManager.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Graphics/ResourceManager.cpp.o
+.PHONY : src/Graphics/ResourceManager.cpp.o
+
+src/Graphics/ResourceManager.i: src/Graphics/ResourceManager.cpp.i
+.PHONY : src/Graphics/ResourceManager.i
+
+# target to preprocess a source file
+src/Graphics/ResourceManager.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Graphics/ResourceManager.cpp.i
+.PHONY : src/Graphics/ResourceManager.cpp.i
+
+src/Graphics/ResourceManager.s: src/Graphics/ResourceManager.cpp.s
+.PHONY : src/Graphics/ResourceManager.s
+
+# target to generate assembly for a file
+src/Graphics/ResourceManager.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Graphics/ResourceManager.cpp.s
+.PHONY : src/Graphics/ResourceManager.cpp.s
+
+src/Graphics/ShaderManager.o: src/Graphics/ShaderManager.cpp.o
+.PHONY : src/Graphics/ShaderManager.o
+
+# target to build an object file
+src/Graphics/ShaderManager.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Graphics/ShaderManager.cpp.o
+.PHONY : src/Graphics/ShaderManager.cpp.o
+
+src/Graphics/ShaderManager.i: src/Graphics/ShaderManager.cpp.i
+.PHONY : src/Graphics/ShaderManager.i
+
+# target to preprocess a source file
+src/Graphics/ShaderManager.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Graphics/ShaderManager.cpp.i
+.PHONY : src/Graphics/ShaderManager.cpp.i
+
+src/Graphics/ShaderManager.s: src/Graphics/ShaderManager.cpp.s
+.PHONY : src/Graphics/ShaderManager.s
+
+# target to generate assembly for a file
+src/Graphics/ShaderManager.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Graphics/ShaderManager.cpp.s
+.PHONY : src/Graphics/ShaderManager.cpp.s
 
 src/Player/Movement.o: src/Player/Movement.cpp.o
 .PHONY : src/Player/Movement.o
@@ -642,6 +738,12 @@ help:
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
 	@echo "... VoxelGlobe"
+	@echo "... src/Core/GameStateManager.o"
+	@echo "... src/Core/GameStateManager.i"
+	@echo "... src/Core/GameStateManager.s"
+	@echo "... src/Core/InputHandler.o"
+	@echo "... src/Core/InputHandler.i"
+	@echo "... src/Core/InputHandler.s"
 	@echo "... src/Core/main.o"
 	@echo "... src/Core/main.i"
 	@echo "... src/Core/main.s"
@@ -654,6 +756,12 @@ help:
 	@echo "... src/Graphics/GraphicsSettings.o"
 	@echo "... src/Graphics/GraphicsSettings.i"
 	@echo "... src/Graphics/GraphicsSettings.s"
+	@echo "... src/Graphics/ResourceManager.o"
+	@echo "... src/Graphics/ResourceManager.i"
+	@echo "... src/Graphics/ResourceManager.s"
+	@echo "... src/Graphics/ShaderManager.o"
+	@echo "... src/Graphics/ShaderManager.i"
+	@echo "... src/Graphics/ShaderManager.s"
 	@echo "... src/Player/Movement.o"
 	@echo "... src/Player/Movement.i"
 	@echo "... src/Player/Movement.s"

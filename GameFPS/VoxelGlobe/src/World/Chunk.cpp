@@ -6,16 +6,8 @@
 #include "Debug/DebugManager.hpp"
 #include <glm/geometric.hpp>
 #include <cmath> // for isnan, isinf
-
-// Constants for collision and rendering alignment
-const float COLLISION_OFFSET = 0.25f; // Same as in Movement.cpp
-
-// Helper function to check if a vector contains NaN or Inf values
-bool isValidVector(const glm::vec3& v) {
-    return !std::isnan(v.x) && !std::isinf(v.x) &&
-           !std::isnan(v.y) && !std::isinf(v.y) &&
-           !std::isnan(v.z) && !std::isinf(v.z);
-}
+#include "Utils/SphereUtils.hpp" // Added
+#include "Graphics/MeshGenerator.hpp" // Added
 
 Chunk::Chunk(int x, int y, int z, int mergeFactor) 
     : chunkX(x), chunkY(y), chunkZ(z), mergeFactor(mergeFactor), 
@@ -99,7 +91,7 @@ void Chunk::generateTerrain() {
     }
     
     // Get the exact surface radius as used in collision - precise consistency is critical
-    float surfaceR = world->getRadius() + 8.0f;
+    float surfaceR = SphereUtils::getSurfaceRadius(world->getRadius());
     
     // Calculate world coordinates of chunk origin
     int worldOriginX = chunkX * SIZE;
@@ -135,23 +127,13 @@ void Chunk::generateTerrain() {
                 double bz = static_cast<double>(blockCenter.z);
                 double dist = sqrt(bx*bx + by*by + bz*bz);
                 
-                // Determine block type based on distance from center
-                BlockType blockType;
+                // Determine block type based on distance from center, using SphereUtils
+                BlockType blockType = static_cast<BlockType>(
+                    SphereUtils::getBlockTypeForElevation(dist, surfaceR)
+                );
                 
-                // EXACT same rules as used in collision detection - complete consistency
-                if (dist < surfaceR - 5.0) {
-                    // Deep underground - DIRT
-                    blockType = BlockType::DIRT;
+                if (blockType != BlockType::AIR) {
                     anyBlocksGenerated = true;
-                }
-                else if (dist < surfaceR) {
-                    // Surface layer - GRASS (8 units thick, matching collision)
-                    blockType = BlockType::GRASS;
-                    anyBlocksGenerated = true;
-                }
-                else {
-                    // Above surface - AIR
-                    blockType = BlockType::AIR;
                 }
                 
                 // Make sure index is in bounds
@@ -250,56 +232,6 @@ void Chunk::updateBuffers() {
     }
 }
 
-// Improved sphere projection function - EXACTLY matching collision detection for perfect alignment
-glm::vec3 projectToSphere(const glm::vec3& worldPos, float surfaceR, bool isInner, int faceType) {
-    // Safety checks for invalid input
-    if (glm::length(worldPos) < 0.001f) {
-        return glm::vec3(0.0f, 0.0f, 0.0f);
-    }
-    
-    // Get the voxel's integer block position (floor for consistency with collision)
-    glm::ivec3 blockPos = glm::ivec3(floor(worldPos.x), floor(worldPos.y), floor(worldPos.z));
-    
-    // Calculate block center in world space (x+0.5, y+0.5, z+0.5)
-    glm::vec3 blockCenter = glm::vec3(blockPos) + glm::vec3(0.5f);
-    
-    // Get normalized direction from world origin to block center
-    glm::vec3 blockDir = glm::normalize(blockCenter);
-    
-    // Calculate distance from center to block center - with double precision
-    double bx = static_cast<double>(blockCenter.x);
-    double by = static_cast<double>(blockCenter.y);
-    double bz = static_cast<double>(blockCenter.z);
-    double blockDistance = sqrt(bx*bx + by*by + bz*bz);
-    
-    // Calculate height layer using floor to ensure consistent layers
-    int heightLayer = static_cast<int>(floor(blockDistance - surfaceR));
-    
-    // Base radius for this height layer (exact match to collision detection)
-    float baseRadius = surfaceR + static_cast<float>(heightLayer);
-    
-    // Select appropriate radius based on face type
-    float radius;
-    
-    // Face types:
-    // 2 = top face (+Y), 3 = bottom face (-Y), others = side faces
-    if (faceType == 2) { // Top face (+Y)
-        // Exactly 1.0 unit above the base radius - matching collision
-        radius = baseRadius + 1.0f;
-    } else if (faceType == 3) { // Bottom face (-Y)
-        // Exactly at the base radius - matching collision 
-        radius = baseRadius;
-    } else { // Side faces
-        // For side faces, use exact local Y position (0.0 to 1.0)
-        float localY = worldPos.y - blockPos.y;
-        radius = baseRadius + localY;
-    }
-    
-    // Project the vertex onto the sphere at the calculated radius
-    // Using the block's center direction ensures perfect alignment
-    return blockDir * radius;
-}
-
 void Chunk::regenerateMesh(int lodLevel) {
     try {
         if (DebugManager::getInstance().logChunkUpdates()) {
@@ -313,195 +245,22 @@ void Chunk::regenerateMesh(int lodLevel) {
         
         // Always regenerate the mesh when requested
         mesh.clear();
+        indices.clear();
         
-        // Get surface radius and add the collision offset for perfect visual-collision alignment
-        // This ensures that rendered terrain appears exactly where collision happens
-        float surfaceR = world->getRadius() + 8.0f;
-        float renderSurfaceR = surfaceR + COLLISION_OFFSET; // Add collision offset for visual rendering
-        
-        // Chunk center distance from world center
-        double chunkCenterX = chunkX * SIZE + SIZE/2.0;
-        double chunkCenterY = chunkY * SIZE + SIZE/2.0;
-        double chunkCenterZ = chunkZ * SIZE + SIZE/2.0;
-        double chunkDist = sqrt(chunkCenterX*chunkCenterX + chunkCenterY*chunkCenterY + chunkCenterZ*chunkCenterZ);
-        
+        // Use MeshGenerator to generate the chunk mesh
         if (mergeFactor == 1) {
-            // Track blocks that have visible faces
-            std::vector<std::tuple<int, int, int, BlockType>> visibleBlocks;
+            MeshGenerator::MeshData meshData = MeshGenerator::generateChunkMesh(
+                blocks, SIZE, chunkX, chunkY, chunkZ, world->getRadius()
+            );
             
-            // Find all non-air blocks with at least one exposed face
-            for (int x = 0; x < SIZE; x++) {
-                for (int y = 0; y < SIZE; y++) {
-                    for (int z = 0; z < SIZE; z++) {
-                        try {
-                            Block block = getBlock(x, y, z);
-                            if (block.type != BlockType::AIR) {
-                                // Check all 6 neighboring directions
-                                const glm::ivec3 directions[6] = {
-                                    {1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}
-                                };
-                                
-                                bool hasVisibleFace = false;
-                                for (int i = 0; i < 6; i++) {
-                                    int nx = x + directions[i].x;
-                                    int ny = y + directions[i].y;
-                                    int nz = z + directions[i].z;
-                                    
-                                    // If neighbor is out of bounds or is air, this face is visible
-                                    if (nx < 0 || nx >= SIZE || ny < 0 || ny >= SIZE || nz < 0 || nz >= SIZE) {
-                                        hasVisibleFace = true;
-                                        break;
-                                    }
-                                    
-                                    // Check if neighbor block is air
-                                    try {
-                                        Block neighborBlock = getBlock(nx, ny, nz);
-                                        if (neighborBlock.type == BlockType::AIR) {
-                                            hasVisibleFace = true;
-                                            break;
-                                        }
-                                    } catch (...) {
-                                        // Assume visible if exception occurs
-                                        hasVisibleFace = true;
-                                        break;
-                                    }
-                                }
-                                
-                                if (hasVisibleFace) {
-                                    visibleBlocks.push_back(std::make_tuple(x, y, z, block.type));
-                                }
-                            }
-                        } catch (...) {
-                            continue; // Skip blocks that cause exceptions
-                        }
-                    }
-                }
-            }
-            
-            // Generate mesh for each visible block
-            for (const auto& [x, y, z, type] : visibleBlocks) {
-                // Calculate world position
-                int worldX = chunkX * SIZE + x;
-                int worldY = chunkY * SIZE + y;
-                int worldZ = chunkZ * SIZE + z;
-                
-                // Calculate block center with double precision - matching collision
-                double wx = static_cast<double>(worldX) + 0.5;
-                double wy = static_cast<double>(worldY) + 0.5;
-                double wz = static_cast<double>(worldZ) + 0.5;
-                double dist = sqrt(wx*wx + wy*wy + wz*wz);
-                
-                // Determine if block is inside or outside the surface
-                bool isInner = (dist < renderSurfaceR); // Use renderSurfaceR instead of surfaceR
-                
-                // Check surrounding faces for visibility
-                const glm::ivec3 directions[6] = {
-                    {1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}
-                };
-                
-                for (int i = 0; i < 6; i++) {
-                    // Get neighbor position
-                    int nx = x + directions[i].x;
-                    int ny = y + directions[i].y;
-                    int nz = z + directions[i].z;
-                    
-                    // Skip faces that are hidden inside the chunk
-                    bool faceVisible = false;
-                    if (nx < 0 || nx >= SIZE || ny < 0 || ny >= SIZE || nz < 0 || nz >= SIZE) {
-                        faceVisible = true; // Face is at chunk boundary
-                    } else {
-                        try {
-                            // Check if neighbor is air
-                            Block neighborBlock = getBlock(nx, ny, nz);
-                            faceVisible = (neighborBlock.type == BlockType::AIR);
-                        } catch (...) {
-                            faceVisible = true; // Assume visible if exception
-                        }
-                    }
-                    
-                    if (faceVisible) {
-                        // Create cube face vertices in world space
-                        // CRITICAL: Use EXACT 1.0 unit dimensions
-                        glm::vec3 v1, v2, v3, v4;
-                        float uBase = static_cast<float>(i); // Use face index for UV
-                        
-                        switch (i) {
-                            case 0: // +X face
-                                v1 = glm::vec3(worldX + 1.0f, worldY, worldZ);
-                                v2 = glm::vec3(worldX + 1.0f, worldY + 1.0f, worldZ);
-                                v3 = glm::vec3(worldX + 1.0f, worldY + 1.0f, worldZ + 1.0f);
-                                v4 = glm::vec3(worldX + 1.0f, worldY, worldZ + 1.0f);
-                                break;
-                            case 1: // -X face
-                                v1 = glm::vec3(worldX, worldY, worldZ);
-                                v2 = glm::vec3(worldX, worldY, worldZ + 1.0f);
-                                v3 = glm::vec3(worldX, worldY + 1.0f, worldZ + 1.0f);
-                                v4 = glm::vec3(worldX, worldY + 1.0f, worldZ);
-                                break;
-                            case 2: // +Y face
-                                v1 = glm::vec3(worldX, worldY + 1.0f, worldZ);
-                                v2 = glm::vec3(worldX + 1.0f, worldY + 1.0f, worldZ);
-                                v3 = glm::vec3(worldX + 1.0f, worldY + 1.0f, worldZ + 1.0f);
-                                v4 = glm::vec3(worldX, worldY + 1.0f, worldZ + 1.0f);
-                                break;
-                            case 3: // -Y face
-                                v1 = glm::vec3(worldX, worldY, worldZ);
-                                v2 = glm::vec3(worldX, worldY, worldZ + 1.0f);
-                                v3 = glm::vec3(worldX + 1.0f, worldY, worldZ + 1.0f);
-                                v4 = glm::vec3(worldX + 1.0f, worldY, worldZ);
-                                break;
-                            case 4: // +Z face
-                                v1 = glm::vec3(worldX, worldY, worldZ + 1.0f);
-                                v2 = glm::vec3(worldX + 1.0f, worldY, worldZ + 1.0f);
-                                v3 = glm::vec3(worldX + 1.0f, worldY + 1.0f, worldZ + 1.0f);
-                                v4 = glm::vec3(worldX, worldY + 1.0f, worldZ + 1.0f);
-                                break;
-                            case 5: // -Z face
-                                v1 = glm::vec3(worldX, worldY, worldZ);
-                                v2 = glm::vec3(worldX + 1.0f, worldY, worldZ);
-                                v3 = glm::vec3(worldX + 1.0f, worldY + 1.0f, worldZ);
-                                v4 = glm::vec3(worldX, worldY + 1.0f, worldZ);
-                                break;
-                        }
-                        
-                        // Project vertices to sphere using identical method as collision
-                        // Use renderSurfaceR instead of surfaceR for perfect alignment
-                        v1 = projectToSphere(v1, renderSurfaceR, isInner, i);
-                        v2 = projectToSphere(v2, renderSurfaceR, isInner, i);
-                        v3 = projectToSphere(v3, renderSurfaceR, isInner, i);
-                        v4 = projectToSphere(v4, renderSurfaceR, isInner, i);
-                        
-                        // Validate vertices (avoid NaN/Inf)
-                        if (!isValidVector(v1) || !isValidVector(v2) || 
-                            !isValidVector(v3) || !isValidVector(v4)) {
-                            continue; // Skip invalid vertices
-                        }
-                        
-                        // Convert back to chunk-local coordinates
-                        v1 -= glm::vec3(chunkX * SIZE, chunkY * SIZE, chunkZ * SIZE);
-                        v2 -= glm::vec3(chunkX * SIZE, chunkY * SIZE, chunkZ * SIZE);
-                        v3 -= glm::vec3(chunkX * SIZE, chunkY * SIZE, chunkZ * SIZE);
-                        v4 -= glm::vec3(chunkX * SIZE, chunkY * SIZE, chunkZ * SIZE);
-                        
-                        // Add vertices to mesh
-                        mesh.insert(mesh.end(), {
-                            v1.x, v1.y, v1.z, uBase, 0.0f,
-                            v2.x, v2.y, v2.z, uBase, 1.0f,
-                            v3.x, v3.y, v3.z, uBase + 1.0f, 1.0f,
-                            v4.x, v4.y, v4.z, uBase + 1.0f, 0.0f
-                        });
-                    }
-                }
-            }
+            // Copy mesh data to chunk
+            mesh = std::move(meshData.vertices);
+            indices = std::move(meshData.indices);
         } else {
-            // For merged chunks, create a simple quad
-            float chunkSize = SIZE * mergeFactor;
-            mesh = {
-                0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
-                chunkSize, 0.0f, 0.0f, 1.0f, 0.0f,
-                chunkSize, chunkSize, chunkSize, 1.0f, 1.0f,
-                0.0f, chunkSize, chunkSize, 0.0f, 1.0f
-            };
+            // For merged chunks, create a simple quad using MeshGenerator
+            MeshGenerator::MeshData meshData = MeshGenerator::generateLODChunkMesh(SIZE, mergeFactor);
+            mesh = std::move(meshData.vertices);
+            indices = std::move(meshData.indices);
         }
         
         currentLodLevel = lodLevel;
@@ -515,23 +274,17 @@ void Chunk::regenerateMesh(int lodLevel) {
     } catch (const std::exception& e) {
         std::cerr << "Exception in regenerateMesh: " << e.what() << std::endl;
         // Create a minimal valid mesh to avoid rendering crashes
-        mesh = {
-            0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
-            1.0f, 0.0f, 0.0f, 1.0f, 0.0f,
-            1.0f, 1.0f, 0.0f, 1.0f, 1.0f,
-            0.0f, 1.0f, 0.0f, 0.0f, 1.0f
-        };
+        MeshGenerator::MeshData fallbackMesh = MeshGenerator::generateFallbackMesh();
+        mesh = std::move(fallbackMesh.vertices);
+        indices = std::move(fallbackMesh.indices);
         meshDirty = false;
         buffersDirty = true;
     } catch (...) {
         std::cerr << "Unknown exception in regenerateMesh" << std::endl;
         // Create a minimal valid mesh to avoid rendering crashes
-        mesh = {
-            0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
-            1.0f, 0.0f, 0.0f, 1.0f, 0.0f,
-            1.0f, 1.0f, 0.0f, 1.0f, 1.0f,
-            0.0f, 1.0f, 0.0f, 0.0f, 1.0f
-        };
+        MeshGenerator::MeshData fallbackMesh = MeshGenerator::generateFallbackMesh();
+        mesh = std::move(fallbackMesh.vertices);
+        indices = std::move(fallbackMesh.indices);
         meshDirty = false;
         buffersDirty = true;
     }

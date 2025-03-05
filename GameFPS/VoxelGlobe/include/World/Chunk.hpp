@@ -2,9 +2,11 @@
 #ifndef CHUNK_HPP
 #define CHUNK_HPP
 
+// Always include GLEW first, before any other OpenGL headers
+#include <GL/glew.h>
 #include <vector>
 #include "World/Block.hpp"
-#include <GL/glew.h>
+#include "Graphics/MeshGenerator.hpp" // Added
 
 // Forward declaration to avoid circular dependency
 class World;

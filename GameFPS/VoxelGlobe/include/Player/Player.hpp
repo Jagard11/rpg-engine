@@ -2,10 +2,14 @@
 #ifndef PLAYER_HPP
 #define PLAYER_HPP
 
+// Include GLEW first
+#include <GL/glew.h>
+// Then include GLFW
+#include <GLFW/glfw3.h>
+
 #include "Player/Movement.hpp"
 #include "UI/Inventory/Inventory.hpp"
 #include "World/World.hpp"
-#include <GLFW/glfw3.h>
 
 class Player {
 public:
@@ -14,6 +18,15 @@ public:
     float getHeight() const { return 1.75f; }
     const World& getWorld() const { return world; }
     void finishLoading(); // New method to signal loading complete
+
+    // Movement delegation methods
+    void moveForward(float deltaTime) { movement.moveForward(deltaTime); }
+    void moveBackward(float deltaTime) { movement.moveBackward(deltaTime); }
+    void moveLeft(float deltaTime) { movement.moveLeft(deltaTime); }
+    void moveRight(float deltaTime) { movement.moveRight(deltaTime); }
+    void jump() { movement.jump(); }
+    void setSprinting(bool sprinting) { movement.setSprinting(sprinting); }
+    void updateOrientation(float deltaX, float deltaY) { movement.updateOrientation(deltaX, deltaY); }
 
     glm::vec3 position;
     glm::vec3 cameraDirection;

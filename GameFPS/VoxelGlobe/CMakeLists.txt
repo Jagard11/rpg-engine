@@ -1,4 +1,3 @@
-# ./GameFPS/VoxelGlobe/CMakeLists.txt
 cmake_minimum_required(VERSION 3.10)
 project(VoxelGlobe)
 
@@ -11,6 +10,7 @@ find_package(OpenGL REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(glfw3 3.3 REQUIRED)
 
+# Include directories
 include_directories(${CMAKE_SOURCE_DIR}/include)
 include_directories(${CMAKE_SOURCE_DIR}/include/Core)
 include_directories(${CMAKE_SOURCE_DIR}/include/World)
@@ -20,27 +20,50 @@ include_directories(${CMAKE_SOURCE_DIR}/include/UI)
 include_directories(${CMAKE_SOURCE_DIR}/include/UI/Inventory)
 include_directories(${CMAKE_SOURCE_DIR}/include/Debug)
 include_directories(${CMAKE_SOURCE_DIR}/include/Graphics)
+include_directories(${CMAKE_SOURCE_DIR}/include/Utils)      # Added for SphereUtils
+include_directories(${CMAKE_SOURCE_DIR}/include/Physics)    # Added for CollisionSystem
 include_directories(${CMAKE_SOURCE_DIR}/third_party/imgui)
 include_directories(${CMAKE_SOURCE_DIR}/third_party/stb)
-include_directories(${CMAKE_SOURCE_DIR}/third_party/nlohmann) # Added nlohmann/json
+include_directories(${CMAKE_SOURCE_DIR}/third_party/nlohmann)
 
 add_compile_definitions(IMGUI_IMPL_OPENGL_LOADER_GLEW)
 
 add_executable(VoxelGlobe
+    # Core
     src/Core/main.cpp
+    src/Core/InputHandler.cpp             # Added
+    src/Core/GameStateManager.cpp         # Added
+    
+    # Player
     src/Player/Player.cpp
     src/Player/Movement.cpp
+    
+    # UI
     src/UI/Inventory/Inventory.cpp
     src/UI/Inventory/InventoryUI.cpp
     src/UI/VoxelHighlightUI.cpp
+    
+    # Rendering
     src/Rendering/Renderer.cpp
+    
+    # World
     src/World/World.cpp
     src/World/Chunk.cpp
     src/World/Block.cpp
+    
+    # Utilities
     src/VoxelManipulator.cpp
+    
+    # Debug
     src/Debug/DebugManager.cpp
     src/Debug/DebugWindow.cpp
+    
+    # Graphics
     src/Graphics/GraphicsSettings.cpp
+    src/Graphics/ShaderManager.cpp         # Added
+    src/Graphics/ResourceManager.cpp       # Added
+    
+    # Third-party libraries
     third_party/stb/stb_image_impl.cpp
     third_party/imgui/imgui.cpp
     third_party/imgui/imgui_draw.cpp
@@ -50,4 +73,13 @@ add_executable(VoxelGlobe
     third_party/imgui/imgui_impl_opengl3.cpp
 )
 
+# Create directory structure
+file(MAKE_DIRECTORY ${CMAKE_SOURCE_DIR}/include/Utils)
+file(MAKE_DIRECTORY ${CMAKE_SOURCE_DIR}/include/Physics)
+file(MAKE_DIRECTORY ${CMAKE_SOURCE_DIR}/src/Core)
+file(MAKE_DIRECTORY ${CMAKE_SOURCE_DIR}/src/Graphics)
+
 target_link_libraries(VoxelGlobe OpenGL::GL GLEW::GLEW glfw)
+
+# Copy shader and texture assets to build directory
+file(COPY ${CMAKE_SOURCE_DIR}/textures DESTINATION ${CMAKE_BINARY_DIR})
