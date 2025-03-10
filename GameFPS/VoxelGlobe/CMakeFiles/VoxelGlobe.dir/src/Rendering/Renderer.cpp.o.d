@@ -430,4 +430,9 @@ CMakeFiles/VoxelGlobe.dir/src/Rendering/Renderer.cpp.o: \
  /usr/include/glm/ext/vector_uint1_sized.hpp \
  /usr/include/glm/gtc/type_ptr.inl \
  /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/Debug/DebugManager.hpp \
+ /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/Debug/Logger.hpp \
+ /usr/include/c++/11/mutex /usr/include/c++/11/bits/std_mutex.h \
+ /usr/include/c++/11/bits/unique_lock.h \
+ /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/Debug/DebugSystem.hpp \
+ /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/Debug/Profiler.hpp \
  /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/Rendering/../../third_party/stb/stb_image.h

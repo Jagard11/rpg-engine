@@ -388,4 +388,11 @@ CMakeFiles/VoxelGlobe.dir/src/UI/VoxelHighlightUI.cpp.o: \
  /usr/include/glm/ext/matrix_transform.hpp \
  /usr/include/glm/ext/matrix_transform.inl \
  /usr/include/glm/gtc/matrix_transform.inl \
- /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/Debug/DebugManager.hpp
+ /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/Debug/DebugManager.hpp \
+ /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/Debug/Logger.hpp \
+ /usr/include/c++/11/fstream \
+ /usr/include/x86_64-linux-gnu/c++/11/bits/basic_file.h \
+ /usr/include/x86_64-linux-gnu/c++/11/bits/c++io.h \
+ /usr/include/c++/11/bits/fstream.tcc /usr/include/c++/11/mutex \
+ /usr/include/c++/11/bits/std_mutex.h \
+ /usr/include/c++/11/bits/unique_lock.h

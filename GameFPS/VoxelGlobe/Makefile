@@ -225,6 +225,30 @@ src/Debug/DebugManager.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Debug/DebugManager.cpp.s
 .PHONY : src/Debug/DebugManager.cpp.s
 
+src/Debug/DebugSystem.o: src/Debug/DebugSystem.cpp.o
+.PHONY : src/Debug/DebugSystem.o
+
+# target to build an object file
+src/Debug/DebugSystem.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Debug/DebugSystem.cpp.o
+.PHONY : src/Debug/DebugSystem.cpp.o
+
+src/Debug/DebugSystem.i: src/Debug/DebugSystem.cpp.i
+.PHONY : src/Debug/DebugSystem.i
+
+# target to preprocess a source file
+src/Debug/DebugSystem.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Debug/DebugSystem.cpp.i
+.PHONY : src/Debug/DebugSystem.cpp.i
+
+src/Debug/DebugSystem.s: src/Debug/DebugSystem.cpp.s
+.PHONY : src/Debug/DebugSystem.s
+
+# target to generate assembly for a file
+src/Debug/DebugSystem.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Debug/DebugSystem.cpp.s
+.PHONY : src/Debug/DebugSystem.cpp.s
+
 src/Debug/DebugWindow.o: src/Debug/DebugWindow.cpp.o
 .PHONY : src/Debug/DebugWindow.o
 
@@ -248,6 +272,54 @@ src/Debug/DebugWindow.s: src/Debug/DebugWindow.cpp.s
 src/Debug/DebugWindow.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Debug/DebugWindow.cpp.s
 .PHONY : src/Debug/DebugWindow.cpp.s
+
+src/Debug/Logger.o: src/Debug/Logger.cpp.o
+.PHONY : src/Debug/Logger.o
+
+# target to build an object file
+src/Debug/Logger.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Debug/Logger.cpp.o
+.PHONY : src/Debug/Logger.cpp.o
+
+src/Debug/Logger.i: src/Debug/Logger.cpp.i
+.PHONY : src/Debug/Logger.i
+
+# target to preprocess a source file
+src/Debug/Logger.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Debug/Logger.cpp.i
+.PHONY : src/Debug/Logger.cpp.i
+
+src/Debug/Logger.s: src/Debug/Logger.cpp.s
+.PHONY : src/Debug/Logger.s
+
+# target to generate assembly for a file
+src/Debug/Logger.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Debug/Logger.cpp.s
+.PHONY : src/Debug/Logger.cpp.s
+
+src/Debug/Profiler.o: src/Debug/Profiler.cpp.o
+.PHONY : src/Debug/Profiler.o
+
+# target to build an object file
+src/Debug/Profiler.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Debug/Profiler.cpp.o
+.PHONY : src/Debug/Profiler.cpp.o
+
+src/Debug/Profiler.i: src/Debug/Profiler.cpp.i
+.PHONY : src/Debug/Profiler.i
+
+# target to preprocess a source file
+src/Debug/Profiler.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Debug/Profiler.cpp.i
+.PHONY : src/Debug/Profiler.cpp.i
+
+src/Debug/Profiler.s: src/Debug/Profiler.cpp.s
+.PHONY : src/Debug/Profiler.s
+
+# target to generate assembly for a file
+src/Debug/Profiler.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Debug/Profiler.cpp.s
+.PHONY : src/Debug/Profiler.cpp.s
 
 src/Graphics/GraphicsSettings.o: src/Graphics/GraphicsSettings.cpp.o
 .PHONY : src/Graphics/GraphicsSettings.o
@@ -774,9 +846,18 @@ help:
 	@echo "... src/Debug/DebugManager.o"
 	@echo "... src/Debug/DebugManager.i"
 	@echo "... src/Debug/DebugManager.s"
+	@echo "... src/Debug/DebugSystem.o"
+	@echo "... src/Debug/DebugSystem.i"
+	@echo "... src/Debug/DebugSystem.s"
 	@echo "... src/Debug/DebugWindow.o"
 	@echo "... src/Debug/DebugWindow.i"
 	@echo "... src/Debug/DebugWindow.s"
+	@echo "... src/Debug/Logger.o"
+	@echo "... src/Debug/Logger.i"
+	@echo "... src/Debug/Logger.s"
+	@echo "... src/Debug/Profiler.o"
+	@echo "... src/Debug/Profiler.i"
+	@echo "... src/Debug/Profiler.s"
 	@echo "... src/Graphics/GraphicsSettings.o"
 	@echo "... src/Graphics/GraphicsSettings.i"
 	@echo "... src/Graphics/GraphicsSettings.s"

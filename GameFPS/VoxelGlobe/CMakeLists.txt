@@ -6,6 +6,12 @@ set(OpenGL_GL_PREFERENCE "GLVND")
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Debug mode configuration
+if(CMAKE_BUILD_TYPE MATCHES Debug)
+    add_definitions(-DENABLE_PROFILING)
+    message(STATUS "Debug build - Profiling enabled")
+endif()
+
 find_package(OpenGL REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(glfw3 3.3 REQUIRED)
@@ -54,9 +60,12 @@ add_executable(VoxelGlobe
     # Utilities
     src/VoxelManipulator.cpp
     
-    # Debug
+    # Debug - Updated with new components
     src/Debug/DebugManager.cpp
     src/Debug/DebugWindow.cpp
+    src/Debug/Logger.cpp                  # New file
+    src/Debug/DebugSystem.cpp             # New file
+    src/Debug/Profiler.cpp                # New file
     
     # Graphics
     src/Graphics/GraphicsSettings.cpp
@@ -79,8 +88,12 @@ file(MAKE_DIRECTORY ${CMAKE_SOURCE_DIR}/include/Utils)
 file(MAKE_DIRECTORY ${CMAKE_SOURCE_DIR}/include/Physics)
 file(MAKE_DIRECTORY ${CMAKE_SOURCE_DIR}/src/Core)
 file(MAKE_DIRECTORY ${CMAKE_SOURCE_DIR}/src/Graphics)
+file(MAKE_DIRECTORY ${CMAKE_SOURCE_DIR}/logs)  # Create logs directory for log files
 
 target_link_libraries(VoxelGlobe OpenGL::GL GLEW::GLEW glfw)
 
 # Copy shader and texture assets to build directory
 file(COPY ${CMAKE_SOURCE_DIR}/textures DESTINATION ${CMAKE_BINARY_DIR})
+
+# Post-build message
+message(STATUS "VoxelGlobe configured with debug logging system")

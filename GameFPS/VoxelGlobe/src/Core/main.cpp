@@ -3,6 +3,9 @@
 #include <GLFW/glfw3.h>
 #include "Debug/DebugManager.hpp"
 #include "Debug/DebugWindow.hpp"
+#include "Debug/DebugSystem.hpp"
+#include "Debug/Logger.hpp"
+#include "Debug/Profiler.hpp"
 #include "World/World.hpp"
 #include "Player/Player.hpp"
 #include "Rendering/Renderer.hpp"
@@ -20,6 +23,8 @@
 
 // Loading screen function
 void renderLoadingScreen(GLFWwindow* window, float progress) {
+    PROFILE_SCOPE("renderLoadingScreen", LogCategory::RENDERING);
+    
     // Clear the buffer
     glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -83,16 +88,43 @@ void updateCursorMode(GLFWwindow* window, bool showEscapeMenu, bool showDebugWin
 }
 
 int main() {
+    // Initialize debug and logging systems
+    DebugManager& debugManager = DebugManager::getInstance();
+    debugManager.initializeLogging();
+
+    // Initialize the DebugSystem singleton
+    DebugSystem::getInstance().initialize();
+
+    // Sync debug systems
+    DebugSystem::getInstance().syncWithDebugManager(debugManager);
+
+    // Configure debug settings - these will use new logging system behind the scenes
+    // Note: These will be overridden by loaded settings if available
+    #ifdef NDEBUG
+    debugManager.setLogLevel(LogLevel::INFO); // Default to INFO level for release builds
+    #else
+    debugManager.setLogLevel(LogLevel::DEBUG); // Default to DEBUG level for debug builds
+    #endif
+
+    LOG_INFO(LogCategory::GENERAL, "Debug and logging systems initialized");
+    
+    // Initialize and configure the profiler
+    #ifdef ENABLE_PROFILING
+    Profiler::getInstance().setEnabled(true);
+    Profiler::getInstance().setReportThreshold(5.0); // Only report sections taking > 5ms
+    LOG_INFO(LogCategory::GENERAL, "Performance profiling enabled");
+    #endif
+    
     // Initialize GLFW
     if (!glfwInit()) {
-        std::cerr << "Failed to initialize GLFW" << std::endl;
+        LOG_FATAL(LogCategory::GENERAL, "Failed to initialize GLFW");
         return -1;
     }
     
     // Create window with OpenGL context
     GLFWwindow* window = glfwCreateWindow(1024, 768, "Voxel Globe", NULL, NULL);
     if (!window) {
-        std::cerr << "Failed to create GLFW window" << std::endl;
+        LOG_FATAL(LogCategory::GENERAL, "Failed to create GLFW window");
         glfwTerminate();
         return -1;
     }
@@ -101,7 +133,7 @@ int main() {
     // Initialize GLEW
     glewExperimental = GL_TRUE;
     if (glewInit() != GLEW_OK) {
-        std::cerr << "GLEW initialization failed" << std::endl;
+        LOG_FATAL(LogCategory::GENERAL, "GLEW initialization failed");
         return -1;
     }
     
@@ -119,27 +151,19 @@ int main() {
     // Show loading screen
     renderLoadingScreen(window, 0.1f);
     
-    // Initialize debug manager
-    DebugManager& debugManager = DebugManager::getInstance();
-    debugManager.setLogChunkUpdates(true);
-    debugManager.setLogPlayerInfo(true);
-    debugManager.setLogBlockPlacement(true);
-    debugManager.setLogRaycast(true);
-    
-    // Initialize core game components
-    std::cout << "Creating world..." << std::endl;
+    LOG_INFO(LogCategory::GENERAL, "Creating world...");
     World world;
     renderLoadingScreen(window, 0.3f);
     
-    std::cout << "Creating player..." << std::endl;
+    LOG_INFO(LogCategory::GENERAL, "Creating player...");
     Player player(world);
     renderLoadingScreen(window, 0.4f);
     
-    std::cout << "Creating renderer..." << std::endl;
+    LOG_INFO(LogCategory::GENERAL, "Creating renderer...");
     Renderer renderer;
     renderLoadingScreen(window, 0.5f);
     
-    std::cout << "Creating additional components..." << std::endl;
+    LOG_INFO(LogCategory::GENERAL, "Creating additional components...");
     VoxelManipulator voxelManip(world);
     renderLoadingScreen(window, 0.6f);
     
@@ -155,11 +179,11 @@ int main() {
     GraphicsSettings graphicsSettings(window);
     
     // Initial world generation (first set of chunks around player)
-    std::cout << "Generating initial chunks..." << std::endl;
+    LOG_INFO(LogCategory::WORLD, "Generating initial chunks...");
     world.update(player.position);
     
     // Initialize chunk buffers
-    std::cout << "Initializing chunk buffers..." << std::endl;
+    LOG_INFO(LogCategory::RENDERING, "Initializing chunk buffers...");
     for (auto& [key, chunk] : world.getChunks()) {
         chunk->setWorld(&world);
         chunk->initializeBuffers();
@@ -168,7 +192,7 @@ int main() {
     renderLoadingScreen(window, 1.0f);
     
     // Signal that initial loading is complete (enables physics)
-    std::cout << "Loading complete, enabling physics" << std::endl;
+    LOG_INFO(LogCategory::GENERAL, "Loading complete, enabling physics");
     player.finishLoading();
     
     // Initialize cursor to disabled state
@@ -192,10 +216,14 @@ int main() {
     // Flag to track if we're on the first frame
     static bool firstFrame = true;
     
-    std::cout << "Starting main game loop" << std::endl;
+    LOG_INFO(LogCategory::GENERAL, "Starting main game loop");
     
     // Main game loop
     while (!glfwWindowShouldClose(window)) {
+        // Begin profiling this frame
+        PROFILE_SCOPE("MainGameLoop", LogCategory::GENERAL);
+        DebugSystem::getInstance().beginFrameTiming();
+        
         // Calculate delta time
         currentTime = glfwGetTime();
         deltaTime = static_cast<float>(currentTime - lastTime);
@@ -205,7 +233,8 @@ int main() {
         frameCount++;
         fpsTime += deltaTime;
         if (fpsTime >= 1.0) {
-            std::cout << "FPS: " << frameCount << std::endl;
+            std::string fpsMsg = "FPS: " + std::to_string(frameCount);
+            LOG_DEBUG(LogCategory::GENERAL, fpsMsg);
             frameCount = 0;
             fpsTime = 0.0;
         }
@@ -228,6 +257,7 @@ int main() {
         
         // Update player if menus are closed
         if (!showEscapeMenu && !debugWindow.isVisible()) {
+            PROFILE_SCOPE("PlayerUpdate", LogCategory::PLAYER);
             player.update(window, deltaTime);
             
             // Handle block placement (left click)
@@ -236,9 +266,10 @@ int main() {
                 BlockType selectedBlock = player.inventory.slots[player.inventory.selectedSlot];
                 if (selectedBlock != BlockType::AIR) {
                     if (voxelManip.placeBlock(player, selectedBlock)) {
-                        std::cout << "Block placed successfully: " << static_cast<int>(selectedBlock) << std::endl;
+                        LOG_INFO(LogCategory::WORLD, "Block placed successfully: " + 
+                                 std::to_string(static_cast<int>(selectedBlock)));
                     } else {
-                        std::cout << "Failed to place block" << std::endl;
+                        LOG_WARNING(LogCategory::WORLD, "Failed to place block");
                     }
                 }
             }
@@ -248,16 +279,19 @@ int main() {
             int rightClickState = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT);
             if (rightClickState == GLFW_PRESS && lastRightClickState == GLFW_RELEASE) {
                 if (voxelManip.removeBlock(player)) {
-                    std::cout << "Block removed successfully" << std::endl;
+                    LOG_INFO(LogCategory::WORLD, "Block removed successfully");
                 } else {
-                    std::cout << "Failed to remove block" << std::endl;
+                    LOG_WARNING(LogCategory::WORLD, "Failed to remove block");
                 }
             }
             lastRightClickState = rightClickState;
         }
         
         // Update world (load/unload chunks around player)
-        world.update(player.position);
+        {
+            PROFILE_SCOPE("WorldUpdate", LogCategory::WORLD);
+            world.update(player.position);
+        }
         
         // Skip gravity on first frame to avoid falling through terrain
         if (!firstFrame) {
@@ -266,14 +300,20 @@ int main() {
         firstFrame = false;
         
         // Render the world
-        renderer.render(world, player, graphicsSettings);
+        {
+            PROFILE_SCOPE("WorldRender", LogCategory::RENDERING);
+            renderer.render(world, player, graphicsSettings);
+        }
         
         // Render block highlight
-        glm::ivec3 hitPos;
-        glm::vec3 hitNormal;
-        glm::vec3 eyePos = player.position + player.up * player.getHeight();
-        if (voxelManip.raycast(eyePos, player.cameraDirection, 5.0f, hitPos, hitNormal, ToolType::NONE)) {
-            voxelHighlightUI.render(player, hitPos, graphicsSettings);
+        {
+            PROFILE_SCOPE("BlockHighlight", LogCategory::RENDERING);
+            glm::ivec3 hitPos;
+            glm::vec3 hitNormal;
+            glm::vec3 eyePos = player.position + player.up * player.getHeight();
+            if (voxelManip.raycast(eyePos, player.cameraDirection, 5.0f, hitPos, hitNormal, ToolType::NONE)) {
+                voxelHighlightUI.render(player, hitPos, graphicsSettings);
+            }
         }
         
         // Begin ImGui frame
@@ -312,18 +352,28 @@ int main() {
             updateCursorMode(window, showEscapeMenu, debugWindow.isVisible(), graphicsSettings.getMode());
         }
         
+        // End frame timing and report performance
+        DebugSystem::getInstance().endFrameTiming();
+        
         // Limit frame rate if needed for testing
         if (deltaTime < 0.016) { // Cap at ~60 FPS during debugging
             std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>((0.016 - deltaTime) * 1000)));
         }
     }
     
+    // Report final profiling results if enabled
+    if (Profiler::getInstance().isEnabled()) {
+        Profiler::getInstance().reportResults();
+    }
+    
     // Cleanup
+    LOG_INFO(LogCategory::GENERAL, "Shutting down...");
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
     glfwDestroyWindow(window);
     glfwTerminate();
     
+    LOG_INFO(LogCategory::GENERAL, "Application closed successfully");
     return 0;
 }

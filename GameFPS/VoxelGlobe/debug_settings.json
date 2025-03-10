@@ -1,0 +1,28 @@
+{
+    "logCategories": {
+        "AUDIO  ": true,
+        "GENERAL": true,
+        "INPUT  ": true,
+        "NETWORK": true,
+        "PHYSICS": true,
+        "PLAYER ": true,
+        "RENDER ": true,
+        "UI     ": true,
+        "WORLD  ": true
+    },
+    "logLevel": 3,
+    "logging": {
+        "logBlockPlacement": false,
+        "logChunkUpdates": false,
+        "logCollision": false,
+        "logInventory": false,
+        "logPlayerInfo": false,
+        "logRaycast": false
+    },
+    "visualization": {
+        "debugVertexScaling": false,
+        "enableCulling": true,
+        "showVoxelEdges": false,
+        "useFaceColors": false
+    }
+}

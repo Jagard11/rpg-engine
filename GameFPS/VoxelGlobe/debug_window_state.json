@@ -1,0 +1,13 @@
+{
+    "panels": {
+        "showLoggingConfig": false,
+        "showMeshDebug": false,
+        "showPerformance": true
+    },
+    "teleportCoords": [
+        0.0,
+        1510.0,
+        0.0
+    ],
+    "visible": false
+}

@@ -2,6 +2,12 @@
 #ifndef DEBUG_MANAGER_HPP
 #define DEBUG_MANAGER_HPP
 
+#include "Debug/Logger.hpp"
+
+/**
+ * Management class for debug settings and flags.
+ * Acts as a bridge between the legacy debug approach and the new logging system.
+ */
 class DebugManager {
 public:
     DebugManager();
@@ -12,7 +18,7 @@ public:
     bool isCullingEnabled() const;
     bool useFaceColors() const;
 
-    // Specific log toggles
+    // Specific log category toggles
     bool logPlayerInfo() const;
     bool logRaycast() const;
     bool logChunkUpdates() const;
@@ -34,6 +40,16 @@ public:
     void setLogCollision(bool enabled);
     void setLogInventory(bool enabled);
     void setDebugVertexScaling(bool enabled);
+    
+    // Configure global log level
+    void setLogLevel(LogLevel level);
+    
+    // Initialize the logging system
+    void initializeLogging();
+    
+    // Save and load settings
+    void saveSettings(const std::string& filename = "debug_settings.json") const;
+    bool loadSettings(const std::string& filename = "debug_settings.json");
 
 private:
     bool showVoxelEdges_;
@@ -46,6 +62,9 @@ private:
     bool logCollision_;
     bool logInventory_;
     bool debugVertexScaling_; // Flag for controlling visual vertex scaling debugging
+    
+    // Helper to convert legacy categories to Logger categories
+    LogCategory mapToLogCategory(bool* flag) const;
 };
 
 #endif

@@ -335,7 +335,17 @@ CMakeFiles/VoxelGlobe.dir/src/World/World.cpp.o: \
  /usr/include/c++/11/pstl/glue_memory_defs.h \
  /usr/include/c++/11/pstl/execution_defs.h \
  /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/Debug/DebugManager.hpp \
- /usr/include/c++/11/algorithm /usr/include/c++/11/bits/stl_algo.h \
+ /media/jagard/Disk\ 0/GIT/rpg-engine/GameFPS/VoxelGlobe/include/Debug/Logger.hpp \
+ /usr/include/c++/11/fstream /usr/include/c++/11/bits/codecvt.h \
+ /usr/include/x86_64-linux-gnu/c++/11/bits/basic_file.h \
+ /usr/include/x86_64-linux-gnu/c++/11/bits/c++io.h \
+ /usr/include/c++/11/bits/fstream.tcc /usr/include/c++/11/sstream \
+ /usr/include/c++/11/bits/sstream.tcc /usr/include/c++/11/mutex \
+ /usr/include/c++/11/chrono /usr/include/c++/11/ratio \
+ /usr/include/c++/11/ctime /usr/include/c++/11/bits/parse_numbers.h \
+ /usr/include/c++/11/bits/std_mutex.h \
+ /usr/include/c++/11/bits/unique_lock.h /usr/include/c++/11/algorithm \
+ /usr/include/c++/11/bits/stl_algo.h \
  /usr/include/c++/11/bits/algorithmfwd.h \
  /usr/include/c++/11/bits/stl_heap.h \
  /usr/include/c++/11/bits/uniform_int_dist.h \

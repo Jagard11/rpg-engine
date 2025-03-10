@@ -8,12 +8,16 @@
 #include "Graphics/ResourceManager.hpp"
 #include "Graphics/ShaderManager.hpp"
 #include "Debug/DebugManager.hpp"
+#include "Debug/DebugSystem.hpp"
+#include "Debug/Logger.hpp"
+#include "Debug/Profiler.hpp"
 #include "../../third_party/stb/stb_image.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <iostream>
 #include <vector>
+#include <sstream>
 
 // Frustum structure for culling
 struct Frustum {
@@ -42,11 +46,15 @@ struct Frustum {
 static void checkGLError(const char* location) {
     GLenum err = glGetError();
     if (err != GL_NO_ERROR) {
-        std::cerr << "OpenGL Error at " << location << ": " << err << std::endl;
+        std::stringstream ss;
+        ss << "OpenGL Error at " << location << ": " << err;
+        LOG_ERROR(LogCategory::RENDERING, ss.str());
     }
 }
 
 Renderer::Renderer() : frameCounter(0) {
+    PROFILE_SCOPE("Renderer::Constructor", LogCategory::RENDERING);
+    
     // Initialize vertex arrays and buffers
     glGenVertexArrays(1, &vao);
     glGenBuffers(1, &vbo);
@@ -59,9 +67,13 @@ Renderer::Renderer() : frameCounter(0) {
     loadShader();
     loadEdgeShader();
     loadTexture();
+    
+    LOG_INFO(LogCategory::RENDERING, "Renderer initialized");
 }
 
 Renderer::~Renderer() {
+    PROFILE_SCOPE("Renderer::Destructor", LogCategory::RENDERING);
+    
     glDeleteVertexArrays(1, &vao);
     glDeleteBuffers(1, &vbo);
     glDeleteBuffers(1, &ebo);
@@ -72,9 +84,12 @@ Renderer::~Renderer() {
     glDeleteProgram(edgeShaderProgram);
     
     glDeleteTextures(1, &texture);
+    
+    LOG_INFO(LogCategory::RENDERING, "Renderer resources released");
 }
 
 void Renderer::render(World& world, const Player& player, const GraphicsSettings& settings) {
+    PROFILE_SCOPE("Renderer::render", LogCategory::RENDERING);
     frameCounter++;
     
     // Clear the screen
@@ -114,12 +129,15 @@ void Renderer::render(World& world, const Player& player, const GraphicsSettings
     Frustum frustum(vp);
 
     // Activate shader and texture
-    glUseProgram(shaderProgram);
-    glBindTexture(GL_TEXTURE_2D, texture);
-    glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "proj"), 1, GL_FALSE, &proj[0][0]);
-    glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "view"), 1, GL_FALSE, &view[0][0]);
-    glUniform1i(glGetUniformLocation(shaderProgram, "useFaceColors"), DebugManager::getInstance().useFaceColors());
-    glUniform1i(glGetUniformLocation(shaderProgram, "tex"), 0);
+    {
+        PROFILE_SCOPE("Shader_Setup", LogCategory::RENDERING);
+        glUseProgram(shaderProgram);
+        glBindTexture(GL_TEXTURE_2D, texture);
+        glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "proj"), 1, GL_FALSE, &proj[0][0]);
+        glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "view"), 1, GL_FALSE, &view[0][0]);
+        glUniform1i(glGetUniformLocation(shaderProgram, "useFaceColors"), DebugManager::getInstance().useFaceColors());
+        glUniform1i(glGetUniformLocation(shaderProgram, "tex"), 0);
+    }
 
     // Get player world position
     glm::vec3 playerWorldPos = player.position;
@@ -141,83 +159,105 @@ void Renderer::render(World& world, const Player& player, const GraphicsSettings
     bool printDebug = (frameCounter % 60 == 0);
     
     if (printDebug) {
-        std::cout << "------- RENDERING FRAME " << frameCounter << " -------" << std::endl;
-        std::cout << "Player at: " << playerWorldPos.x << ", " << playerWorldPos.y << ", " << playerWorldPos.z << std::endl;
+        std::stringstream ss;
+        ss << "------- RENDERING FRAME " << frameCounter << " -------";
+        LOG_DEBUG(LogCategory::RENDERING, ss.str());
+        
+        ss.str("");
+        ss << "Player at: " << playerWorldPos.x << ", " << playerWorldPos.y << ", " << playerWorldPos.z;
+        LOG_DEBUG(LogCategory::RENDERING, ss.str());
     }
 
     float maxRenderDistance = 5000.0f;
 
     // Render all chunks
-    for (auto& [key, chunk] : world.getChunks()) {
-        totalChunks++;
+    {
+        PROFILE_SCOPE("RenderChunks", LogCategory::RENDERING);
+        
+        for (auto& [key, chunk] : world.getChunks()) {
+            totalChunks++;
 
-        int chunkX = std::get<0>(key);
-        int chunkY = std::get<1>(key);
-        int chunkZ = std::get<2>(key);
-        int chunkSize = Chunk::SIZE * chunk->getMergeFactor();
+            int chunkX = std::get<0>(key);
+            int chunkY = std::get<1>(key);
+            int chunkZ = std::get<2>(key);
+            int chunkSize = Chunk::SIZE * chunk->getMergeFactor();
 
-        // Calculate chunk origin in world space (corrected from center)
-        glm::vec3 chunkOriginWorld(
-            chunkX * Chunk::SIZE,
-            chunkY * Chunk::SIZE,
-            chunkZ * Chunk::SIZE
-        );
+            // Calculate chunk origin in world space (corrected from center)
+            glm::vec3 chunkOriginWorld(
+                chunkX * Chunk::SIZE,
+                chunkY * Chunk::SIZE,
+                chunkZ * Chunk::SIZE
+            );
 
-        // Calculate chunk origin relative to player
-        glm::vec3 chunkRelativeOrigin = chunkOriginWorld - playerWorldPos;
+            // Calculate chunk origin relative to player
+            glm::vec3 chunkRelativeOrigin = chunkOriginWorld - playerWorldPos;
 
-        // For culling, calculate center relative to player
-        glm::vec3 chunkCenterRelative = chunkRelativeOrigin + glm::vec3(chunkSize / 2.0f);
+            // For culling, calculate center relative to player
+            glm::vec3 chunkCenterRelative = chunkRelativeOrigin + glm::vec3(chunkSize / 2.0f);
 
-        // Distance culling
-        float dist = glm::length(chunkCenterRelative);
-        if (dist > maxRenderDistance) {
-            skippedChunks++;
-            continue;
+            // Distance culling
+            float dist = glm::length(chunkCenterRelative);
+            if (dist > maxRenderDistance) {
+                skippedChunks++;
+                continue;
+            }
+
+            // Frustum culling
+            bool inFrustum = frustum.isSphereInFrustum(chunkCenterRelative, chunkSize * 0.866f);
+            if (!inFrustum) {
+                skippedChunks++;
+                continue;
+            }
+
+            // Regenerate mesh if dirty
+            if (chunk->isMeshDirty()) {
+                PROFILE_SCOPE("RegenerateMesh", LogCategory::RENDERING);
+                chunk->regenerateMesh();
+            }
+
+            // Initialize or update buffers
+            if (!chunk->isBuffersInitialized()) {
+                PROFILE_SCOPE("InitBuffers", LogCategory::RENDERING);
+                chunk->initializeBuffers();
+            } else if (chunk->isBuffersDirty()) {
+                PROFILE_SCOPE("UpdateBuffers", LogCategory::RENDERING);
+                chunk->updateBuffers();
+            }
+
+            if (chunk->getIndexCount() == 0) {
+                skippedChunks++;
+                continue;
+            }
+
+            // Set up model matrix with player-relative transform using chunk origin
+            glm::mat4 model = glm::translate(glm::mat4(1.0f), chunkRelativeOrigin);
+            glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model"), 1, GL_FALSE, &model[0][0]);
+
+            // Pass chunk world position for shader adjustments
+            glUniform3fv(glGetUniformLocation(shaderProgram, "chunkWorldPos"), 1, &chunkOriginWorld[0]);
+
+            // Draw chunk
+            {
+                PROFILE_SCOPE("Chunk::draw", LogCategory::RENDERING);
+                chunk->bindVAO();
+                glDrawElements(GL_TRIANGLES, chunk->getIndexCount(), GL_UNSIGNED_INT, 0);
+                checkGLError("post-draw");
+            }
+
+            renderedChunks++;
         }
-
-        // Frustum culling
-        bool inFrustum = frustum.isSphereInFrustum(chunkCenterRelative, chunkSize * 0.866f);
-        if (!inFrustum) {
-            skippedChunks++;
-            continue;
-        }
-
-        // Regenerate mesh if dirty
-        if (chunk->isMeshDirty()) {
-            chunk->regenerateMesh();
-        }
-
-        // Initialize or update buffers
-        if (!chunk->isBuffersInitialized()) {
-            chunk->initializeBuffers();
-        } else if (chunk->isBuffersDirty()) {
-            chunk->updateBuffers();
-        }
-
-        if (chunk->getIndexCount() == 0) {
-            skippedChunks++;
-            continue;
-        }
-
-        // Set up model matrix with player-relative transform using chunk origin
-        glm::mat4 model = glm::translate(glm::mat4(1.0f), chunkRelativeOrigin);
-        glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model"), 1, GL_FALSE, &model[0][0]);
-
-        // Pass chunk world position for shader adjustments
-        glUniform3fv(glGetUniformLocation(shaderProgram, "chunkWorldPos"), 1, &chunkOriginWorld[0]);
-
-        // Draw chunk
-        chunk->bindVAO();
-        glDrawElements(GL_TRIANGLES, chunk->getIndexCount(), GL_UNSIGNED_INT, 0);
-        checkGLError("post-draw");
-
-        renderedChunks++;
     }
 
     if (printDebug) {
-        std::cout << "Rendered chunks: " << renderedChunks << " / " << totalChunks
-                  << " (Skipped: " << skippedChunks << ")" << std::endl;
+        std::stringstream ss;
+        ss << "Rendered chunks: " << renderedChunks << " / " << totalChunks
+           << " (Skipped: " << skippedChunks << ")";
+        LOG_DEBUG(LogCategory::RENDERING, ss.str());
+        
+        // Report profiling results every 60 frames if profiling is enabled
+        if (Profiler::getInstance().isEnabled()) {
+            Profiler::getInstance().reportResults();
+        }
     }
 
     if (DebugManager::getInstance().showVoxelEdges()) {
@@ -226,6 +266,8 @@ void Renderer::render(World& world, const Player& player, const GraphicsSettings
 }
 
 void Renderer::renderVoxelEdges(const World& world, const Player& player, const GraphicsSettings& settings) {
+    PROFILE_SCOPE("Renderer::renderVoxelEdges", LogCategory::RENDERING);
+    
     glUseProgram(edgeShaderProgram);
     glBindVertexArray(edgeVao);
 
@@ -297,6 +339,8 @@ void Renderer::renderVoxelEdges(const World& world, const Player& player, const 
 }
 
 void Renderer::loadShader() {
+    PROFILE_SCOPE("Renderer::loadShader", LogCategory::RENDERING);
+    
     const char* vertSrc = R"(
         #version 330 core
         layout(location = 0) in vec3 pos;
@@ -343,7 +387,7 @@ void Renderer::loadShader() {
     glGetShaderiv(vert, GL_COMPILE_STATUS, &success);
     if (!success) {
         glGetShaderInfoLog(vert, 512, NULL, infoLog);
-        std::cerr << "Vertex Shader Error: " << infoLog << std::endl;
+        LOG_ERROR(LogCategory::RENDERING, std::string("Vertex Shader Error: ") + infoLog);
     }
     
     GLuint frag = glCreateShader(GL_FRAGMENT_SHADER);
@@ -352,7 +396,7 @@ void Renderer::loadShader() {
     glGetShaderiv(frag, GL_COMPILE_STATUS, &success);
     if (!success) {
         glGetShaderInfoLog(frag, 512, NULL, infoLog);
-        std::cerr << "Fragment Shader Error: " << infoLog << std::endl;
+        LOG_ERROR(LogCategory::RENDERING, std::string("Fragment Shader Error: ") + infoLog);
     }
     
     shaderProgram = glCreateProgram();
@@ -362,7 +406,7 @@ void Renderer::loadShader() {
     glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
     if (!success) {
         glGetProgramInfoLog(shaderProgram, 512, NULL, infoLog);
-        std::cerr << "Shader Program Link Error: " << infoLog << std::endl;
+        LOG_ERROR(LogCategory::RENDERING, std::string("Shader Program Link Error: ") + infoLog);
     }
     
     glDeleteShader(vert);
@@ -377,9 +421,13 @@ void Renderer::loadShader() {
     glEnableVertexAttribArray(1);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
     glBindVertexArray(0);
+    
+    LOG_INFO(LogCategory::RENDERING, "Default shader loaded successfully");
 }
 
 void Renderer::loadEdgeShader() {
+    PROFILE_SCOPE("Renderer::loadEdgeShader", LogCategory::RENDERING);
+    
     const char* vertSrc = R"(
         #version 330 core
         layout(location = 0) in vec3 pos;
@@ -407,7 +455,7 @@ void Renderer::loadEdgeShader() {
     glGetShaderiv(vert, GL_COMPILE_STATUS, &success);
     if (!success) {
         glGetShaderInfoLog(vert, 512, NULL, infoLog);
-        std::cerr << "Edge Vertex Shader Error: " << infoLog << std::endl;
+        LOG_ERROR(LogCategory::RENDERING, std::string("Edge Vertex Shader Error: ") + infoLog);
     }
     
     GLuint frag = glCreateShader(GL_FRAGMENT_SHADER);
@@ -416,7 +464,7 @@ void Renderer::loadEdgeShader() {
     glGetShaderiv(frag, GL_COMPILE_STATUS, &success);
     if (!success) {
         glGetShaderInfoLog(frag, 512, NULL, infoLog);
-        std::cerr << "Edge Fragment Shader Error: " << infoLog << std::endl;
+        LOG_ERROR(LogCategory::RENDERING, std::string("Edge Fragment Shader Error: ") + infoLog);
     }
     
     edgeShaderProgram = glCreateProgram();
@@ -426,7 +474,7 @@ void Renderer::loadEdgeShader() {
     glGetProgramiv(edgeShaderProgram, GL_LINK_STATUS, &success);
     if (!success) {
         glGetProgramInfoLog(edgeShaderProgram, 512, NULL, infoLog);
-        std::cerr << "Edge Shader Program Link Error: " << infoLog << std::endl;
+        LOG_ERROR(LogCategory::RENDERING, std::string("Edge Shader Program Link Error: ") + infoLog);
     }
     
     glDeleteShader(vert);
@@ -437,9 +485,13 @@ void Renderer::loadEdgeShader() {
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
     glBindVertexArray(0);
+    
+    LOG_INFO(LogCategory::RENDERING, "Edge shader loaded successfully");
 }
 
 void Renderer::loadTexture() {
+    PROFILE_SCOPE("Renderer::loadTexture", LogCategory::RENDERING);
+    
     glGenTextures(1, &texture);
     glBindTexture(GL_TEXTURE_2D, texture);
     
@@ -454,10 +506,12 @@ void Renderer::loadTexture() {
     if (data) {
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, 
                      channels == 4 ? GL_RGBA : GL_RGB, GL_UNSIGNED_BYTE, data);
-        std::cout << "Texture loaded: " << width << "x" << height 
-                  << ", channels: " << channels << std::endl;
+        
+        std::stringstream ss;
+        ss << "Texture loaded: " << width << "x" << height << ", channels: " << channels;
+        LOG_INFO(LogCategory::RENDERING, ss.str());
     } else {
-        std::cerr << "Failed to load texture: " << stbi_failure_reason() << std::endl;
+        LOG_ERROR(LogCategory::RENDERING, std::string("Failed to load texture: ") + stbi_failure_reason());
         
         const int atlasSize = 512;
         const int tileSize = 128;
@@ -498,7 +552,7 @@ void Renderer::loadTexture() {
         }
         
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, atlasSize, atlasSize, 0, GL_RGBA, GL_UNSIGNED_BYTE, atlas);
-        std::cout << "Created fallback texture atlas: " << atlasSize << "x" << atlasSize << std::endl;
+        LOG_INFO(LogCategory::RENDERING, "Created fallback texture atlas: " + std::to_string(atlasSize) + "x" + std::to_string(atlasSize));
         
         delete[] atlas;
     }
