@@ -6,14 +6,21 @@
 #include "Utils/SphereUtils.hpp"
 
 // Constants for collision and ground detection
-const float COLLISION_OFFSET = 0.25f;  // Increased from 0.15f to prevent sinking
-const float GROUND_OFFSET = 0.3f;      // Increased from 0.2f to keep player higher
-const float STEP_HEIGHT = 0.55f;       // Maximum height player can automatically step up
-const float PLAYER_RADIUS = 0.4f;      // Player collision radius (slightly smaller than a block)
+const float COLLISION_OFFSET = 0.25f;      // Distance offset for collision detection
+const float GROUND_OFFSET = 0.3f;          // Height above surface for grounded state
+const float STEP_HEIGHT = 0.55f;           // Maximum height player can automatically step up
+const float PLAYER_RADIUS = 0.4f;          // Player collision radius
+
+// Physics constants
+const float GRAVITY_ACCELERATION = 9.81f;  // Standard gravity acceleration (m/s²)
+const float JUMP_IMPULSE = 10.0f;         // Direct upward impulse force for jumps
+const float TERMINAL_VELOCITY = 53.0f;     // Terminal velocity (m/s)
+const float AIR_CONTROL = 0.25f;           // Factor for air control (0-1)
+const float DRAG_FACTOR = 0.02f;           // Air resistance factor
 
 Movement::Movement(const World& w, glm::vec3& pos, glm::vec3& camDir, glm::vec3& moveDir, glm::vec3& u)
     : world(w), position(pos), cameraDirection(camDir), movementDirection(moveDir), up(u),
-      frameCounter(0) {}
+      frameCounter(0), verticalVelocity(0.0f), isGrounded(true), lateralVelocity(0.0f, 0.0f, 0.0f) {}
 
 bool Movement::checkCollision(const glm::vec3& newPosition) const {
     // Get surface radius using standardized method
@@ -90,18 +97,26 @@ void Movement::moveForward(float deltaTime) {
     // Get forward direction in the tangent plane of the sphere
     glm::vec3 forwardDir = glm::normalize(cameraDirection - glm::dot(cameraDirection, up) * up);
     
+    // Reduced control in the air - only a quarter of normal influence
+    if (!isGrounded) {
+        effectiveSpeed *= 0.25f; // 25% of normal speed while airborne
+    }
+    
     // Calculate intended position
     glm::vec3 newPos = position + forwardDir * effectiveSpeed * deltaTime;
     
     // Try offset positions if there's a collision (step up)
     if (checkCollision(newPos)) {
-        // Try stepping up at increasing heights
-        for (float yOffset = 0.1f; yOffset <= STEP_HEIGHT; yOffset += 0.1f) {
-            glm::vec3 steppedPos = position + forwardDir * effectiveSpeed * deltaTime + up * yOffset;
-            if (!checkCollision(steppedPos)) {
-                // Found a valid position - use it
-                position = steppedPos;
-                return;
+        // Only allow stepping up if grounded
+        if (isGrounded) {
+            // Try stepping up at increasing heights
+            for (float yOffset = 0.1f; yOffset <= STEP_HEIGHT; yOffset += 0.1f) {
+                glm::vec3 steppedPos = position + forwardDir * effectiveSpeed * deltaTime + up * yOffset;
+                if (!checkCollision(steppedPos)) {
+                    // Found a valid position - use it
+                    position = steppedPos;
+                    return;
+                }
             }
         }
         
@@ -121,21 +136,34 @@ void Movement::moveForward(float deltaTime) {
 }
 
 void Movement::moveBackward(float deltaTime) {
+    // Get effective speed based on sprint state
     float effectiveSpeed = speed * (isSprinting ? sprintMultiplier : 1.0f);
+    
+    // Reduced control in the air - only a quarter of normal influence
+    if (!isGrounded) {
+        effectiveSpeed *= 0.25f; // 25% of normal speed while airborne
+    }
+    
+    // Get forward direction in the tangent plane of the sphere
     glm::vec3 forwardDir = glm::normalize(cameraDirection - glm::dot(cameraDirection, up) * up);
+    
+    // Calculate intended position
     glm::vec3 newPos = position - forwardDir * effectiveSpeed * deltaTime;
     
-    // Try stepping up if there's a collision
+    // Try stepping up if there's a collision (only when grounded)
     if (checkCollision(newPos)) {
-        for (float yOffset = 0.1f; yOffset <= STEP_HEIGHT; yOffset += 0.1f) {
-            glm::vec3 steppedPos = position - forwardDir * effectiveSpeed * deltaTime + up * yOffset;
-            if (!checkCollision(steppedPos)) {
-                position = steppedPos;
-                return;
+        if (isGrounded) {
+            // Try stepping up (only if grounded)
+            for (float yOffset = 0.1f; yOffset <= STEP_HEIGHT; yOffset += 0.1f) {
+                glm::vec3 steppedPos = position - forwardDir * effectiveSpeed * deltaTime + up * yOffset;
+                if (!checkCollision(steppedPos)) {
+                    position = steppedPos;
+                    return;
+                }
             }
         }
         
-        // Try sliding
+        // Try sliding along the surface
         glm::vec3 slideDir = glm::normalize(forwardDir - glm::dot(forwardDir, up) * up);
         glm::vec3 slidePos = position - slideDir * effectiveSpeed * deltaTime;
         
@@ -148,22 +176,35 @@ void Movement::moveBackward(float deltaTime) {
 }
 
 void Movement::moveLeft(float deltaTime) {
+    // Get effective speed based on sprint state
     float effectiveSpeed = speed * (isSprinting ? sprintMultiplier : 1.0f);
+    
+    // Reduced control in the air - only a quarter of normal influence
+    if (!isGrounded) {
+        effectiveSpeed *= 0.25f; // 25% of normal speed while airborne
+    }
+    
+    // Calculate direction vectors
     glm::vec3 forwardDir = glm::normalize(cameraDirection - glm::dot(cameraDirection, up) * up);
     glm::vec3 rightDir = glm::normalize(glm::cross(forwardDir, up));
+    
+    // Calculate intended position
     glm::vec3 newPos = position - rightDir * effectiveSpeed * deltaTime;
     
-    // Try stepping up if there's a collision
+    // Try stepping up if there's a collision (only when grounded)
     if (checkCollision(newPos)) {
-        for (float yOffset = 0.1f; yOffset <= STEP_HEIGHT; yOffset += 0.1f) {
-            glm::vec3 steppedPos = position - rightDir * effectiveSpeed * deltaTime + up * yOffset;
-            if (!checkCollision(steppedPos)) {
-                position = steppedPos;
-                return;
+        if (isGrounded) {
+            // Try stepping up (only if grounded)
+            for (float yOffset = 0.1f; yOffset <= STEP_HEIGHT; yOffset += 0.1f) {
+                glm::vec3 steppedPos = position - rightDir * effectiveSpeed * deltaTime + up * yOffset;
+                if (!checkCollision(steppedPos)) {
+                    position = steppedPos;
+                    return;
+                }
             }
         }
         
-        // Try sliding
+        // Try sliding along the surface
         glm::vec3 slideDir = glm::normalize(rightDir - glm::dot(rightDir, up) * up);
         glm::vec3 slidePos = position - slideDir * effectiveSpeed * deltaTime;
         
@@ -176,22 +217,35 @@ void Movement::moveLeft(float deltaTime) {
 }
 
 void Movement::moveRight(float deltaTime) {
+    // Get effective speed based on sprint state
     float effectiveSpeed = speed * (isSprinting ? sprintMultiplier : 1.0f);
+    
+    // Reduced control in the air - only a quarter of normal influence
+    if (!isGrounded) {
+        effectiveSpeed *= 0.25f; // 25% of normal speed while airborne
+    }
+    
+    // Calculate direction vectors
     glm::vec3 forwardDir = glm::normalize(cameraDirection - glm::dot(cameraDirection, up) * up);
     glm::vec3 rightDir = glm::normalize(glm::cross(forwardDir, up));
+    
+    // Calculate intended position
     glm::vec3 newPos = position + rightDir * effectiveSpeed * deltaTime;
     
-    // Try stepping up if there's a collision
+    // Try stepping up if there's a collision (only when grounded)
     if (checkCollision(newPos)) {
-        for (float yOffset = 0.1f; yOffset <= STEP_HEIGHT; yOffset += 0.1f) {
-            glm::vec3 steppedPos = position + rightDir * effectiveSpeed * deltaTime + up * yOffset;
-            if (!checkCollision(steppedPos)) {
-                position = steppedPos;
-                return;
+        if (isGrounded) {
+            // Try stepping up (only if grounded)
+            for (float yOffset = 0.1f; yOffset <= STEP_HEIGHT; yOffset += 0.1f) {
+                glm::vec3 steppedPos = position + rightDir * effectiveSpeed * deltaTime + up * yOffset;
+                if (!checkCollision(steppedPos)) {
+                    position = steppedPos;
+                    return;
+                }
             }
         }
         
-        // Try sliding
+        // Try sliding along the surface
         glm::vec3 slideDir = glm::normalize(rightDir - glm::dot(rightDir, up) * up);
         glm::vec3 slidePos = position + slideDir * effectiveSpeed * deltaTime;
         
@@ -216,87 +270,163 @@ void Movement::applyGravity(float deltaTime) {
     double pz = static_cast<double>(position.z);
     double distFromCenter = sqrt(px*px + py*py + pz*pz);
     
+    // Print debug info every 60 frames
+    bool debugFrame = (frameCounter % 60 == 0);
+    
+    if (debugFrame) {
+        std::cout << "GRAVITY: isGrounded=" << isGrounded 
+                  << ", verticalVelocity=" << verticalVelocity
+                  << ", height=" << (distFromCenter - surfaceR) << "m" << std::endl;
+    }
+    
+    // If we're airborne (in a jump or falling)
     if (!isGrounded) {
-        // Apply gravity if not on ground, with reduced strength to minimize bouncing
-        verticalVelocity += 5.0f * deltaTime; // Reduced from 9.81 for smoother movement
+        // Apply gravity acceleration
+        verticalVelocity += GRAVITY_ACCELERATION * deltaTime;
         
-        // Calculate fall position
-        glm::vec3 newPos = position + gravityDir * verticalVelocity * deltaTime;
+        // Apply air drag (gradually reduces lateral velocity)
+        if (glm::length(lateralVelocity) > 0.01f) {
+            lateralVelocity -= lateralVelocity * DRAG_FACTOR * deltaTime;
+        }
         
-        // Check for collisions with ground
-        if (checkCollision(newPos)) {
-            // We hit the ground - find a safe position
+        // Clamp to terminal velocity
+        if (verticalVelocity > TERMINAL_VELOCITY) {
+            verticalVelocity = TERMINAL_VELOCITY;
+        }
+        
+        // Calculate lateral direction in tangent plane
+        glm::vec3 lateralDir = glm::vec3(0.0f);
+        float lateralSpeed = glm::length(lateralVelocity);
+        
+        if (lateralSpeed > 0.01f) {
+            // Make sure lateral movement is perpendicular to up vector
+            lateralDir = glm::normalize(lateralVelocity - glm::dot(lateralVelocity, up) * up);
+        }
+        
+        // Calculate new position with both vertical and lateral movement
+        glm::vec3 newPos = position;
+        
+        // Apply lateral movement first
+        if (lateralSpeed > 0.01f) {
+            newPos += lateralDir * lateralSpeed * deltaTime;
+        }
+        
+        // Apply vertical movement separately
+        glm::vec3 verticalMovement = gravityDir * verticalVelocity * deltaTime;
+        glm::vec3 verticalOnlyPos = position + verticalMovement;
+        
+        // Test if vertical movement alone would cause collision
+        bool verticalCollision = checkCollision(verticalOnlyPos);
+        
+        // Apply full movement if no collision, otherwise handle separately
+        if (!verticalCollision) {
+            newPos += verticalMovement;
+        }
+        
+        // Check for collisions with the combined movement
+        bool finalCollision = checkCollision(newPos);
+        
+        if (finalCollision || verticalCollision) {
+            // Debug output
+            if (verticalCollision) {
+                std::cout << "VERTICAL COLLISION DETECTED during jump/fall" << std::endl;
+            }
+            
+            if (finalCollision) {
+                std::cout << "FINAL COLLISION DETECTED during jump/fall" << std::endl;
+            }
+            
+            // We hit the ground - transition to grounded state
             isGrounded = true;
             verticalVelocity = 0.0f;
+            lateralVelocity = glm::vec3(0.0f);
             
-            // Calculate exact surface position - move to further above the surface
-            // This prevents sinking and ensures consistent player height
+            // Calculate exact surface position
             float targetDistance = surfaceR + GROUND_OFFSET;
             
-            // Use exact calculation to position player at precise surface height
+            // Position player at precise surface height
             glm::vec3 exactSurfacePos = glm::normalize(position) * targetDistance;
             
             // Check if this position is free from block collisions
             if (!checkCollision(exactSurfacePos)) {
                 position = exactSurfacePos;
+                if (debugFrame) {
+                    std::cout << "LANDING: Placed at exact surface height" << std::endl;
+                }
             } else {
                 // If there's a block at exact surface, try to find closest safe position
+                bool foundSafePos = false;
                 for (float offset = 0.1f; offset <= 1.0f; offset += 0.1f) {
                     glm::vec3 testPos = glm::normalize(position) * (targetDistance + offset);
                     if (!checkCollision(testPos)) {
                         position = testPos;
+                        foundSafePos = true;
+                        if (debugFrame) {
+                            std::cout << "LANDING: Placed at height +" << offset << "m above surface" << std::endl;
+                        }
                         break;
                     }
                 }
+                
+                if (!foundSafePos) {
+                    // If we couldn't find a safe position, just stay where we are
+                    std::cout << "WARNING: Couldn't find safe landing position" << std::endl;
+                }
             }
             
-            if (DebugManager::getInstance().logCollision()) {
-                std::cout << "Landed on ground. New position: " << position.x << ", "
-                          << position.y << ", " << position.z 
-                          << " (dist from center: " << glm::length(position) << ")" << std::endl;
-            }
+            std::cout << "Landed on ground. New position: " << position.x << ", "
+                      << position.y << ", " << position.z 
+                      << " (dist from center: " << glm::length(position) << ")" << std::endl;
         } else {
+            // No collision, can move to the new position
             position = newPos;
+            
+            // Log details during air movement
+            if (debugFrame) {
+                float height = glm::length(position) - surfaceR;
+                std::cout << "AIRBORNE: height=" << height 
+                         << "m, verticalVel=" << verticalVelocity 
+                         << ", lateralVel=" << lateralSpeed << std::endl;
+            }
         }
     } else {
-        // When on ground, check if still grounded
-        // Calculate a point below current position to check for ground
-        float checkDistance = 0.3f; // Increased check distance
+        // Currently on ground - check if we should transition to airborne
+        // Check if there's ground beneath us
+        float checkDistance = 0.3f;
         glm::vec3 testPos = position + gravityDir * checkDistance;
         
-        // We check two things: 
-        // 1. If we're well above the surface radius
-        // 2. If there's no block directly beneath us
-        
         bool blockBeneath = checkCollision(testPos);
-        bool aboveSurface = (distFromCenter > surfaceR + GROUND_OFFSET * 1.5f);
+        bool wellAboveSurface = (distFromCenter > surfaceR + GROUND_OFFSET * 1.5f);
         
-        if (aboveSurface && !blockBeneath) {
-            // We're well above the surface and no block is supporting us - not grounded
+        // Debug output
+        if (debugFrame) {
+            std::cout << "GROUND CHECK: blockBeneath=" << blockBeneath 
+                     << ", wellAboveSurface=" << wellAboveSurface 
+                     << ", height=" << (distFromCenter - surfaceR) << "m" << std::endl;
+        }
+        
+        // If we're above the surface and there's no block beneath, we should fall
+        if (wellAboveSurface && !blockBeneath) {
+            // Transition to falling state
             isGrounded = false;
-            verticalVelocity = 0.1f; // Small initial velocity for smooth start of fall
-            
-            if (DebugManager::getInstance().logCollision()) {
-                std::cout << "No longer grounded. Height above surface: " 
-                          << (distFromCenter - surfaceR) << std::endl;
-            }
+            verticalVelocity = 0.1f; // Small initial velocity for fall
+            std::cout << "FALLING: No longer grounded. Height: " 
+                     << (distFromCenter - surfaceR) << "m" << std::endl;
         } else {
             // Keep player at consistent height above surface
             float targetDistance = surfaceR + GROUND_OFFSET;
             
-            // Only apply if we're sinking too much
+            // Only push up if we're too low
             if (distFromCenter < targetDistance && blockBeneath) {
-                // Push player up to target height to prevent sinking into terrain
+                // Push player up to target height
                 glm::vec3 exactSurfacePos = glm::normalize(position) * targetDistance;
                 
                 // Only use this position if it doesn't cause a block collision
                 if (!checkCollision(exactSurfacePos)) {
                     position = exactSurfacePos;
-                }
-                
-                if (DebugManager::getInstance().logCollision() && frameCounter % 120 == 0) {
-                    std::cout << "Maintaining ground position. Height above surface: "
-                              << (targetDistance - surfaceR) << std::endl;
+                    if (debugFrame) {
+                        std::cout << "ADJUSTED: Maintaining ground height" << std::endl;
+                    }
                 }
             }
         }
@@ -307,13 +437,34 @@ void Movement::applyGravity(float deltaTime) {
 
 void Movement::jump() {
     if (isGrounded) {
-        // In sphere world, jumping means moving away from center
-        // So negative velocity means moving outward
-        verticalVelocity = -5.25f;  // Stronger jump
+        // Debug output to confirm jump is triggered
+        std::cout << "Jump triggered! isGrounded = " << isGrounded << std::endl;
+        
+        // Set player to airborne state immediately
         isGrounded = false;
-        if (DebugManager::getInstance().logPlayerInfo()) {
-            std::cout << "Jump initiated, verticalVelocity = " << verticalVelocity << std::endl;
-        }
+        
+        // Calculate up direction (away from planet center)
+        glm::vec3 upDir = glm::normalize(position);
+        
+        // Apply direct upward impulse - immediately move the player upward
+        position += upDir * JUMP_IMPULSE;
+        
+        // Set initial upward velocity to zero - we'll let gravity handle the physics
+        verticalVelocity = 0.0f;
+        
+        // Log details
+        std::cout << "JUMP: Applied direct upward impulse of " << JUMP_IMPULSE << " meters" << std::endl;
+        std::cout << "JUMP: New position is " << position.x << ", " << position.y << ", " << position.z << std::endl;
+        
+        // Calculate height above surface
+        float surfaceR = static_cast<float>(SphereUtils::getSurfaceRadiusMeters());
+        double newDistFromCenter = glm::length(position);
+        double newHeight = newDistFromCenter - surfaceR;
+        
+        std::cout << "JUMP: New height above surface: " << newHeight << " meters" << std::endl;
+    } else {
+        // Debug output if jump is attempted while in the air
+        std::cout << "Jump attempted but player is not grounded" << std::endl;
     }
 }
 
@@ -369,4 +520,14 @@ void Movement::setSprinting(bool sprinting) {
             lastSprintState = isSprinting;
         }
     }
+}
+
+// Get ground state for UI/animations
+bool Movement::isPlayerGrounded() const {
+    return isGrounded;
+}
+
+// Get fall velocity for UI/animations
+float Movement::getVerticalVelocity() const {
+    return verticalVelocity;
 }

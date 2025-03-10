@@ -68,6 +68,18 @@ public:
      * @param sprinting True if player is sprinting
      */
     void setSprinting(bool sprinting);
+    
+    /**
+     * Check if player is currently on the ground
+     * @return True if player is grounded
+     */
+    bool isPlayerGrounded() const;
+    
+    /**
+     * Get player's current vertical velocity
+     * @return Vertical velocity in m/s (negative is upward)
+     */
+    float getVerticalVelocity() const;
 
 private:
     const World& world;             // Reference to voxel world
@@ -77,7 +89,8 @@ private:
     glm::vec3& up;                  // Reference to up vector
     float speed = 5.0f;             // Base movement speed in meters/second
     float height = 1.75f;           // Player height in meters
-    float verticalVelocity = 0.0f;  // Current vertical velocity
+    float verticalVelocity = 0.0f;  // Current vertical velocity (negative is upward)
+    glm::vec3 lateralVelocity;      // Current lateral velocity for momentum in air
     bool isGrounded = false;        // Is player on the ground
     bool isSprinting = false;       // Is player sprinting
     static constexpr float sprintMultiplier = 2.0f; // Speed multiplier when sprinting

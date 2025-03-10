@@ -102,7 +102,18 @@ void Player::update(GLFWwindow* window, float deltaTime) {
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) movement.moveBackward(deltaTime);
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) movement.moveLeft(deltaTime);
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) movement.moveRight(deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) movement.jump();
+    
+    // JUMPING: Check direct key state rather than relying on keyboard callback
+    // This handles key repeats and ensures jump is detected properly
+    static int lastSpaceState = GLFW_RELEASE;
+    int currentSpaceState = glfwGetKey(window, GLFW_KEY_SPACE);
+    
+    // Only jump on the initial press (not held)
+    if (currentSpaceState == GLFW_PRESS && lastSpaceState == GLFW_RELEASE) {
+        std::cout << "Space key pressed - triggering jump" << std::endl;
+        movement.jump();
+    }
+    lastSpaceState = currentSpaceState;
     
     // Process sprint key
     bool sprinting = glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS;
@@ -141,6 +152,10 @@ void Player::update(GLFWwindow* window, float deltaTime) {
             float dotProduct = glm::dot(normalizedPos, up);
             std::cout << "Alignment (up·normalized_pos): " << dotProduct 
                       << " (should be close to 1.0)" << std::endl;
+                      
+            // Log jump/grounded state
+            std::cout << "Player is " << (movement.isPlayerGrounded() ? "grounded" : "in the air") 
+                      << ", Vertical velocity: " << movement.getVerticalVelocity() << std::endl;
         }
     }
     
