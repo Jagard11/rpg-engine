@@ -28,7 +28,28 @@ bool VoxelManipulator::placeBlock(const Player& player, BlockType type) {
     // Use increased reach distance suitable for the planet scale
     if (raycast(eyePos, player.cameraDirection, MAX_REACH, hitPos, hitNormal)) {
         // Placement position is adjacent to the hit face
-        glm::ivec3 placePos = hitPos + glm::ivec3(round(hitNormal.x), round(hitNormal.y), round(hitNormal.z));
+        // IMPROVED: Use proper normal to position calculation to ensure vertical building works
+        glm::ivec3 placePos;
+        
+        // Check if we're looking up at a block (special case for vertical building)
+        bool lookingUp = player.cameraDirection.y > 0.3f; // If looking upward
+        
+        if (abs(hitNormal.y) > 0.9f && hitNormal.y > 0) {
+            // Special case: We hit the top face of a block - place directly above
+            placePos = hitPos + glm::ivec3(0, 1, 0);
+            if (DebugManager::getInstance().logBlockPlacement()) {
+                std::cout << "Detected top face hit - placing block directly above" << std::endl;
+            }
+        } else if (abs(hitNormal.y) > 0.9f && hitNormal.y < 0 && lookingUp) {
+            // Special case: We hit the bottom face of a block while looking up
+            placePos = hitPos + glm::ivec3(0, -1, 0);
+            if (DebugManager::getInstance().logBlockPlacement()) {
+                std::cout << "Detected bottom face hit while looking up - placing below" << std::endl;
+            }
+        } else {
+            // Standard case - use normal to determine direction
+            placePos = hitPos + glm::ivec3(round(hitNormal.x), round(hitNormal.y), round(hitNormal.z));
+        }
         
         if (DebugManager::getInstance().logBlockPlacement()) {
             std::cout << "Raycast hit at: " << hitPos.x << ", " << hitPos.y << ", " << hitPos.z << std::endl;
@@ -225,10 +246,10 @@ bool VoxelManipulator::raycast(const glm::vec3& origin, const glm::vec3& directi
     // Calculate the surface normal at the player position (points away from center)
     glm::vec3 surfaceNormal = glm::normalize(origin);
     
-    // Limit maximum distance to a reasonable value based on player height
+    // FIXED: Always provide enough reach distance for building (minimum 5 units)
     double heightAboveSurface = distFromCenter - surfaceR;
-    float adaptedMaxDistance = std::min(maxDistance, 
-                                      static_cast<float>(heightAboveSurface) * 2.0f + 20.0f);
+    // Always give at least 5 units of reach regardless of height
+    float adaptedMaxDistance = std::max(5.0f, std::min(maxDistance, static_cast<float>(heightAboveSurface) * 2.0f + 20.0f));
                                       
     if (DebugManager::getInstance().logRaycast()) {
         std::cout << "Height above surface: " << heightAboveSurface 
@@ -258,8 +279,15 @@ bool VoxelManipulator::raycast(const glm::vec3& origin, const glm::vec3& directi
     const int MAX_ITERATIONS = 1000;
     int iterations = 0;
     
-    // Use a shorter initial step size
-    float stepSize = 0.2f;
+    // IMPROVED: Use a much finer step size when looking straight up or down
+    // This is crucial for vertical building
+    float baseStepSize = 0.1f; // Always use a smaller base step for accuracy
+    float stepSize = baseStepSize;
+    
+    // If looking mostly up/down, use an even smaller step size for better precision
+    if (abs(dir.y) > 0.7f) {
+        stepSize = 0.05f;
+    }
     
     while (distance < adaptedMaxDistance && iterations < MAX_ITERATIONS) {
         iterations++;
@@ -268,9 +296,10 @@ bool VoxelManipulator::raycast(const glm::vec3& origin, const glm::vec3& directi
         float localStepSize = stepSize;
         float distFromOrigin = glm::length(localCurrentPos - localOrigin);
         
-        // Use larger steps when further from origin
-        if (distFromOrigin > 10.0f) localStepSize = 0.5f;
-        if (distFromOrigin > 20.0f) localStepSize = 1.0f;
+        // Use slightly larger steps when further from origin, but still keep a reasonable size
+        // for accurate top-face detection
+        if (distFromOrigin > 10.0f) localStepSize = stepSize * 2.0f;
+        if (distFromOrigin > 20.0f) localStepSize = stepSize * 3.0f;
         
         // Step along ray in local coordinates
         localCurrentPos += dir * localStepSize;
@@ -290,21 +319,28 @@ bool VoxelManipulator::raycast(const glm::vec3& origin, const glm::vec3& directi
         Block block = worldRef.getBlock(voxelPos.x, voxelPos.y, voxelPos.z);
         if (block.type != BlockType::AIR) {
             // Extra verification for exact face hit
-            float smallStep = 0.1f;
+            float smallStep = 0.05f; // Reduced for better precision
             glm::vec3 confirmPos = worldPos - dir * smallStep;
             glm::ivec3 confirmVoxel = glm::ivec3(floor(confirmPos.x), floor(confirmPos.y), floor(confirmPos.z));
             
             // If the confirmation position is different, we're on the block boundary
             if (confirmVoxel.x != voxelPos.x || confirmVoxel.y != voxelPos.y || confirmVoxel.z != voxelPos.z) {
                 // Find the face normal by comparing the position components
-                glm::vec3 diff = glm::vec3(voxelPos) - confirmPos;
+                glm::vec3 diff = glm::vec3(voxelPos) + glm::vec3(0.5f) - confirmPos;
                 hitNormal = glm::vec3(0.0f);
                 
-                if (abs(diff.x) > abs(diff.y) && abs(diff.x) > abs(diff.z)) {
-                    hitNormal.x = diff.x > 0 ? -1.0f : 1.0f;
-                } else if (abs(diff.y) > abs(diff.x) && abs(diff.y) > abs(diff.z)) {
+                // IMPROVED: Better face detection, especially for top/bottom faces
+                // Focus even more on Y-axis for better vertical building detection
+                
+                if (abs(diff.y) >= abs(diff.x) * 0.8f && abs(diff.y) >= abs(diff.z) * 0.8f) {
+                    // We hit a horizontal face (top or bottom) - prioritize this for vertical building
                     hitNormal.y = diff.y > 0 ? -1.0f : 1.0f;
-                } else {
+                    if (DebugManager::getInstance().logRaycast()) {
+                        std::cout << "Detected horizontal face hit (Y-axis)" << std::endl;
+                    }
+                } else if (abs(diff.x) >= abs(diff.y) && abs(diff.x) >= abs(diff.z)) {
+                    hitNormal.x = diff.x > 0 ? -1.0f : 1.0f;
+                } else if (abs(diff.z) >= abs(diff.x) && abs(diff.z) >= abs(diff.y)) {
                     hitNormal.z = diff.z > 0 ? -1.0f : 1.0f;
                 }
                 
