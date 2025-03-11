@@ -4,8 +4,19 @@
 
 #include <GL/glew.h>
 #include <glm/glm.hpp>
+#include <unordered_map>
+#include <mutex>
+#include <future>
+#include <atomic>
 #include "World/World.hpp"
 #include "Graphics/GraphicsSettings.hpp"
+
+// Custom hash function for glm::ivec2
+struct IVec2Hash {
+    std::size_t operator()(const glm::ivec2& v) const {
+        return std::hash<int>()(v.x) ^ (std::hash<int>()(v.y) << 1);
+    }
+};
 
 /**
  * Debug tool that provides a god's eye view of the entire globe.
@@ -13,29 +24,43 @@
  */
 class GodViewDebugTool {
 public:
+    // Visualization modes
+    enum class VisualizationMode {
+        PROCEDURAL,   // Show only procedural terrain
+        ACTUAL,       // Show only actual voxel data
+        HYBRID        // Show both procedural and actual data
+    };
+
+    // Height sample cache
+    struct HeightSample {
+        double height;      // Height value
+        bool isActual;      // True if from actual chunk, false if procedural
+        double timestamp;   // When this sample was taken
+    };
+
     GodViewDebugTool(const World& world);
     ~GodViewDebugTool();
     
     // Render the globe visualization
     void render(const GraphicsSettings& settings);
     
-    // Set the position of the camera in the god view
+    // Camera and view controls
     void setCameraPosition(const glm::vec3& position);
-    
-    // Set the target the camera is looking at
     void setCameraTarget(const glm::vec3& target);
-    
-    // Adjust the zoom level
     void setZoom(float zoom);
-    
-    // Rotate the view by specified degrees
     void rotateView(float degrees);
     
-    // Toggle wireframe mode
+    // Appearance controls
     void setWireframeMode(bool enabled);
-    
-    // Set visualization type (height map, biomes, etc.)
+    void setVisualizationMode(VisualizationMode mode);
+    void setAdaptiveResolution(bool enabled);
+    void setAdaptiveDetailFactor(float factor);
+    void clearHeightCache();
     void setVisualizationType(int type);
+    
+    // Data updates
+    void updateHeightData();
+    bool generateGlobeMesh();
     
     // Get current rotation angle
     float getCurrentRotation() const;
@@ -50,6 +75,10 @@ private:
     bool wireframeMode;
     int visualizationType;
     bool shadersLoaded;
+    VisualizationMode visualizationMode;
+    bool useAdaptiveResolution;
+    float adaptiveDetailFactor;
+    bool meshDirty;
     
     // Camera settings
     glm::vec3 cameraPosition;
@@ -62,23 +91,29 @@ private:
     GLuint shaderProgram;
     size_t indexCount;
     
-    // Load shaders for rendering
+    // Height sampling
+    std::unordered_map<glm::ivec2, HeightSample, IVec2Hash> heightSampleCache;
+    std::mutex cacheMutex;
+    std::atomic<bool> updateInProgress;
+    std::future<void> updateFuture;
+    
+    // Mesh generation
     bool loadShaders();
-    
-    // Generate a sphere mesh for the globe
-    bool generateGlobeMesh();
-    
-    // Create a fallback sphere if detailed generation fails
+    void generateAdaptiveMesh();
     void createFallbackSphere();
     
-    // Generate height data based on position
+    // Height sampling
+    double sampleHeight(const glm::dvec3& direction);
+    double sampleFromChunks(const glm::dvec3& direction);
+    double sampleProcedural(const glm::dvec3& direction);
     float generateHeight(const glm::vec3& pos);
+    void updateHeightDataAsync();
     
-    // Update the height data based on world state
-    void updateHeightData();
-    
-    // Release all OpenGL resources
+    // Resource management
     void releaseResources();
+    
+    // Helper functions
+    bool needsMeshUpdate() const;
 };
 
 #endif // GOD_VIEW_DEBUG_TOOL_HPP

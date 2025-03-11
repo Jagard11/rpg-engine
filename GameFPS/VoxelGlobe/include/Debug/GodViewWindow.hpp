@@ -25,7 +25,7 @@ public:
     bool visible = false;
     
     // Window properties
-    ImVec2 windowSize = ImVec2(400, 400);
+    ImVec2 windowSize = ImVec2(600, 500);
     ImVec2 windowPos = ImVec2(50, 50);
     
     // Control state
@@ -40,7 +40,24 @@ public:
     
     // Appearance
     bool wireframeMode = false;
-    int visualizationType = 0;
+    int visualizationType = 0;        // 0=terrain, 1=biomes, 2=block density
+    int visualizationMode = 2;        // 0=procedural, 1=actual, 2=hybrid (maps to enum)
+    bool useAdaptiveResolution = true;
+    float adaptiveDetailFactor = 1.0f;
+    bool showChunkBoundaries = false;
+    
+    // Preset views
+    void setTopDownView();
+    void setFrontView();
+    void setPlayerView();
+    void setRandomView();
+    
+    // Focus on specific areas
+    void focusOnLocation(const glm::vec3& worldPos);
+    
+    // Save/restore camera state
+    void saveViewState(const std::string& name);
+    bool loadViewState(const std::string& name);
     
     // Access to the underlying tool
     GodViewDebugTool* getGodViewTool() { return godViewTool; }
@@ -51,6 +68,22 @@ private:
     
     // Track last frame time for auto-rotation
     double lastFrameTime = 0.0;
+    
+    // Saved camera presets
+    struct CameraPreset {
+        glm::vec3 position;
+        glm::vec3 target;
+        float rotation;
+        float zoom;
+    };
+    std::unordered_map<std::string, CameraPreset> savedPresets;
+    
+    // UI component rendering helpers
+    void renderControlPanel();
+    void renderVisualizationControls();
+    void renderCameraControls();
+    void renderPresetControls();
+    void renderDebugInfo();
 };
 
 #endif // GOD_VIEW_WINDOW_HPP
