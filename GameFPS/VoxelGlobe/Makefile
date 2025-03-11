@@ -273,6 +273,30 @@ src/Debug/DebugWindow.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Debug/DebugWindow.cpp.s
 .PHONY : src/Debug/DebugWindow.cpp.s
 
+src/Debug/DebugWindowGodViewPanel.o: src/Debug/DebugWindowGodViewPanel.cpp.o
+.PHONY : src/Debug/DebugWindowGodViewPanel.o
+
+# target to build an object file
+src/Debug/DebugWindowGodViewPanel.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Debug/DebugWindowGodViewPanel.cpp.o
+.PHONY : src/Debug/DebugWindowGodViewPanel.cpp.o
+
+src/Debug/DebugWindowGodViewPanel.i: src/Debug/DebugWindowGodViewPanel.cpp.i
+.PHONY : src/Debug/DebugWindowGodViewPanel.i
+
+# target to preprocess a source file
+src/Debug/DebugWindowGodViewPanel.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Debug/DebugWindowGodViewPanel.cpp.i
+.PHONY : src/Debug/DebugWindowGodViewPanel.cpp.i
+
+src/Debug/DebugWindowGodViewPanel.s: src/Debug/DebugWindowGodViewPanel.cpp.s
+.PHONY : src/Debug/DebugWindowGodViewPanel.s
+
+# target to generate assembly for a file
+src/Debug/DebugWindowGodViewPanel.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Debug/DebugWindowGodViewPanel.cpp.s
+.PHONY : src/Debug/DebugWindowGodViewPanel.cpp.s
+
 src/Debug/GodViewDebugTool.o: src/Debug/GodViewDebugTool.cpp.o
 .PHONY : src/Debug/GodViewDebugTool.o
 
@@ -296,6 +320,30 @@ src/Debug/GodViewDebugTool.s: src/Debug/GodViewDebugTool.cpp.s
 src/Debug/GodViewDebugTool.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Debug/GodViewDebugTool.cpp.s
 .PHONY : src/Debug/GodViewDebugTool.cpp.s
+
+src/Debug/GodViewWindow.o: src/Debug/GodViewWindow.cpp.o
+.PHONY : src/Debug/GodViewWindow.o
+
+# target to build an object file
+src/Debug/GodViewWindow.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Debug/GodViewWindow.cpp.o
+.PHONY : src/Debug/GodViewWindow.cpp.o
+
+src/Debug/GodViewWindow.i: src/Debug/GodViewWindow.cpp.i
+.PHONY : src/Debug/GodViewWindow.i
+
+# target to preprocess a source file
+src/Debug/GodViewWindow.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Debug/GodViewWindow.cpp.i
+.PHONY : src/Debug/GodViewWindow.cpp.i
+
+src/Debug/GodViewWindow.s: src/Debug/GodViewWindow.cpp.s
+.PHONY : src/Debug/GodViewWindow.s
+
+# target to generate assembly for a file
+src/Debug/GodViewWindow.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/src/Debug/GodViewWindow.cpp.s
+.PHONY : src/Debug/GodViewWindow.cpp.s
 
 src/Debug/Logger.o: src/Debug/Logger.cpp.o
 .PHONY : src/Debug/Logger.o
@@ -876,9 +924,15 @@ help:
 	@echo "... src/Debug/DebugWindow.o"
 	@echo "... src/Debug/DebugWindow.i"
 	@echo "... src/Debug/DebugWindow.s"
+	@echo "... src/Debug/DebugWindowGodViewPanel.o"
+	@echo "... src/Debug/DebugWindowGodViewPanel.i"
+	@echo "... src/Debug/DebugWindowGodViewPanel.s"
 	@echo "... src/Debug/GodViewDebugTool.o"
 	@echo "... src/Debug/GodViewDebugTool.i"
 	@echo "... src/Debug/GodViewDebugTool.s"
+	@echo "... src/Debug/GodViewWindow.o"
+	@echo "... src/Debug/GodViewWindow.i"
+	@echo "... src/Debug/GodViewWindow.s"
 	@echo "... src/Debug/Logger.o"
 	@echo "... src/Debug/Logger.i"
 	@echo "... src/Debug/Logger.s"

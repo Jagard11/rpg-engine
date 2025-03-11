@@ -6,14 +6,17 @@
 #include "Debug/Logger.hpp"
 #include "Debug/Profiler.hpp"
 #include "Utils/SphereUtils.hpp"
+#include "imgui.h" // Added ImGui header
 #include <vector>
 #include <iostream>
 #include <cmath>
 #include <functional>
+#include <sstream>
+#include <unordered_map>
 
 GodViewDebugTool::GodViewDebugTool(const World& world)
     : world(world), 
-      active(false),
+      active(false),  // Start inactive
       wireframeMode(false),
       visualizationType(0), // 0 = height map
       cameraPosition(0.0f, 0.0f, -30000.0f), // Start far away
@@ -78,6 +81,7 @@ bool GodViewDebugTool::loadShaders() {
             
             out vec3 fragNormal;
             out float fragHeight;
+            out vec3 fragWorldPos;
             
             uniform mat4 model, view, proj;
             uniform float surfaceRadius;
@@ -88,12 +92,13 @@ bool GodViewDebugTool::loadShaders() {
                 vec3 scaledPos = normalize(pos) * surfaceRadius;
                 
                 // Apply height exaggeration for better visualization
-                // Scale the height to show the -5km to +15km range
-                scaledPos += normalize(pos) * height * heightScale;
+                // Use very minimal height variation for a mostly flat surface
+                scaledPos += normalize(pos) * height * heightScale * 0.05;
                 
                 gl_Position = proj * view * model * vec4(scaledPos, 1.0);
                 fragNormal = normal;
                 fragHeight = height;
+                fragWorldPos = scaledPos;
             }
         )";
         
@@ -101,6 +106,7 @@ bool GodViewDebugTool::loadShaders() {
             #version 330 core
             in vec3 fragNormal;
             in float fragHeight;
+            in vec3 fragWorldPos;
             out vec4 FragColor;
             
             uniform int visualizationType;
@@ -110,62 +116,37 @@ bool GodViewDebugTool::loadShaders() {
                 float diff = max(dot(normalize(fragNormal), lightDir), 0.2);
                 
                 // Visualization types
-                if (visualizationType == 0) { // Height map
-                    // Blue to brown to white gradient based on height
-                    vec3 waterColor = vec3(0.0, 0.0, 0.7);
-                    vec3 landColor = vec3(0.5, 0.3, 0.0);
-                    vec3 mountainColor = vec3(1.0, 1.0, 1.0);
+                if (visualizationType == 0) { // Terrain
+                    // For flat surface, use consistent green (grass) color
+                    vec3 grassColor = vec3(0.2, 0.7, 0.3);
+                    FragColor = vec4(grassColor * diff, 1.0);
+                }
+                else if (visualizationType == 1) { // Biomes
+                    // Simulate latitude-based biomes
+                    float latitude = asin(normalize(fragWorldPos).y);
                     
-                    vec3 baseColor;
-                    if (fragHeight < 0.0) {
-                        // Water (blend from deep to shallow)
-                        float t = (fragHeight + 1.0) / 1.0; // -1 to 0 mapped to 0 to 1
-                        baseColor = mix(vec3(0.0, 0.0, 0.5), waterColor, t);
-                    } else if (fragHeight < 0.6) {
-                        // Land (blend from beaches to grassland to forests)
-                        float t = fragHeight / 0.6; // 0 to 0.6 mapped to 0 to 1
-                        baseColor = mix(vec3(0.9, 0.8, 0.5), landColor, t);
-                    } else {
-                        // Mountains (blend from rock to snow)
-                        float t = (fragHeight - 0.6) / 0.4; // 0.6 to 1.0 mapped to 0 to 1
-                        baseColor = mix(landColor, mountainColor, t);
+                    // Snow at poles
+                    if (abs(latitude) > 1.2) {
+                        FragColor = vec4(0.95, 0.95, 0.95, 1.0) * diff;
                     }
-                    
-                    FragColor = vec4(baseColor * diff, 1.0);
-                } else if (visualizationType == 1) { // Biomes
-                    // Simple biome visualization based on height and latitude
-                    float latitude = asin(fragNormal.y) / 3.14159 * 2.0; // -1 to 1
-                    
-                    // Polar
-                    if (abs(latitude) > 0.7) {
-                        FragColor = vec4(1.0, 1.0, 1.0, 1.0) * diff; // Snow
+                    // Tundra near poles
+                    else if (abs(latitude) > 1.0) {
+                        FragColor = vec4(0.7, 0.7, 0.7, 1.0) * diff;
                     }
-                    // Temperate
-                    else if (abs(latitude) > 0.4) {
-                        if (fragHeight < 0.0) {
-                            FragColor = vec4(0.0, 0.0, 0.7, 1.0) * diff; // Ocean
-                        } else if (fragHeight < 0.3) {
-                            FragColor = vec4(0.0, 0.6, 0.0, 1.0) * diff; // Forest
-                        } else {
-                            FragColor = vec4(0.5, 0.5, 0.5, 1.0) * diff; // Mountains
-                        }
+                    // Temperate zones
+                    else if (abs(latitude) > 0.5) {
+                        FragColor = vec4(0.1, 0.6, 0.2, 1.0) * diff;
                     }
-                    // Tropical
+                    // Tropical zones
                     else {
-                        if (fragHeight < 0.0) {
-                            FragColor = vec4(0.0, 0.2, 0.8, 1.0) * diff; // Ocean
-                        } else if (fragHeight < 0.2) {
-                            FragColor = vec4(1.0, 0.9, 0.6, 1.0) * diff; // Beach/Desert
-                        } else if (fragHeight < 0.5) {
-                            FragColor = vec4(0.0, 0.8, 0.0, 1.0) * diff; // Jungle
-                        } else {
-                            FragColor = vec4(0.5, 0.5, 0.5, 1.0) * diff; // Mountains
-                        }
+                        FragColor = vec4(0.3, 0.8, 0.2, 1.0) * diff;
                     }
-                } else if (visualizationType == 2) { // Block density
-                    // Visualize areas with more blocks as brighter
-                    FragColor = vec4(0.0, fragHeight * 2.0, 0.0, 1.0) * diff;
-                } else {         // Default wireframe color
+                }
+                else if (visualizationType == 2) { // Blocks
+                    // Uniform green for flat surface
+                    FragColor = vec4(0.3, 0.7, 0.3, 1.0) * diff;
+                }
+                else { // Default wireframe color
                     FragColor = vec4(0.0, 1.0, 0.0, 1.0) * diff;
                 }
             }
@@ -227,63 +208,29 @@ bool GodViewDebugTool::loadShaders() {
     }
 }
 
+// Generate height data that represents the actual world
 float GodViewDebugTool::generateHeight(const glm::vec3& pos) {
     // Get surface radius
     double surfaceR = SphereUtils::getSurfaceRadiusMeters();
     
-    // Convert position to world coordinates (assuming pos is normalized)
-    double worldX = pos.x * surfaceR;
-    double worldY = pos.y * surfaceR;
-    double worldZ = pos.z * surfaceR;
-    
-    // Use distance to generate a basic height value
-    double dist = sqrt(worldX*worldX + worldY*worldY + worldZ*worldZ);
-    
-    // Calculate height relative to surface (-1 to +1 range)
-    float relativeHeight = static_cast<float>((dist - surfaceR) / 5000.0); // 5km scale
-    
-    // Add some noise based on position
-    float noiseValue = (sin(pos.x * 10.0f) * cos(pos.z * 10.0f) + cos(pos.y * 8.0f)) * 0.1f;
-    
-    // Base height on latitude (distance from equator) for continental shapes
-    float latitude = asin(pos.y) / 3.14159f;
-    float latitudeEffect = 0.0f;
-    
-    // Create continents
-    if (abs(latitude) < 0.6f) {
-        // Noise creates continental shapes
-        float continentalNoise = sin(pos.x * 3.0f) * cos(pos.z * 2.0f) + cos(pos.y * 5.0f);
-        
-        if (continentalNoise > 0.1f) {
-            latitudeEffect = 0.3f; // Continent
-        } else {
-            latitudeEffect = -0.2f; // Ocean
-        }
-    } else {
-        // Polar regions - create ice caps
-        latitudeEffect = 0.3f + 0.1f * (abs(latitude) - 0.6f) / 0.4f;
-    }
-    
-    // Combine all height factors
-    float finalHeight = relativeHeight + noiseValue + latitudeEffect;
-    
-    // Clamp to reasonable range
-    return glm::clamp(finalHeight, -1.0f, 1.5f);
+    // For a flat surface, we set a constant height value of 0.0
+    // This creates a perfectly spherical planet as it's supposed to be
+    // The height value is only used for visualization in shaders
+    return 0.0f;
 }
 
 void GodViewDebugTool::updateHeightData() {
-    // This would update the height data based on current world state
-    // For now, just logging that it was called
+    // Nothing to update since we use a flat surface
     LOG_DEBUG(LogCategory::RENDERING, "God View height data update requested");
 }
 
 bool GodViewDebugTool::generateGlobeMesh() {
     try {
-        // Create a low-poly sphere to represent the globe
+        // Create a higher-resolution sphere to represent the globe
         // We'll subdivide an icosahedron for better uniformity than a UV sphere
         
-        // Resolution of the globe mesh - lower for better performance
-        const int resolution = 3; // Reduced from 4 to 3 subdivisions for performance
+        // Resolution of the globe mesh - higher for better detail
+        const int resolution = 6; // Increased from 3 for better resolution
         
         std::vector<float> vertices;
         std::vector<unsigned int> indices;
@@ -435,6 +382,14 @@ void GodViewDebugTool::render(const GraphicsSettings& settings) {
     
     PROFILE_SCOPE("GodViewDebugTool::render", LogCategory::RENDERING);
     
+    // Safety check - don't try to render if OpenGL isn't ready
+    GLint currentFBO;
+    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &currentFBO);
+    if (glGetError() != GL_NO_ERROR) {
+        LOG_ERROR(LogCategory::RENDERING, "OpenGL error before GodViewDebugTool rendering");
+        return;
+    }
+    
     // Store previous GL state
     GLboolean cullFace;
     glGetBooleanv(GL_CULL_FACE, &cullFace);
@@ -469,24 +424,39 @@ void GodViewDebugTool::render(const GraphicsSettings& settings) {
     );
     
     // Apply transforms
-    glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "proj"), 1, GL_FALSE, glm::value_ptr(projection));
-    glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "view"), 1, GL_FALSE, glm::value_ptr(view));
-    glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model"), 1, GL_FALSE, glm::value_ptr(model));
+    GLint projLoc = glGetUniformLocation(shaderProgram, "proj");
+    GLint viewLoc = glGetUniformLocation(shaderProgram, "view");
+    GLint modelLoc = glGetUniformLocation(shaderProgram, "model");
+    
+    if (projLoc >= 0) glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
+    if (viewLoc >= 0) glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
+    if (modelLoc >= 0) glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
     
     // Set visualization type
-    glUniform1i(glGetUniformLocation(shaderProgram, "visualizationType"), visualizationType);
+    GLint vizLoc = glGetUniformLocation(shaderProgram, "visualizationType");
+    if (vizLoc >= 0) glUniform1i(vizLoc, visualizationType);
     
     // Set surface radius (in kilometers)
-    glUniform1f(glGetUniformLocation(shaderProgram, "surfaceRadius"), 
-                static_cast<float>(SphereUtils::getSurfaceRadiusMeters() / 1000.0));
+    GLint radiusLoc = glGetUniformLocation(shaderProgram, "surfaceRadius");
+    if (radiusLoc >= 0) {
+        float radius = static_cast<float>(SphereUtils::getSurfaceRadiusMeters() / 1000.0);
+        glUniform1f(radiusLoc, radius);
+    }
     
     // Set height scale for better visualization
-    glUniform1f(glGetUniformLocation(shaderProgram, "heightScale"), 3000.0f);
+    GLint heightLoc = glGetUniformLocation(shaderProgram, "heightScale");
+    if (heightLoc >= 0) glUniform1f(heightLoc, 3000.0f);
     
     // Draw the globe
     glBindVertexArray(vao);
     glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, 0);
     glBindVertexArray(0);
+    
+    // Check for OpenGL errors
+    GLenum err = glGetError();
+    if (err != GL_NO_ERROR) {
+        LOG_ERROR(LogCategory::RENDERING, "OpenGL error during God View rendering: " + std::to_string(err));
+    }
     
     // Restore polygon mode
     if (wireframeMode) {
@@ -526,4 +496,8 @@ void GodViewDebugTool::setVisualizationType(int type) {
 
 void GodViewDebugTool::setActive(bool enabled) {
     active = enabled;
+}
+
+float GodViewDebugTool::getCurrentRotation() const {
+    return rotationAngle;
 }

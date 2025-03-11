@@ -6,6 +6,7 @@
 #include "Debug/DebugSystem.hpp"
 #include "Debug/Logger.hpp"
 #include "Debug/Profiler.hpp"
+#include "Debug/GlobeUpdater.hpp"
 #include "World/World.hpp"
 #include "Player/Player.hpp"
 #include "Rendering/Renderer.hpp"
@@ -178,6 +179,9 @@ int main() {
     auto godViewTool = debugWindow.getGodViewTool();
     renderLoadingScreen(window, 0.9f);
     
+    // Add globe updater helper
+    GlobeUpdater globeUpdater(world, debugWindow);
+    
     GraphicsSettings graphicsSettings(window);
     
     // Initial world generation (first set of chunks around player)
@@ -295,6 +299,9 @@ int main() {
             world.update(player.position);
         }
         
+        // Update globe visualization if necessary
+        globeUpdater.update();
+        
         // Skip gravity on first frame to avoid falling through terrain
         if (!firstFrame) {
             // Gravity is handled in Player::update()
@@ -328,10 +335,10 @@ int main() {
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
-        
+
         // Render debug window if visible
-        debugWindow.render();
-        
+        debugWindow.render(graphicsSettings);
+
         // Render escape menu if visible
         if (showEscapeMenu) {
             ImGui::Begin("Menu", &showEscapeMenu, ImGuiWindowFlags_AlwaysAutoResize);
@@ -343,10 +350,15 @@ int main() {
             }
             ImGui::End();
         }
-        
+
         // Render inventory UI
         inventoryUI.render(player.inventory, io);
-        
+
+        // Render God View Window if enabled (MOVED HERE for safety)
+        if (debugWindow.getGodViewWindow() && debugWindow.getGodViewWindow()->visible) {
+            debugWindow.getGodViewWindow()->render(graphicsSettings);
+        }
+
         // Render ImGui
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

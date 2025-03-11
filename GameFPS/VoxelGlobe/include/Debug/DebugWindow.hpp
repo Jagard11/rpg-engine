@@ -5,14 +5,16 @@
 #include "Debug/DebugManager.hpp"
 #include "Debug/DebugSystem.hpp"
 #include "Debug/GodViewDebugTool.hpp"
+#include "Debug/GodViewWindow.hpp"
 #include "Player/Player.hpp"
+#include "Graphics/GraphicsSettings.hpp"
 #include "imgui.h"
 
 class DebugWindow {
 public:
     DebugWindow(DebugManager& debugMgr, Player& player);
     ~DebugWindow();
-    void render();
+    void render(const GraphicsSettings& settings);
     bool isVisible() const { return visible; }
     void toggleVisibility();
     void saveWindowState();
@@ -21,22 +23,30 @@ public:
     // Accessor for GodViewDebugTool
     GodViewDebugTool* getGodViewTool() { return godViewTool; }
     
+    // Accessor for GodViewWindow
+    GodViewWindow* getGodViewWindow() { return godViewWindow; }
+    
     // Render the god view if active
     void renderGodView(const GraphicsSettings& settings);
+    
+    // Render the god view panel (part of the debug window)
+    void renderGodViewPanel();
 
 private:
     DebugManager& debugManager;
     Player& player;
     bool visible;
     
-    // God view tool
+    // God view tools
     GodViewDebugTool* godViewTool;
+    GodViewWindow* godViewWindow;
     
     // UI State for each debug panel
     bool showMeshDebug; // Flag to toggle mesh debugging tools
     bool showLoggingConfig; // Flag to toggle logging configuration panel
     bool showPerformance; // Flag to toggle performance metrics panel
     bool showGodView; // Flag to toggle god view panel
+    bool showGodViewWindow; // Flag to toggle persistent god view window
     
     // Teleport coordinates
     float teleportCoords[3] = {0.0f, 1510.0f, 0.0f}; // Default teleport coordinates
@@ -75,7 +85,6 @@ private:
     void renderWorldDebugPanel();
     void renderPerformancePanel();
     void renderPlayerInfoPanel();
-    void renderGodViewPanel();
     
     // Sync UI state with DebugManager
     void syncWithDebugManager();

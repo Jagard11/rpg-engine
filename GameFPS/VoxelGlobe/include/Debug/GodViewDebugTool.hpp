@@ -37,8 +37,8 @@ public:
     // Set visualization type (height map, biomes, etc.)
     void setVisualizationType(int type);
     
-    // Rotation-related methods
-    float getCurrentRotation() const { return rotationAngle; }
+    // Get current rotation angle
+    float getCurrentRotation() const;
     
     // Flag to indicate if the tool is active
     bool isActive() const { return active; }

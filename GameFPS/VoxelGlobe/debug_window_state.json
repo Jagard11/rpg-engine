@@ -1,7 +1,7 @@
 {
     "godView": {
         "active": true,
-        "autoRotate": false,
+        "autoRotate": true,
         "cameraPos": [
             -8.130000114440918,
             37.39799880981445,
@@ -12,14 +12,32 @@
             0.0,
             0.0
         ],
-        "rotation": 307.47857666015625,
+        "rotation": 99.98649597167969,
         "rotationSpeed": 0.18799999356269836,
-        "visualizationType": 2,
+        "visualizationType": 0,
         "wireframe": false,
-        "zoom": 0.3009999990463257
+        "zoom": 0.5580000281333923
+    },
+    "godViewWindow": {
+        "autoRotate": false,
+        "manualRotation": 0.0,
+        "position": [
+            50.0,
+            50.0
+        ],
+        "rotationSpeed": 0.20000000298023224,
+        "size": [
+            400.0,
+            400.0
+        ],
+        "visible": false,
+        "visualizationType": 0,
+        "wireframeMode": false,
+        "zoom": 1.0
     },
     "panels": {
         "showGodView": true,
+        "showGodViewWindow": false,
         "showLoggingConfig": false,
         "showMeshDebug": false,
         "showPerformance": true

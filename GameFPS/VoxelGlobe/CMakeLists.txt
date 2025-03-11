@@ -67,8 +67,10 @@ add_executable(VoxelGlobe
     src/Debug/DebugSystem.cpp             # New file
     src/Debug/Profiler.cpp                # New file
     src/Debug/GodViewDebugTool.cpp
-    # Removed duplicate file - DebugWindowGodViewPanel.cpp
-    
+    src/Debug/GodViewWindow.cpp
+    # src/Debug/GlobeUpdater.cpp
+    src/Debug/DebugWindowGodViewPanel.cpp
+
     # Graphics
     src/Graphics/GraphicsSettings.cpp
     src/Graphics/ShaderManager.cpp         # Added
