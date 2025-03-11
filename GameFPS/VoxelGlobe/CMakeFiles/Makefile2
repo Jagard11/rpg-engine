@@ -81,12 +81,12 @@ clean: CMakeFiles/VoxelGlobe.dir/clean
 CMakeFiles/VoxelGlobe.dir/all:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/VoxelGlobe.dir/build.make CMakeFiles/VoxelGlobe.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir="/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/CMakeFiles" --progress-num=1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33 "Built target VoxelGlobe"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir="/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/CMakeFiles" --progress-num=1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34 "Built target VoxelGlobe"
 .PHONY : CMakeFiles/VoxelGlobe.dir/all
 
 # Build rule for subdir invocation for target.
 CMakeFiles/VoxelGlobe.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/CMakeFiles" 33
+	$(CMAKE_COMMAND) -E cmake_progress_start "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/CMakeFiles" 34
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/VoxelGlobe.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/CMakeFiles" 0
 .PHONY : CMakeFiles/VoxelGlobe.dir/rule

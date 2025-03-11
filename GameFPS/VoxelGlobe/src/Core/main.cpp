@@ -190,9 +190,23 @@ int main() {
     
     // Initialize chunk buffers
     LOG_INFO(LogCategory::RENDERING, "Initializing chunk buffers...");
-    for (auto& [key, chunk] : world.getChunks()) {
-        chunk->setWorld(&world);
-        chunk->initializeBuffers();
+    try {
+        for (auto& [key, chunk] : world.getChunks()) {
+            if (chunk) {
+                chunk->setWorld(&world);
+                try {
+                    chunk->initializeBuffers();
+                } catch (const std::exception& e) {
+                    LOG_ERROR(LogCategory::RENDERING, "Exception initializing chunk buffers: " + std::string(e.what()));
+                } catch (...) {
+                    LOG_ERROR(LogCategory::RENDERING, "Unknown error initializing chunk buffers");
+                }
+            }
+        }
+    } catch (const std::exception& e) {
+        LOG_ERROR(LogCategory::RENDERING, "Exception in chunk buffer loop: " + std::string(e.what()));
+    } catch (...) {
+        LOG_ERROR(LogCategory::RENDERING, "Unknown error in chunk buffer loop");
     }
     
     renderLoadingScreen(window, 1.0f);

@@ -15,6 +15,7 @@ set(CMAKE_DEPENDS_DEPENDENCY_FILES
   "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/Debug/DebugSystem.cpp" "CMakeFiles/VoxelGlobe.dir/src/Debug/DebugSystem.cpp.o" "gcc" "CMakeFiles/VoxelGlobe.dir/src/Debug/DebugSystem.cpp.o.d"
   "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/Debug/DebugWindow.cpp" "CMakeFiles/VoxelGlobe.dir/src/Debug/DebugWindow.cpp.o" "gcc" "CMakeFiles/VoxelGlobe.dir/src/Debug/DebugWindow.cpp.o.d"
   "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/Debug/DebugWindowGodViewPanel.cpp" "CMakeFiles/VoxelGlobe.dir/src/Debug/DebugWindowGodViewPanel.cpp.o" "gcc" "CMakeFiles/VoxelGlobe.dir/src/Debug/DebugWindowGodViewPanel.cpp.o.d"
+  "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/Debug/GlobeUpdater.cpp" "CMakeFiles/VoxelGlobe.dir/src/Debug/GlobeUpdater.cpp.o" "gcc" "CMakeFiles/VoxelGlobe.dir/src/Debug/GlobeUpdater.cpp.o.d"
   "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/Debug/GodViewDebugTool.cpp" "CMakeFiles/VoxelGlobe.dir/src/Debug/GodViewDebugTool.cpp.o" "gcc" "CMakeFiles/VoxelGlobe.dir/src/Debug/GodViewDebugTool.cpp.o.d"
   "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/Debug/GodViewWindow.cpp" "CMakeFiles/VoxelGlobe.dir/src/Debug/GodViewWindow.cpp.o" "gcc" "CMakeFiles/VoxelGlobe.dir/src/Debug/GodViewWindow.cpp.o.d"
   "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/Debug/Logger.cpp" "CMakeFiles/VoxelGlobe.dir/src/Debug/Logger.cpp.o" "gcc" "CMakeFiles/VoxelGlobe.dir/src/Debug/Logger.cpp.o.d"

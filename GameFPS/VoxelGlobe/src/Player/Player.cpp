@@ -23,28 +23,23 @@ Player::Player(const World& w)
         cameraDirection = glm::vec3(0.0f, 0.0f, -1.0f);
         movementDirection = cameraDirection;
     } else {
-        // CRITICAL FIX: Position player at Earth's surface with proper visual height
+        // SPAWN CORRECTLY: Position player at Earth's surface at true north pole 
         double surfaceR = SphereUtils::getSurfaceRadiusMeters();
         
-        // Position at the "north pole" with a slight offset to see the horizon better
-        float angle = 5.0f * 3.14159f / 180.0f; // 5 degrees in radians
-        position = glm::vec3(sin(angle) * surfaceR, cos(angle) * surfaceR, 0.0f);
+        // Position at exactly the "north pole" on the surface plus a small offset
+        position = glm::vec3(0.0f, static_cast<float>(surfaceR) + 2.0f, 0.0f);
         
         // Initialize up vector to point away from planet center
         up = glm::normalize(position);
         
-        // Camera direction should look along the surface
-        glm::vec3 northPole = glm::vec3(0.0f, 1.0f, 0.0f);
-        glm::vec3 tangent = glm::normalize(glm::cross(up, northPole));
-        cameraDirection = glm::normalize(glm::cross(tangent, up));
+        // Camera direction should look along the surface (in the +X direction)
+        cameraDirection = glm::vec3(1.0f, 0.0f, 0.0f);
+        
+        // Make sure cameraDirection is perpendicular to up
+        cameraDirection = glm::normalize(cameraDirection - glm::dot(cameraDirection, up) * up);
         
         // Movement direction same as camera initially
         movementDirection = cameraDirection;
-        
-        // Ensure player starts at exactly the right height above surface
-        // This prevents falling through on game start and positions for optimal viewing
-        float exactHeight = static_cast<float>(surfaceR + 2.0); // Position 2 meters above surface
-        position = glm::normalize(position) * exactHeight;
         
         std::cout << "************ PLAYER INITIALIZATION ************" << std::endl;
         std::cout << "Earth radius: " << w.getRadius() << " meters" << std::endl;
@@ -71,7 +66,7 @@ void Player::update(GLFWwindow* window, float deltaTime) {
         firstMouse = false;
     }
     float deltaX = static_cast<float>(mouseX - lastX);
-    float deltaY = static_cast<float>(mouseY - lastY);
+    float deltaY = static_cast<float>(lastY - mouseY); // Invert Y for natural camera control
     lastX = mouseX;
     lastY = mouseY;
     

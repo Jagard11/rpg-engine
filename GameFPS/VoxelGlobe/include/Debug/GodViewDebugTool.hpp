@@ -68,11 +68,17 @@ private:
     // Generate a sphere mesh for the globe
     bool generateGlobeMesh();
     
+    // Create a fallback sphere if detailed generation fails
+    void createFallbackSphere();
+    
     // Generate height data based on position
     float generateHeight(const glm::vec3& pos);
     
     // Update the height data based on world state
     void updateHeightData();
+    
+    // Release all OpenGL resources
+    void releaseResources();
 };
 
 #endif // GOD_VIEW_DEBUG_TOOL_HPP

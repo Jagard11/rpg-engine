@@ -85,6 +85,21 @@ void Chunk::generateTerrain() {
         return;
     }
     
+    // Safety check for block array
+    if (blocks.empty() || blocks.size() != SIZE * SIZE * SIZE) {
+        std::cerr << "Error: Invalid blocks array in generateTerrain for chunk (" 
+                  << chunkX << ", " << chunkY << ", " << chunkZ 
+                  << "), size: " << blocks.size() << std::endl;
+        
+        // Resize the blocks array if needed
+        try {
+            blocks.resize(SIZE * SIZE * SIZE, Block(BlockType::AIR));
+        } catch (...) {
+            std::cerr << "Failed to resize blocks array" << std::endl;
+            return;
+        }
+    }
+    
     // Get the exact surface radius as used in collision
     double surfaceR = SphereUtils::getSurfaceRadiusMeters();
     
@@ -97,39 +112,56 @@ void Chunk::generateTerrain() {
     bool anyBlocksGenerated = false;
     
     // Generate terrain based on distance from center
-    for (int x = 0; x < SIZE; x++) {
-        for (int y = 0; y < SIZE; y++) {
-            for (int z = 0; z < SIZE; z++) {
-                // Calculate world position
-                int worldX = worldOriginX + x;
-                int worldY = worldOriginY + y;
-                int worldZ = worldOriginZ + z;
-                
-                // Create a block center position (x+0.5, y+0.5, z+0.5) - same as in collision
-                glm::dvec3 blockCenter(worldX + 0.5, worldY + 0.5, worldZ + 0.5);
-                
-                // Calculate distance from center using double precision
-                double dist = glm::length(blockCenter);
-                
-                // Determine block type based on distance from center, using SphereUtils
-                BlockType blockType = static_cast<BlockType>(
-                    SphereUtils::getBlockTypeForElevation(dist)
-                );
-                
-                if (blockType != BlockType::AIR) {
-                    anyBlocksGenerated = true;
-                }
-                
-                // Make sure index is in bounds
-                int index = x + y * SIZE + z * SIZE * SIZE;
-                if (index >= 0 && index < static_cast<int>(blocks.size())) {
-                    blocks[index] = Block(blockType);
-                } else {
-                    std::cerr << "Error: Block index out of bounds in generateTerrain: " << index 
-                              << " (max: " << blocks.size() << ")" << std::endl;
+    try {
+        for (int x = 0; x < SIZE; x++) {
+            for (int y = 0; y < SIZE; y++) {
+                for (int z = 0; z < SIZE; z++) {
+                    // Calculate world position
+                    int worldX = worldOriginX + x;
+                    int worldY = worldOriginY + y;
+                    int worldZ = worldOriginZ + z;
+                    
+                    // Create a block center position (x+0.5, y+0.5, z+0.5) - same as in collision
+                    glm::dvec3 blockCenter(worldX + 0.5, worldY + 0.5, worldZ + 0.5);
+                    
+                    // Calculate distance from center using double precision
+                    double dist = glm::length(blockCenter);
+                    
+                    // Default to standard elevation check if block is too far from center
+                    BlockType blockType;
+                    if (dist > 1.5 * surfaceR) {
+                        // For extreme distances, just use AIR to avoid calculation issues
+                        blockType = BlockType::AIR;
+                    } else {
+                        try {
+                            // Determine block type with height variation
+                            blockType = static_cast<BlockType>(
+                                SphereUtils::getBlockTypeForElevation(dist, blockCenter)
+                            );
+                        } catch (...) {
+                            // Fallback to standard elevation check on error
+                            blockType = static_cast<BlockType>(
+                                SphereUtils::getBlockTypeForElevation(dist)
+                            );
+                        }
+                    }
+                    
+                    if (blockType != BlockType::AIR) {
+                        anyBlocksGenerated = true;
+                    }
+                    
+                    // Make sure index is in bounds
+                    int index = x + y * SIZE + z * SIZE * SIZE;
+                    if (index >= 0 && index < static_cast<int>(blocks.size())) {
+                        blocks[index] = Block(blockType);
+                    }
                 }
             }
         }
+    } catch (const std::exception& e) {
+        std::cerr << "Exception in terrain generation: " << e.what() << std::endl;
+    } catch (...) {
+        std::cerr << "Unknown exception in terrain generation" << std::endl;
     }
     
     // Mark the mesh as needing regeneration
@@ -148,63 +180,133 @@ void Chunk::generateTerrain() {
 
 void Chunk::initializeBuffers() {
     if (!buffersInitialized) {
-        glGenVertexArrays(1, &vao);
-        glGenBuffers(1, &vbo);
-        glGenBuffers(1, &ebo);
-        buffersInitialized = true;
-        
-        if (DebugManager::getInstance().logChunkUpdates()) {
-            std::cout << "Initialized buffers for chunk (" << chunkX << ", " << chunkY << ", " << chunkZ << ")" << std::endl;
+        try {
+            // Create buffer objects only if they haven't been created yet
+            glGenVertexArrays(1, &vao);
+            if (glGetError() != GL_NO_ERROR) {
+                LOG_ERROR(LogCategory::RENDERING, "Error generating VAO for chunk");
+                return;
+            }
+            
+            glGenBuffers(1, &vbo);
+            if (glGetError() != GL_NO_ERROR) {
+                LOG_ERROR(LogCategory::RENDERING, "Error generating VBO for chunk");
+                glDeleteVertexArrays(1, &vao);
+                return;
+            }
+            
+            glGenBuffers(1, &ebo);
+            if (glGetError() != GL_NO_ERROR) {
+                LOG_ERROR(LogCategory::RENDERING, "Error generating EBO for chunk");
+                glDeleteVertexArrays(1, &vao);
+                glDeleteBuffers(1, &vbo);
+                return;
+            }
+            
+            buffersInitialized = true;
+            
+            if (DebugManager::getInstance().logChunkUpdates()) {
+                std::cout << "Initialized buffers for chunk (" << chunkX << ", " << chunkY << ", " << chunkZ << ")" << std::endl;
+            }
+        }
+        catch (const std::exception& e) {
+            LOG_ERROR(LogCategory::RENDERING, "Exception in initializeBuffers: " + std::string(e.what()));
+            buffersInitialized = false;
+        }
+        catch (...) {
+            LOG_ERROR(LogCategory::RENDERING, "Unknown exception in initializeBuffers");
+            buffersInitialized = false;
         }
     }
-    updateBuffers();
+    
+    // Update the buffers with current data
+    try {
+        updateBuffers();
+    }
+    catch (const std::exception& e) {
+        LOG_ERROR(LogCategory::RENDERING, "Exception in updateBuffers: " + std::string(e.what()));
+    }
+    catch (...) {
+        LOG_ERROR(LogCategory::RENDERING, "Unknown exception in updateBuffers");
+    }
 }
 
 void Chunk::updateBuffers() {
-    if (!buffersDirty || mesh.empty()) return;
-    
-    // Ensure we have a valid VAO before binding
-    if (!buffersInitialized) {
-        std::cerr << "Error: Attempting to update buffers before initialization for chunk (" 
-                  << chunkX << ", " << chunkY << ", " << chunkZ << ")" << std::endl;
+    // Skip if buffers don't need updating or mesh is empty
+    if (!buffersDirty || mesh.empty() || !buffersInitialized) {
         return;
     }
     
-    // Safety check for oversized mesh
-    const size_t MAX_MESH_SIZE = 10000000; // 10 million elements
-    if (mesh.size() > MAX_MESH_SIZE) {
-        std::cerr << "Error: Mesh size too large in updateBuffers: " << mesh.size() 
-                  << " elements, truncating to " << MAX_MESH_SIZE << std::endl;
-        mesh.resize(MAX_MESH_SIZE);
-    }
-    
     try {
+        // Safety check for oversized mesh
+        const size_t MAX_MESH_SIZE = 10000000; // 10 million elements
+        if (mesh.size() > MAX_MESH_SIZE) {
+            LOG_WARNING(LogCategory::RENDERING, "Mesh size too large: " + 
+                        std::to_string(mesh.size()) + " elements, truncating to " + 
+                        std::to_string(MAX_MESH_SIZE));
+            mesh.resize(MAX_MESH_SIZE);
+        }
+        
+        // Check OpenGL state before operations
+        GLint currentVAO = 0;
+        glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &currentVAO);
+        
+        // Bind and update the VAO/VBO/EBO
         glBindVertexArray(vao);
+        if (glGetError() != GL_NO_ERROR) {
+            LOG_ERROR(LogCategory::RENDERING, "Error binding VAO in updateBuffers");
+            return;
+        }
+        
         glBindBuffer(GL_ARRAY_BUFFER, vbo);
+        if (glGetError() != GL_NO_ERROR) {
+            LOG_ERROR(LogCategory::RENDERING, "Error binding VBO in updateBuffers");
+            return;
+        }
+        
         glBufferData(GL_ARRAY_BUFFER, mesh.size() * sizeof(float), mesh.data(), GL_STATIC_DRAW);
+        if (glGetError() != GL_NO_ERROR) {
+            LOG_ERROR(LogCategory::RENDERING, "Error uploading vertex data in updateBuffers");
+            return;
+        }
 
         // Only update indices if they're non-empty
         if (!indices.empty()) {
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+            if (glGetError() != GL_NO_ERROR) {
+                LOG_ERROR(LogCategory::RENDERING, "Error binding EBO in updateBuffers");
+                return;
+            }
+            
             glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(GLuint), indices.data(), GL_STATIC_DRAW);
+            if (glGetError() != GL_NO_ERROR) {
+                LOG_ERROR(LogCategory::RENDERING, "Error uploading index data in updateBuffers");
+                return;
+            }
         }
 
-        // Set up vertex attributes (position and texture coords)
+        // Set up vertex attributes
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
         glEnableVertexAttribArray(0);
+        
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
         glEnableVertexAttribArray(1);
         
+        // Unbind to restore state
+        glBindVertexArray(0);
+        
         buffersDirty = false;
+        
+        if (DebugManager::getInstance().logChunkUpdates()) {
+            LOG_DEBUG(LogCategory::RENDERING, "Updated buffers for chunk (" + 
+                     std::to_string(chunkX) + ", " + std::to_string(chunkY) + ", " + 
+                     std::to_string(chunkZ) + ") with " + std::to_string(mesh.size() / 5) + 
+                     " vertices and " + std::to_string(indices.size()) + " indices");
+        }
     } catch (const std::exception& e) {
-        std::cerr << "Exception in updateBuffers: " << e.what() << std::endl;
+        LOG_ERROR(LogCategory::RENDERING, "Exception in updateBuffers: " + std::string(e.what()));
     } catch (...) {
-        std::cerr << "Unknown exception in updateBuffers" << std::endl;
-    }
-    
-    if (DebugManager::getInstance().logChunkUpdates()) {
-        std::cout << "Updated buffers for chunk (" << chunkX << ", " << chunkY << ", " << chunkZ 
-                  << ") with " << mesh.size() / 5 << " vertices and " << indices.size() << " indices" << std::endl;
+        LOG_ERROR(LogCategory::RENDERING, "Unknown exception in updateBuffers");
     }
 }
 

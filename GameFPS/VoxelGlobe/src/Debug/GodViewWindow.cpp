@@ -4,20 +4,17 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <GLFW/glfw3.h>
 
-GodViewWindow::GodViewWindow(const World& w)
+GodViewWindow::GodViewWindow(const World& w, GodViewDebugTool* tool)
     : world(w), 
+      godViewTool(tool),
       lastFrameTime(glfwGetTime()),
       visible(false)  // Start hidden
 {
-    godViewTool = new GodViewDebugTool(world);
     LOG_INFO(LogCategory::UI, "God View Window initialized");
 }
 
 GodViewWindow::~GodViewWindow() {
-    if (godViewTool) {
-        delete godViewTool;
-        godViewTool = nullptr;
-    }
+    // No need to delete godViewTool as it's now managed by DebugWindow
     LOG_INFO(LogCategory::UI, "God View Window destroyed");
 }
 

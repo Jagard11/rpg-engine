@@ -344,37 +344,58 @@ void World::setBlock(int worldX, int worldY, int worldZ, BlockType type) {
 }
 
 Block World::getBlock(int worldX, int worldY, int worldZ) const {
-    // Simple mapping to chunk coordinates
-    int chunkX = static_cast<int>(floor(worldX / static_cast<float>(Chunk::SIZE)));
-    int chunkY = static_cast<int>(floor(worldY / static_cast<float>(Chunk::SIZE)));
-    int chunkZ = static_cast<int>(floor(worldZ / static_cast<float>(Chunk::SIZE)));
-    
-    // Calculate local block position within chunk
-    int localX = worldX - chunkX * Chunk::SIZE;
-    int localY = worldY - chunkY * Chunk::SIZE;
-    int localZ = worldZ - chunkZ * Chunk::SIZE;
-    
-    // Handle negative local coordinates properly
-    if (localX < 0) { localX += Chunk::SIZE; chunkX--; }
-    if (localY < 0) { localY += Chunk::SIZE; chunkY--; }
-    if (localZ < 0) { localZ += Chunk::SIZE; chunkZ--; }
+    try {
+        // Simple mapping to chunk coordinates
+        int chunkX = static_cast<int>(floor(worldX / static_cast<float>(Chunk::SIZE)));
+        int chunkY = static_cast<int>(floor(worldY / static_cast<float>(Chunk::SIZE)));
+        int chunkZ = static_cast<int>(floor(worldZ / static_cast<float>(Chunk::SIZE)));
+        
+        // Calculate local block position within chunk
+        int localX = worldX - chunkX * Chunk::SIZE;
+        int localY = worldY - chunkY * Chunk::SIZE;
+        int localZ = worldZ - chunkZ * Chunk::SIZE;
+        
+        // Handle negative local coordinates properly
+        if (localX < 0) { localX += Chunk::SIZE; chunkX--; }
+        if (localY < 0) { localY += Chunk::SIZE; chunkY--; }
+        if (localZ < 0) { localZ += Chunk::SIZE; chunkZ--; }
 
-    // Find the chunk
-    auto it = chunks.find(std::make_tuple(chunkX, chunkY, chunkZ, 1));
-    if (it != chunks.end()) {
-        return it->second->getBlock(localX, localY, localZ);
+        // Find the chunk
+        auto it = chunks.find(std::make_tuple(chunkX, chunkY, chunkZ, 1));
+        if (it != chunks.end() && it->second) {
+            return it->second->getBlock(localX, localY, localZ);
+        }
+        
+        // If chunk doesn't exist, determine block type based on distance from center
+        // using double precision for accurate calculation
+        double wx = static_cast<double>(worldX);
+        double wy = static_cast<double>(worldY);
+        double wz = static_cast<double>(worldZ);
+        glm::dvec3 pos(wx, wy, wz);
+        double distFromCenter = sqrt(wx*wx + wy*wy + wz*wz);
+        
+        // Check if position is extremely far from surface
+        double surfaceR = SphereUtils::getSurfaceRadiusMeters();
+        if (distFromCenter > 1.5 * surfaceR || distFromCenter < 0.5 * surfaceR) {
+            // For positions extremely far from the surface, just return AIR
+            return Block(BlockType::AIR);
+        }
+        
+        // Use try/catch to safely get block type with height variation
+        try {
+            return Block(static_cast<BlockType>(
+                SphereUtils::getBlockTypeForElevation(distFromCenter, pos)
+            ));
+        } catch (...) {
+            // Fallback to standard calculation without height variation
+            return Block(static_cast<BlockType>(
+                SphereUtils::getBlockTypeForElevation(distFromCenter)
+            ));
+        }
+    } catch (...) {
+        // Absolute fallback to ensure we never crash during block lookup
+        return Block(BlockType::AIR);
     }
-    
-    // If chunk doesn't exist, determine block type based on distance from center
-    // using double precision for accurate calculation
-    double wx = static_cast<double>(worldX);
-    double wy = static_cast<double>(worldY);
-    double wz = static_cast<double>(worldZ);
-    double distFromCenter = sqrt(wx*wx + wy*wy + wz*wz);
-    
-    return Block(static_cast<BlockType>(
-        SphereUtils::getBlockTypeForElevation(distFromCenter)
-    ));
 }
 
 std::unordered_map<std::tuple<int, int, int, int>, std::unique_ptr<Chunk>, quad_hash>& World::getChunks() {

@@ -15,7 +15,7 @@
  */
 class GodViewWindow {
 public:
-    GodViewWindow(const World& world);
+    GodViewWindow(const World& world, GodViewDebugTool* tool);
     ~GodViewWindow();
 
     // Render the God View window

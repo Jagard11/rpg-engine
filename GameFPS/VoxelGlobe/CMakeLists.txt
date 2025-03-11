@@ -68,7 +68,7 @@ add_executable(VoxelGlobe
     src/Debug/Profiler.cpp                # New file
     src/Debug/GodViewDebugTool.cpp
     src/Debug/GodViewWindow.cpp
-    # src/Debug/GlobeUpdater.cpp
+    src/Debug/GlobeUpdater.cpp
     src/Debug/DebugWindowGodViewPanel.cpp
 
     # Graphics

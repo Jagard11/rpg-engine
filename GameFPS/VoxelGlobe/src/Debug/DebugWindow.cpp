@@ -20,7 +20,9 @@ DebugWindow::DebugWindow(DebugManager& debugMgr, Player& p)
       showLoggingConfig(false),
       showPerformance(true),
       showGodView(false),
-      showGodViewWindow(false) {
+      showGodViewWindow(false),
+      godViewTool(nullptr),
+      godViewWindow(nullptr) {
     
     // Load window state (visibility, panel states)
     loadWindowState();
@@ -28,12 +30,9 @@ DebugWindow::DebugWindow(DebugManager& debugMgr, Player& p)
     // Sync UI state with actual debug settings
     syncWithDebugManager();
     
-    // Create the god view debug tool
-    godViewTool = new GodViewDebugTool(player.getWorld());
+    // TEMPORARY FIX: Don't create GodViewDebugTool during initialization
+    // Will be created on first use instead
     
-    // Create the dedicated god view window
-    godViewWindow = new GodViewWindow(player.getWorld());
-
     // Log initialization
     LOG_INFO(LogCategory::UI, "Debug Window initialized");
 }
@@ -70,6 +69,26 @@ void DebugWindow::setBlockHelper(int x, int y, int z, BlockType type) {
 }
 
 void DebugWindow::renderGodView(const GraphicsSettings& settings) {
+    // Initialize GodViewDebugTool if needed
+    if (!godViewTool) {
+        try {
+            LOG_INFO(LogCategory::UI, "Creating GodViewDebugTool on first use");
+            godViewTool = new GodViewDebugTool(player.getWorld());
+            
+            // Initialize the god view window if needed
+            if (!godViewWindow && godViewTool) {
+                LOG_INFO(LogCategory::UI, "Creating GodViewWindow on first use");
+                godViewWindow = new GodViewWindow(player.getWorld(), godViewTool);
+            }
+        } catch (const std::exception& e) {
+            LOG_ERROR(LogCategory::UI, "Failed to create GodViewDebugTool: " + std::string(e.what()));
+            return;
+        } catch (...) {
+            LOG_ERROR(LogCategory::UI, "Unknown error creating GodViewDebugTool");
+            return;
+        }
+    }
+
     // Render the God View if it's initialized and active - ONLY the tool, not the window
     if (godViewTool && godViewTool->isActive()) {
         try {
@@ -77,6 +96,8 @@ void DebugWindow::renderGodView(const GraphicsSettings& settings) {
             godViewTool->render(settings);
         } catch (const std::exception& e) {
             LOG_ERROR(LogCategory::RENDERING, "Error rendering God View: " + std::string(e.what()));
+        } catch (...) {
+            LOG_ERROR(LogCategory::RENDERING, "Unknown error rendering God View");
         }
     }
     
@@ -691,64 +712,9 @@ void DebugWindow::loadWindowState() {
             if (godView.contains("visualizationType")) godViewVisualizationType = godView["visualizationType"].get<int>();
             if (godView.contains("autoRotate")) godViewAutoRotate = godView["autoRotate"].get<bool>();
             if (godView.contains("rotationSpeed")) godViewRotationSpeed = godView["rotationSpeed"].get<float>();
-            
-            // Apply settings to the god view tool
-            if (godViewTool) {
-                godViewTool->setCameraPosition(glm::vec3(godViewCameraPos[0] * 1000.0f, 
-                                                        godViewCameraPos[1] * 1000.0f, 
-                                                        godViewCameraPos[2] * 1000.0f));
-                godViewTool->setCameraTarget(glm::vec3(godViewCameraTarget[0] * 1000.0f, 
-                                                      godViewCameraTarget[1] * 1000.0f, 
-                                                      godViewCameraTarget[2] * 1000.0f));
-                godViewTool->setZoom(godViewZoom);
-                godViewTool->rotateView(godViewRotation);
-                godViewTool->setWireframeMode(godViewWireframe);
-                godViewTool->setVisualizationType(godViewVisualizationType);
-                
-                // Set active state last
-                if (godView.contains("active")) {
-                    godViewTool->setActive(godView["active"].get<bool>() && showGodView);
-                }
-            }
         }
         
-        // Load god view window state
-        if (state.contains("godViewWindow") && godViewWindow) {
-            auto& gvWindow = state["godViewWindow"];
-            
-            if (gvWindow.contains("visible")) {
-                godViewWindow->visible = gvWindow["visible"].get<bool>();
-            }
-            
-            if (gvWindow.contains("position")) {
-                auto& pos = gvWindow["position"];
-                if (pos.is_array() && pos.size() == 2) {
-                    godViewWindow->windowPos = ImVec2(pos[0].get<float>(), pos[1].get<float>());
-                }
-            }
-            
-            if (gvWindow.contains("size")) {
-                auto& size = gvWindow["size"];
-                if (size.is_array() && size.size() == 2) {
-                    godViewWindow->windowSize = ImVec2(size[0].get<float>(), size[1].get<float>());
-                }
-            }
-            
-            if (gvWindow.contains("autoRotate")) godViewWindow->autoRotate = gvWindow["autoRotate"].get<bool>();
-            if (gvWindow.contains("rotationSpeed")) godViewWindow->rotationSpeed = gvWindow["rotationSpeed"].get<float>();
-            if (gvWindow.contains("manualRotation")) godViewWindow->manualRotation = gvWindow["manualRotation"].get<float>();
-            if (gvWindow.contains("zoom")) godViewWindow->zoom = gvWindow["zoom"].get<float>();
-            if (gvWindow.contains("wireframeMode")) godViewWindow->wireframeMode = gvWindow["wireframeMode"].get<bool>();
-            if (gvWindow.contains("visualizationType")) godViewWindow->visualizationType = gvWindow["visualizationType"].get<int>();
-            
-            // Apply camera settings
-            if (godViewWindow->getGodViewTool()) {
-                godViewWindow->getGodViewTool()->setZoom(godViewWindow->zoom);
-                godViewWindow->getGodViewTool()->rotateView(godViewWindow->manualRotation);
-                godViewWindow->getGodViewTool()->setWireframeMode(godViewWindow->wireframeMode);
-                godViewWindow->getGodViewTool()->setVisualizationType(godViewWindow->visualizationType);
-            }
-        }
+        // Don't apply settings to the tool yet - it will be created on demand
         
         LOG_DEBUG(LogCategory::UI, "Debug window state loaded");
     } catch (const std::exception& e) {

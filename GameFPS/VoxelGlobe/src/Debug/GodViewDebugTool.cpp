@@ -24,25 +24,55 @@ GodViewDebugTool::GodViewDebugTool(const World& world)
       zoom(1.0f),
       rotationAngle(0.0f),
       indexCount(0),
-      shadersLoaded(false)
+      shadersLoaded(false),
+      vao(0), vbo(0), ebo(0), shaderProgram(0)     // Initialize OpenGL handles to 0
 {
     PROFILE_SCOPE("GodViewDebugTool::Constructor", LogCategory::RENDERING);
     
     try {
-        // Generate OpenGL objects
+        // Check if OpenGL is initialized by checking for errors
+        // This is a simple way to see if we have a valid context
+        GLenum err = glGetError();
+        if (err != GL_NO_ERROR) {
+            LOG_ERROR(LogCategory::RENDERING, "OpenGL error detected during GodViewDebugTool initialization: " + std::to_string(err));
+            return;
+        }
+        
         glGenVertexArrays(1, &vao);
+        if (glGetError() != GL_NO_ERROR || vao == 0) {
+            LOG_ERROR(LogCategory::RENDERING, "Failed to generate VAO for God View Debug Tool");
+            return;
+        }
+        
         glGenBuffers(1, &vbo);
+        if (glGetError() != GL_NO_ERROR || vbo == 0) {
+            LOG_ERROR(LogCategory::RENDERING, "Failed to generate VBO for God View Debug Tool");
+            glDeleteVertexArrays(1, &vao);
+            vao = 0;
+            return;
+        }
+        
         glGenBuffers(1, &ebo);
+        if (glGetError() != GL_NO_ERROR || ebo == 0) {
+            LOG_ERROR(LogCategory::RENDERING, "Failed to generate EBO for God View Debug Tool");
+            glDeleteVertexArrays(1, &vao);
+            glDeleteBuffers(1, &vbo);
+            vao = 0;
+            vbo = 0;
+            return;
+        }
         
         // Load shaders
         if (!loadShaders()) {
             LOG_ERROR(LogCategory::RENDERING, "Failed to load shaders for God View Debug Tool");
+            releaseResources();
             return;
         }
         
         // Generate initial globe mesh
         if (!generateGlobeMesh()) {
             LOG_ERROR(LogCategory::RENDERING, "Failed to generate globe mesh for God View Debug Tool");
+            releaseResources();
             return;
         }
         
@@ -50,23 +80,40 @@ GodViewDebugTool::GodViewDebugTool(const World& world)
         LOG_INFO(LogCategory::RENDERING, "God View Debug Tool initialized successfully");
     } catch (const std::exception& e) {
         LOG_ERROR(LogCategory::RENDERING, "Exception in GodViewDebugTool constructor: " + std::string(e.what()));
+        releaseResources();
     } catch (...) {
         LOG_ERROR(LogCategory::RENDERING, "Unknown exception in GodViewDebugTool constructor");
+        releaseResources();
+    }
+}
+
+// Helper method to clean up OpenGL resources
+void GodViewDebugTool::releaseResources() {
+    if (vao != 0) {
+        glDeleteVertexArrays(1, &vao);
+        vao = 0;
+    }
+    
+    if (vbo != 0) {
+        glDeleteBuffers(1, &vbo);
+        vbo = 0;
+    }
+    
+    if (ebo != 0) {
+        glDeleteBuffers(1, &ebo);
+        ebo = 0;
+    }
+    
+    if (shaderProgram != 0 && shadersLoaded) {
+        glDeleteProgram(shaderProgram);
+        shaderProgram = 0;
+        shadersLoaded = false;
     }
 }
 
 GodViewDebugTool::~GodViewDebugTool() {
     PROFILE_SCOPE("GodViewDebugTool::Destructor", LogCategory::RENDERING);
-    
-    // Clean up OpenGL resources
-    glDeleteVertexArrays(1, &vao);
-    glDeleteBuffers(1, &vbo);
-    glDeleteBuffers(1, &ebo);
-    
-    if (shadersLoaded) {
-        glDeleteProgram(shaderProgram);
-    }
-    
+    releaseResources();
     LOG_INFO(LogCategory::RENDERING, "God View Debug Tool released");
 }
 
@@ -154,6 +201,11 @@ bool GodViewDebugTool::loadShaders() {
         
         // Compile vertex shader
         GLuint vert = glCreateShader(GL_VERTEX_SHADER);
+        if (vert == 0) {
+            LOG_ERROR(LogCategory::RENDERING, "Failed to create vertex shader");
+            return false;
+        }
+        
         glShaderSource(vert, 1, &vertSrc, NULL);
         glCompileShader(vert);
         GLint success;
@@ -168,6 +220,12 @@ bool GodViewDebugTool::loadShaders() {
         
         // Compile fragment shader
         GLuint frag = glCreateShader(GL_FRAGMENT_SHADER);
+        if (frag == 0) {
+            LOG_ERROR(LogCategory::RENDERING, "Failed to create fragment shader");
+            glDeleteShader(vert);
+            return false;
+        }
+        
         glShaderSource(frag, 1, &fragSrc, NULL);
         glCompileShader(frag);
         glGetShaderiv(frag, GL_COMPILE_STATUS, &success);
@@ -181,6 +239,13 @@ bool GodViewDebugTool::loadShaders() {
         
         // Link program
         shaderProgram = glCreateProgram();
+        if (shaderProgram == 0) {
+            LOG_ERROR(LogCategory::RENDERING, "Failed to create shader program");
+            glDeleteShader(vert);
+            glDeleteShader(frag);
+            return false;
+        }
+        
         glAttachShader(shaderProgram, vert);
         glAttachShader(shaderProgram, frag);
         glLinkProgram(shaderProgram);
@@ -191,6 +256,7 @@ bool GodViewDebugTool::loadShaders() {
             glDeleteShader(vert);
             glDeleteShader(frag);
             glDeleteProgram(shaderProgram);
+            shaderProgram = 0;
             return false;
         }
         
@@ -208,15 +274,33 @@ bool GodViewDebugTool::loadShaders() {
     }
 }
 
-// Generate height data that represents the actual world
+// Generate height data based on position
 float GodViewDebugTool::generateHeight(const glm::vec3& pos) {
-    // Get surface radius
-    double surfaceR = SphereUtils::getSurfaceRadiusMeters();
+    // Safety check for zero vector
+    if (glm::length(pos) < 0.001f) {
+        return 0.0f;
+    }
     
-    // For a flat surface, we set a constant height value of 0.0
-    // This creates a perfectly spherical planet as it's supposed to be
-    // The height value is only used for visualization in shaders
-    return 0.0f;
+    // Create a normalized direction to get the position on the unit sphere
+    glm::dvec3 direction = glm::normalize(glm::dvec3(pos.x, pos.y, pos.z));
+    
+    // Scale to the actual planet radius to get the position in world space
+    double surfaceR = SphereUtils::getSurfaceRadiusMeters();
+    glm::dvec3 worldPos = direction * surfaceR;
+    
+    try {
+        // Calculate height variation using the same function as terrain generation
+        double heightVariation = SphereUtils::getHeightVariation(worldPos);
+        
+        // Return height normalized to a reasonable range for the visualization
+        // We divide by 1000 to get a value in the [0,1] range (assuming max height is 1000m)
+        return static_cast<float>(heightVariation / 1000.0f);
+    } catch (...) {
+        // Handle any exceptions during height calculation
+        std::cerr << "Exception during height generation at position " 
+                  << pos.x << ", " << pos.y << ", " << pos.z << std::endl;
+        return 0.0f;
+    }
 }
 
 void GodViewDebugTool::updateHeightData() {
@@ -229,8 +313,8 @@ bool GodViewDebugTool::generateGlobeMesh() {
         // Create a higher-resolution sphere to represent the globe
         // We'll subdivide an icosahedron for better uniformity than a UV sphere
         
-        // Resolution of the globe mesh - higher for better detail
-        const int resolution = 6; // Increased from 3 for better resolution
+        // Resolution of the globe mesh - lower for better stability
+        const int resolution = 4; // Reduced from 6 for stability
         
         std::vector<float> vertices;
         std::vector<unsigned int> indices;
@@ -281,8 +365,19 @@ bool GodViewDebugTool::generateGlobeMesh() {
             vertices.push_back(pos.y);
             vertices.push_back(pos.z);
             
-            // Height
-            vertices.push_back(height);
+            // Height - use a safe implementation
+            float safeHeight = 0.0f;
+            try {
+                safeHeight = height;
+                // Clamp height to reasonable range to avoid rendering issues
+                safeHeight = std::max(0.0f, std::min(safeHeight, 1.0f));
+            } catch (...) {
+                // If anything goes wrong with height, use default
+                safeHeight = 0.0f;
+            }
+            
+            // Add height value
+            vertices.push_back(safeHeight);
             
             vertexMap[key] = index;
             return index;
@@ -293,9 +388,22 @@ bool GodViewDebugTool::generateGlobeMesh() {
         subdivide = [&](const glm::vec3& a, const glm::vec3& b, const glm::vec3& c, int depth) {
             if (depth == 0) {
                 // Generate height values based on position
-                float heightA = generateHeight(a);
-                float heightB = generateHeight(b);
-                float heightC = generateHeight(c);
+                float heightA = 0.0f;
+                float heightB = 0.0f;
+                float heightC = 0.0f;
+                
+                // Use try/catch for each height calculation
+                try {
+                    heightA = generateHeight(a);
+                } catch (...) {}
+                
+                try {
+                    heightB = generateHeight(b);
+                } catch (...) {}
+                
+                try {
+                    heightC = generateHeight(c);
+                } catch (...) {}
                 
                 // Get indices for the three vertices
                 unsigned int idxA = getVertexIndex(a, heightA);
@@ -335,14 +443,52 @@ bool GodViewDebugTool::generateGlobeMesh() {
             return false;
         }
         
-        // Upload to GPU
+        // Limit mesh size to prevent memory issues
+        const size_t MAX_VERTICES = 100000;
+        const size_t MAX_INDICES = 300000;
+        
+        if (vertices.size() > MAX_VERTICES) {
+            LOG_WARNING(LogCategory::RENDERING, "Truncating globe mesh vertices: " + 
+                std::to_string(vertices.size() / 7) + " to " + std::to_string(MAX_VERTICES / 7));
+            vertices.resize(MAX_VERTICES);
+        }
+        
+        if (indices.size() > MAX_INDICES) {
+            LOG_WARNING(LogCategory::RENDERING, "Truncating globe mesh indices: " + 
+                std::to_string(indices.size()) + " to " + std::to_string(MAX_INDICES));
+            indices.resize(MAX_INDICES);
+        }
+        
+        // Upload to GPU - with proper error checking
         glBindVertexArray(vao);
+        if (glGetError() != GL_NO_ERROR) {
+            LOG_ERROR(LogCategory::RENDERING, "Error binding VAO for globe mesh");
+            return false;
+        }
         
         glBindBuffer(GL_ARRAY_BUFFER, vbo);
+        if (glGetError() != GL_NO_ERROR) {
+            LOG_ERROR(LogCategory::RENDERING, "Error binding VBO for globe mesh");
+            return false;
+        }
+        
         glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
+        if (glGetError() != GL_NO_ERROR) {
+            LOG_ERROR(LogCategory::RENDERING, "Error uploading vertex data for globe mesh");
+            return false;
+        }
         
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+        if (glGetError() != GL_NO_ERROR) {
+            LOG_ERROR(LogCategory::RENDERING, "Error binding EBO for globe mesh");
+            return false;
+        }
+        
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), indices.data(), GL_STATIC_DRAW);
+        if (glGetError() != GL_NO_ERROR) {
+            LOG_ERROR(LogCategory::RENDERING, "Error uploading index data for globe mesh");
+            return false;
+        }
         
         // Position attribute
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 7 * sizeof(float), (void*)0);
@@ -368,11 +514,116 @@ bool GodViewDebugTool::generateGlobeMesh() {
         return true;
     } catch (const std::exception& e) {
         LOG_ERROR(LogCategory::RENDERING, "Exception in globe mesh generation: " + std::string(e.what()));
-        return false;
+        try {
+            // Create a minimal fallback sphere
+            createFallbackSphere();
+            return true;
+        } catch (...) {
+            LOG_ERROR(LogCategory::RENDERING, "Failed to create fallback sphere");
+            return false;
+        }
     } catch (...) {
         LOG_ERROR(LogCategory::RENDERING, "Unknown exception in globe mesh generation");
-        return false;
+        try {
+            // Create a minimal fallback sphere
+            createFallbackSphere();
+            return true;
+        } catch (...) {
+            LOG_ERROR(LogCategory::RENDERING, "Failed to create fallback sphere");
+            return false;
+        }
     }
+}
+
+// Create a simple fallback sphere with minimal detail if main generation fails
+void GodViewDebugTool::createFallbackSphere() {
+    std::vector<float> vertices;
+    std::vector<unsigned int> indices;
+    
+    // Create a very simple sphere with just 12 points (an icosahedron)
+    const float X = 0.525731f;
+    const float Z = 0.850651f;
+    
+    // Basic vertices
+    std::vector<glm::vec3> positions = {
+        {-X, 0.0f, Z}, {X, 0.0f, Z}, {-X, 0.0f, -Z}, {X, 0.0f, -Z},
+        {0.0f, Z, X}, {0.0f, Z, -X}, {0.0f, -Z, X}, {0.0f, -Z, -X},
+        {Z, X, 0.0f}, {-Z, X, 0.0f}, {Z, -X, 0.0f}, {-Z, -X, 0.0f}
+    };
+    
+    // Simple indices for triangles
+    indices = {
+        0, 4, 1, 0, 9, 4, 9, 5, 4, 4, 5, 8, 4, 8, 1,
+        8, 10, 1, 8, 3, 10, 5, 3, 8, 5, 2, 3, 2, 7, 3,
+        7, 10, 3, 7, 6, 10, 7, 11, 6, 11, 0, 6, 0, 1, 6,
+        6, 1, 10, 9, 0, 11, 9, 11, 2, 9, 2, 5, 7, 2, 11
+    };
+    
+    // Create vertex data
+    for (const auto& pos : positions) {
+        // Position
+        vertices.push_back(pos.x);
+        vertices.push_back(pos.y);
+        vertices.push_back(pos.z);
+        
+        // Normal
+        vertices.push_back(pos.x);
+        vertices.push_back(pos.y);
+        vertices.push_back(pos.z);
+        
+        // Height (constant 0.0 for fallback)
+        vertices.push_back(0.0f);
+    }
+    
+    // Upload to GPU
+    glBindVertexArray(vao);
+    if (glGetError() != GL_NO_ERROR) {
+        LOG_ERROR(LogCategory::RENDERING, "Error binding VAO for fallback sphere");
+        return;
+    }
+    
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    if (glGetError() != GL_NO_ERROR) {
+        LOG_ERROR(LogCategory::RENDERING, "Error binding VBO for fallback sphere");
+        return;
+    }
+    
+    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
+    if (glGetError() != GL_NO_ERROR) {
+        LOG_ERROR(LogCategory::RENDERING, "Error uploading vertex data for fallback sphere");
+        return;
+    }
+    
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+    if (glGetError() != GL_NO_ERROR) {
+        LOG_ERROR(LogCategory::RENDERING, "Error binding EBO for fallback sphere");
+        return;
+    }
+    
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), indices.data(), GL_STATIC_DRAW);
+    if (glGetError() != GL_NO_ERROR) {
+        LOG_ERROR(LogCategory::RENDERING, "Error uploading index data for fallback sphere");
+        return;
+    }
+    
+    // Position attribute
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 7 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    
+    // Normal attribute
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 7 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+    
+    // Height attribute
+    glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, 7 * sizeof(float), (void*)(6 * sizeof(float)));
+    glEnableVertexAttribArray(2);
+    
+    glBindVertexArray(0);
+    
+    // Store index count for rendering
+    indexCount = indices.size();
+    
+    LOG_INFO(LogCategory::RENDERING, "Created fallback sphere for God View");
 }
 
 void GodViewDebugTool::render(const GraphicsSettings& settings) {
