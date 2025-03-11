@@ -66,6 +66,8 @@ add_executable(VoxelGlobe
     src/Debug/Logger.cpp                  # New file
     src/Debug/DebugSystem.cpp             # New file
     src/Debug/Profiler.cpp                # New file
+    src/Debug/GodViewDebugTool.cpp
+    # Removed duplicate file - DebugWindowGodViewPanel.cpp
     
     # Graphics
     src/Graphics/GraphicsSettings.cpp
@@ -96,4 +98,4 @@ target_link_libraries(VoxelGlobe OpenGL::GL GLEW::GLEW glfw)
 file(COPY ${CMAKE_SOURCE_DIR}/textures DESTINATION ${CMAKE_BINARY_DIR})
 
 # Post-build message
-message(STATUS "VoxelGlobe configured with debug logging system")
+message(STATUS "Build Completed!")

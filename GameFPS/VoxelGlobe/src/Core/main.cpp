@@ -174,6 +174,8 @@ int main() {
     renderLoadingScreen(window, 0.8f);
     
     DebugWindow debugWindow(debugManager, player);
+    // Initialize GodViewDebugTool from DebugWindow
+    auto godViewTool = debugWindow.getGodViewTool();
     renderLoadingScreen(window, 0.9f);
     
     GraphicsSettings graphicsSettings(window);
@@ -303,6 +305,12 @@ int main() {
         {
             PROFILE_SCOPE("WorldRender", LogCategory::RENDERING);
             renderer.render(world, player, graphicsSettings);
+        }
+        
+        // Render the God View if active
+        {
+            PROFILE_SCOPE("GodViewRender", LogCategory::RENDERING);
+            debugWindow.renderGodView(graphicsSettings);
         }
         
         // Render block highlight

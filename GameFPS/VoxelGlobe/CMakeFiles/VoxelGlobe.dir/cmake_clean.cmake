@@ -11,6 +11,8 @@ file(REMOVE_RECURSE
   "CMakeFiles/VoxelGlobe.dir/src/Debug/DebugSystem.cpp.o.d"
   "CMakeFiles/VoxelGlobe.dir/src/Debug/DebugWindow.cpp.o"
   "CMakeFiles/VoxelGlobe.dir/src/Debug/DebugWindow.cpp.o.d"
+  "CMakeFiles/VoxelGlobe.dir/src/Debug/GodViewDebugTool.cpp.o"
+  "CMakeFiles/VoxelGlobe.dir/src/Debug/GodViewDebugTool.cpp.o.d"
   "CMakeFiles/VoxelGlobe.dir/src/Debug/Logger.cpp.o"
   "CMakeFiles/VoxelGlobe.dir/src/Debug/Logger.cpp.o.d"
   "CMakeFiles/VoxelGlobe.dir/src/Debug/Profiler.cpp.o"

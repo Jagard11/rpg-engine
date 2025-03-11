@@ -1,5 +1,25 @@
 {
+    "godView": {
+        "active": true,
+        "autoRotate": false,
+        "cameraPos": [
+            -8.130000114440918,
+            37.39799880981445,
+            -42.400001525878906
+        ],
+        "cameraTarget": [
+            0.32499998807907104,
+            0.0,
+            0.0
+        ],
+        "rotation": 307.47857666015625,
+        "rotationSpeed": 0.18799999356269836,
+        "visualizationType": 2,
+        "wireframe": false,
+        "zoom": 0.3009999990463257
+    },
     "panels": {
+        "showGodView": true,
         "showLoggingConfig": false,
         "showMeshDebug": false,
         "showPerformance": true

@@ -10,7 +10,7 @@
         "UI     ": true,
         "WORLD  ": true
     },
-    "logLevel": 3,
+    "logLevel": 1,
     "logging": {
         "logBlockPlacement": false,
         "logChunkUpdates": false,

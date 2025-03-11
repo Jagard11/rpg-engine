@@ -14,6 +14,7 @@ set(CMAKE_DEPENDS_DEPENDENCY_FILES
   "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/Debug/DebugManager.cpp" "CMakeFiles/VoxelGlobe.dir/src/Debug/DebugManager.cpp.o" "gcc" "CMakeFiles/VoxelGlobe.dir/src/Debug/DebugManager.cpp.o.d"
   "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/Debug/DebugSystem.cpp" "CMakeFiles/VoxelGlobe.dir/src/Debug/DebugSystem.cpp.o" "gcc" "CMakeFiles/VoxelGlobe.dir/src/Debug/DebugSystem.cpp.o.d"
   "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/Debug/DebugWindow.cpp" "CMakeFiles/VoxelGlobe.dir/src/Debug/DebugWindow.cpp.o" "gcc" "CMakeFiles/VoxelGlobe.dir/src/Debug/DebugWindow.cpp.o.d"
+  "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/Debug/GodViewDebugTool.cpp" "CMakeFiles/VoxelGlobe.dir/src/Debug/GodViewDebugTool.cpp.o" "gcc" "CMakeFiles/VoxelGlobe.dir/src/Debug/GodViewDebugTool.cpp.o.d"
   "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/Debug/Logger.cpp" "CMakeFiles/VoxelGlobe.dir/src/Debug/Logger.cpp.o" "gcc" "CMakeFiles/VoxelGlobe.dir/src/Debug/Logger.cpp.o.d"
   "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/Debug/Profiler.cpp" "CMakeFiles/VoxelGlobe.dir/src/Debug/Profiler.cpp.o" "gcc" "CMakeFiles/VoxelGlobe.dir/src/Debug/Profiler.cpp.o.d"
   "/media/jagard/Disk 0/GIT/rpg-engine/GameFPS/VoxelGlobe/src/Graphics/GraphicsSettings.cpp" "CMakeFiles/VoxelGlobe.dir/src/Graphics/GraphicsSettings.cpp.o" "gcc" "CMakeFiles/VoxelGlobe.dir/src/Graphics/GraphicsSettings.cpp.o.d"

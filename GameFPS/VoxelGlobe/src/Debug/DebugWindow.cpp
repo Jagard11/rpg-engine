@@ -4,6 +4,7 @@
 #include <sstream>
 #include "World/Chunk.hpp"
 #include "Debug/Logger.hpp"
+#include "Debug/DebugWindowUtility.hpp"
 #include <glm/gtc/type_ptr.hpp>
 #include <algorithm>
 #include <fstream>
@@ -17,13 +18,28 @@ DebugWindow::DebugWindow(DebugManager& debugMgr, Player& p)
       visible(false), 
       showMeshDebug(false), 
       showLoggingConfig(false),
-      showPerformance(true) {
+      showPerformance(true),
+      showGodView(false) {
     
     // Load window state (visibility, panel states)
     loadWindowState();
     
     // Sync UI state with actual debug settings
     syncWithDebugManager();
+    
+    // Create the god view debug tool
+    godViewTool = new GodViewDebugTool(player.getWorld());
+
+    // Log initialization
+    LOG_INFO(LogCategory::UI, "Debug Window initialized");
+}
+
+DebugWindow::~DebugWindow() {
+    if (godViewTool) {
+        delete godViewTool;
+        godViewTool = nullptr;
+    }
+    LOG_INFO(LogCategory::UI, "Debug Window destroyed");
 }
 
 // Helper function to set a block at world coordinates
@@ -41,6 +57,18 @@ void DebugWindow::setBlockHelper(int x, int y, int z, BlockType type) {
     ss << (type == BlockType::AIR ? "Removed" : "Placed")
        << " block at position (" << x << ", " << y << ", " << z << ")";
     LOG_DEBUG(LogCategory::WORLD, ss.str());
+}
+
+void DebugWindow::renderGodView(const GraphicsSettings& settings) {
+    // Render the God View if it's initialized and active
+    if (godViewTool && godViewTool->isActive()) {
+        try {
+            LOG_DEBUG(LogCategory::RENDERING, "Rendering God View");
+            godViewTool->render(settings);
+        } catch (const std::exception& e) {
+            LOG_ERROR(LogCategory::RENDERING, "Error rendering God View: " + std::string(e.what()));
+        }
+    }
 }
 
 void DebugWindow::render() {
@@ -77,6 +105,19 @@ void DebugWindow::render() {
         if (ImGui::BeginTabItem("Player Info")) {
             renderPlayerInfoPanel();
             ImGui::EndTabItem();
+        }
+        
+        // God View tab
+        if (ImGui::BeginTabItem("God View")) {
+            showGodView = true;
+            renderGodViewPanel();
+            ImGui::EndTabItem();
+        } else {
+            // Only disable god view when not in this tab
+            if (showGodView) {
+                showGodView = false;
+                if (godViewTool) godViewTool->setActive(false);
+            }
         }
         
         ImGui::EndTabBar();
@@ -116,6 +157,12 @@ void DebugWindow::render() {
     // Save window state when closing
     if (!visible) {
         saveWindowState();
+    }
+    
+    // Update God View if auto-rotate is enabled
+    if (godViewTool && godViewTool->isActive() && godViewAutoRotate) {
+        godViewTool->rotateView(godViewRotationSpeed);
+        godViewRotation = fmod(godViewRotation + godViewRotationSpeed, 360.0f);
     }
 }
 
@@ -507,6 +554,111 @@ void DebugWindow::renderPlayerInfoPanel() {
     ImGui::Text("Selected Block: %d", static_cast<int>(player.inventory.slots[player.inventory.selectedSlot]));
 }
 
+void DebugWindow::renderGodViewPanel() {
+    ImGui::Text("God View Debug Tool");
+    ImGui::TextWrapped("This tool provides a global view of the planet for debugging terrain generation algorithms.");
+    ImGui::Separator();
+    
+    if (!godViewTool) {
+        ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Error: God View Debug Tool not initialized!");
+        return;
+    }
+    
+    // Toggle god view
+    bool isActive = godViewTool->isActive();
+    if (ImGui::Checkbox("Enable God View", &isActive)) {
+        godViewTool->setActive(isActive);
+        // Log when the God View is activated or deactivated
+        LOG_INFO(LogCategory::UI, std::string("God View ") + (isActive ? "activated" : "deactivated"));
+        
+        // Dump debugging info
+        DebugWindowUtility::dumpGodViewState(godViewTool);
+    }
+    
+    // Add a force-activate button for emergency debugging
+    if (ImGui::Button("Force Activate (Debug)")) {
+        DebugWindowUtility::forceActivateGodView(godViewTool);
+    }
+    
+    if (!isActive) {
+        ImGui::Text("God View is disabled. Enable it to see the globe visualization.");
+        ImGui::TextWrapped("When enabled, a visualization will appear showing the globe view.");
+        return;
+    }
+    
+    ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "God View is active!");
+    ImGui::TextWrapped("The globe visualization is now active. Use arrow keys to rotate the globe.");
+    ImGui::Separator();
+    
+    // Camera position controls
+    if (ImGui::CollapsingHeader("Camera Settings")) {
+        // Camera position controls with wider range
+        if (ImGui::SliderFloat3("Camera Position (km)", godViewCameraPos, -100.0f, 100.0f)) {
+            // Convert km to meters for internal representation
+            glm::vec3 posMeter = glm::vec3(
+                godViewCameraPos[0] * 1000.0f,
+                godViewCameraPos[1] * 1000.0f,
+                godViewCameraPos[2] * 1000.0f
+            );
+            godViewTool->setCameraPosition(posMeter);
+        }
+        
+        // Look at target
+        if (ImGui::SliderFloat3("Look At (km)", godViewCameraTarget, -20.0f, 20.0f)) {
+            // Convert km to meters for internal representation
+            glm::vec3 targetMeter = glm::vec3(
+                godViewCameraTarget[0] * 1000.0f, 
+                godViewCameraTarget[1] * 1000.0f, 
+                godViewCameraTarget[2] * 1000.0f
+            );
+            godViewTool->setCameraTarget(targetMeter);
+        }
+        
+        // Zoom control
+        if (ImGui::SliderFloat("Zoom Factor", &godViewZoom, 0.1f, 10.0f)) {
+            godViewTool->setZoom(godViewZoom);
+        }
+        
+        // Auto-rotation settings
+        if (ImGui::Checkbox("Auto-Rotate", &godViewAutoRotate)) {
+            // This will be handled in the main render loop
+        }
+        
+        if (godViewAutoRotate) {
+            ImGui::SliderFloat("Rotation Speed", &godViewRotationSpeed, 0.05f, 1.0f);
+        }
+    }
+    
+    // Visual settings
+    if (ImGui::CollapsingHeader("Visual Settings")) {
+        // Wireframe toggle
+        if (ImGui::Checkbox("Wireframe Mode", &godViewWireframe)) {
+            godViewTool->setWireframeMode(godViewWireframe);
+        }
+        
+        // Visualization type
+        const char* vizTypes[] = {"Height Map", "Biomes", "Block Density"};
+        if (ImGui::Combo("Visualization", &godViewVisualizationType, vizTypes, IM_ARRAYSIZE(vizTypes))) {
+            godViewTool->setVisualizationType(godViewVisualizationType);
+        }
+        
+        // Show the height range information
+        ImGui::Separator();
+        ImGui::Text("Height Visualization Range:");
+        ImGui::TextColored(ImVec4(0.2f, 0.2f, 0.8f, 1.0f), "Blue: -5km (below sea level)");
+        ImGui::TextColored(ImVec4(0.0f, 0.8f, 0.0f, 1.0f), "Green: Sea level");
+        ImGui::TextColored(ImVec4(0.8f, 0.2f, 0.2f, 1.0f), "Red: +15km (above sea level)");
+    }
+    
+    ImGui::Separator();
+    ImGui::TextWrapped("Controls: Use arrow keys to rotate the globe. After 15 seconds of inactivity, auto-rotation will resume with north pole facing up.");
+    
+    // Real-time visualization info
+    double planetRadius = player.getWorld().getRadius();
+    ImGui::Text("Planet Radius: %.2f km", planetRadius / 1000.0);
+    ImGui::Text("Surface Area: %.2f million km²", 4.0 * 3.14159 * pow(planetRadius / 1000.0, 2));
+}
+
 void DebugWindow::saveWindowState() {
     try {
         json state;
@@ -518,7 +670,8 @@ void DebugWindow::saveWindowState() {
         state["panels"] = {
             {"showMeshDebug", showMeshDebug},
             {"showLoggingConfig", showLoggingConfig},
-            {"showPerformance", showPerformance}
+            {"showPerformance", showPerformance},
+            {"showGodView", showGodView}
         };
         
         // Save teleport coordinates
@@ -526,6 +679,19 @@ void DebugWindow::saveWindowState() {
             teleportCoords[0],
             teleportCoords[1],
             teleportCoords[2]
+        };
+        
+        // Save god view state
+        state["godView"] = {
+            {"active", godViewTool ? godViewTool->isActive() : false},
+            {"cameraPos", {godViewCameraPos[0], godViewCameraPos[1], godViewCameraPos[2]}},
+            {"cameraTarget", {godViewCameraTarget[0], godViewCameraTarget[1], godViewCameraTarget[2]}},
+            {"zoom", godViewZoom},
+            {"rotation", godViewRotation},
+            {"wireframe", godViewWireframe},
+            {"visualizationType", godViewVisualizationType},
+            {"autoRotate", godViewAutoRotate},
+            {"rotationSpeed", godViewRotationSpeed}
         };
         
         // Write to file
@@ -559,6 +725,7 @@ void DebugWindow::loadWindowState() {
             if (panels.contains("showMeshDebug")) showMeshDebug = panels["showMeshDebug"].get<bool>();
             if (panels.contains("showLoggingConfig")) showLoggingConfig = panels["showLoggingConfig"].get<bool>();
             if (panels.contains("showPerformance")) showPerformance = panels["showPerformance"].get<bool>();
+            if (panels.contains("showGodView")) showGodView = panels["showGodView"].get<bool>();
         }
         
         // Load teleport coordinates
@@ -568,6 +735,51 @@ void DebugWindow::loadWindowState() {
                 teleportCoords[0] = coords[0].get<float>();
                 teleportCoords[1] = coords[1].get<float>();
                 teleportCoords[2] = coords[2].get<float>();
+            }
+        }
+        
+        // Load god view state
+        if (state.contains("godView")) {
+            auto& godView = state["godView"];
+            
+            if (godView.contains("cameraPos")) {
+                auto& camPos = godView["cameraPos"];
+                if (camPos.is_array() && camPos.size() == 3) {
+                    godViewCameraPos[0] = camPos[0].get<float>();
+                    godViewCameraPos[1] = camPos[1].get<float>();
+                    godViewCameraPos[2] = camPos[2].get<float>();
+                }
+            }
+            
+            if (godView.contains("cameraTarget")) {
+                auto& camTarget = godView["cameraTarget"];
+                if (camTarget.is_array() && camTarget.size() == 3) {
+                    godViewCameraTarget[0] = camTarget[0].get<float>();
+                    godViewCameraTarget[1] = camTarget[1].get<float>();
+                    godViewCameraTarget[2] = camTarget[2].get<float>();
+                }
+            }
+            
+            if (godView.contains("zoom")) godViewZoom = godView["zoom"].get<float>();
+            if (godView.contains("rotation")) godViewRotation = godView["rotation"].get<float>();
+            if (godView.contains("wireframe")) godViewWireframe = godView["wireframe"].get<bool>();
+            if (godView.contains("visualizationType")) godViewVisualizationType = godView["visualizationType"].get<int>();
+            if (godView.contains("autoRotate")) godViewAutoRotate = godView["autoRotate"].get<bool>();
+            if (godView.contains("rotationSpeed")) godViewRotationSpeed = godView["rotationSpeed"].get<float>();
+            
+            // Apply settings to the god view tool
+            if (godViewTool) {
+                godViewTool->setCameraPosition(glm::vec3(godViewCameraPos[0], godViewCameraPos[1], godViewCameraPos[2]));
+                godViewTool->setCameraTarget(glm::vec3(godViewCameraTarget[0], godViewCameraTarget[1], godViewCameraTarget[2]));
+                godViewTool->setZoom(godViewZoom);
+                godViewTool->rotateView(godViewRotation);
+                godViewTool->setWireframeMode(godViewWireframe);
+                godViewTool->setVisualizationType(godViewVisualizationType);
+                
+                // Set active state last
+                if (godView.contains("active")) {
+                    godViewTool->setActive(godView["active"].get<bool>() && showGodView);
+                }
             }
         }
         
@@ -587,4 +799,9 @@ void DebugWindow::syncWithDebugManager() {
     for (int i = 0; i < 7; i++) {
         categoryEnabled[i] = Logger::getInstance().isCategoryEnabled(static_cast<LogCategory>(i));
     }
+}
+
+void DebugWindow::toggleVisibility() {
+    visible = !visible;
+    LOG_INFO(LogCategory::UI, std::string("Debug window ") + (visible ? "shown" : "hidden"));
 }
