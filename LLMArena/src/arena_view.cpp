@@ -1,13 +1,14 @@
-// src/arena_view.cpp
+// src/arena_view.cpp - Complete file with focus and key handling fixes
 #include "../include/arena_view.h"
 #include <QDebug>
 #include <QMessageBox>
+#include <QTimer>
 
-// Fix for the ArenaView constructor
+// ArenaView constructor
 ArenaView::ArenaView(CharacterManager *charManager, QWidget *parent)
     : QWidget(parent), characterManager(charManager) {
     
-    // Set focus policy to receive keyboard events
+    // Set focus policy to receive keyboard events - MUST BE STRONGFOCUS
     setFocusPolicy(Qt::StrongFocus);
     
     try {
@@ -25,6 +26,19 @@ ArenaView::ArenaView(CharacterManager *charManager, QWidget *parent)
                 });
         connect(resetButton, &QPushButton::clicked, this, &ArenaView::onResetArena);
         connect(renderer, &ArenaRenderer::renderingInitialized, this, &ArenaView::onRendererInitialized);
+        
+        // Use a timer to periodically re-grab focus if needed
+        QTimer *focusTimer = new QTimer(this);
+        connect(focusTimer, &QTimer::timeout, [this]() {
+            // Only grab focus if this widget is visible and doesn't have it
+            if (isVisible() && !hasFocus()) {
+                qDebug() << "Regrabbing focus for ArenaView";
+                setFocus();
+                activateWindow();
+            }
+        });
+        focusTimer->start(1000); // Check every second
+        
     } catch (const std::exception& e) {
         qWarning() << "Failed to create ArenaRenderer:" << e.what();
         
@@ -52,6 +66,7 @@ void ArenaView::initialize() {
     // Initialize the renderer if available
     if (renderer) {
         try {
+            qDebug() << "Initializing arena renderer";
             renderer->initialize();
         } catch (const std::exception& e) {
             qWarning() << "Failed to initialize renderer:" << e.what();
@@ -74,16 +89,21 @@ void ArenaView::setupUI() {
     characterSelector = new QComboBox(this);
     resetButton = new QPushButton("Reset Arena", this);
     
+    // Fix: Set focus policy for controls so they don't steal keyboard focus
+    characterSelector->setFocusPolicy(Qt::ClickFocus);
+    resetButton->setFocusPolicy(Qt::ClickFocus);
+    
     controlsLayout->addWidget(label);
     controlsLayout->addWidget(characterSelector);
     controlsLayout->addStretch();
     controlsLayout->addWidget(resetButton);
     
-    // Controls label
+    // Controls label - Make more prominent
     controlsLabel = new QLabel(
-        "Controls: W/S - Move forward/backward, A/D - Rotate left/right, Q/E - Strafe left/right",
+        "<strong>Controls:</strong> W/S - Move forward/backward, A/D - Rotate left/right, Q/E - Strafe left/right",
         this
     );
+    controlsLabel->setStyleSheet("background-color: rgba(0,0,0,0.1); padding: 5px; border-radius: 3px;");
     
     // Add WebView only if renderer is available
     if (renderer) {
@@ -92,7 +112,7 @@ void ArenaView::setupUI() {
         
         // Add layouts and widgets
         mainLayout->addLayout(controlsLayout);
-        mainLayout->addWidget(renderer->getView());
+        mainLayout->addWidget(renderer->getView(), 1); // Give view maximum stretch
         mainLayout->addWidget(controlsLabel);
     } else {
         // Create a simplified UI with no WebView
@@ -119,29 +139,58 @@ void ArenaView::loadCharacters() {
 }
 
 void ArenaView::keyPressEvent(QKeyEvent *event) {
+    qDebug() << "ArenaView received key press event: " << event->key();
+    
+    // Take focus when key is pressed
+    setFocus();
+    
     // Pass key press events to player controller if renderer is available
     if (renderer && renderer->getPlayerController()) {
         renderer->getPlayerController()->handleKeyPress(event);
+        
+        // Important: Accept the event to prevent it from being passed up
+        event->accept();
+    } else {
+        // Call the base class implementation
+        QWidget::keyPressEvent(event);
     }
-    
-    // Allow parent to handle event too
-    QWidget::keyPressEvent(event);
 }
 
 void ArenaView::keyReleaseEvent(QKeyEvent *event) {
+    qDebug() << "ArenaView received key release event: " << event->key();
+    
     // Pass key release events to player controller if renderer is available
     if (renderer && renderer->getPlayerController()) {
         renderer->getPlayerController()->handleKeyRelease(event);
+        
+        // Important: Accept the event to prevent it from being passed up
+        event->accept();
+    } else {
+        // Call the base class implementation
+        QWidget::keyReleaseEvent(event);
     }
-    
-    // Allow parent to handle event too
-    QWidget::keyReleaseEvent(event);
 }
 
 void ArenaView::showEvent(QShowEvent *event) {
     // Make sure we have focus when shown
-    setFocus();
+    qDebug() << "ArenaView shown, setting focus";
+    QTimer::singleShot(100, this, [this]() {
+        setFocus();
+        activateWindow();
+    });
+    
     QWidget::showEvent(event);
+}
+
+// Override focus events to debug focus issues
+void ArenaView::focusInEvent(QFocusEvent *event) {
+    qDebug() << "ArenaView received focus";
+    QWidget::focusInEvent(event);
+}
+
+void ArenaView::focusOutEvent(QFocusEvent *event) {
+    qDebug() << "ArenaView lost focus";
+    QWidget::focusOutEvent(event);
 }
 
 void ArenaView::onCharacterSelected(const QString &characterName) {
@@ -155,6 +204,7 @@ void ArenaView::onCharacterSelected(const QString &characterName) {
 void ArenaView::onResetArena() {
     // Reset arena parameters and player position if renderer is available
     if (renderer) {
+        qDebug() << "Resetting arena to 10m radius with 2m walls";
         renderer->setArenaParameters(10.0, 2.0);
         
         if (renderer->getPlayerController()) {
@@ -162,6 +212,9 @@ void ArenaView::onResetArena() {
             renderer->getPlayerController()->createPlayerEntity();
         }
     }
+    
+    // Make sure we have focus after reset
+    setFocus();
 }
 
 void ArenaView::onArenaParametersChanged() {
@@ -169,12 +222,18 @@ void ArenaView::onArenaParametersChanged() {
 }
 
 void ArenaView::onRendererInitialized() {
-    qDebug() << "Renderer initialized";
+    qDebug() << "Renderer initialized - setting focus to arena view";
     
     // Load the first character if any are available
     if (characterSelector && characterSelector->count() > 1) {
         characterSelector->setCurrentIndex(1); // Select first actual character
     }
+    
+    // Make sure we have focus for key events
+    QTimer::singleShot(500, this, [this]() {
+        setFocus();
+        activateWindow();
+    });
 }
 
 void ArenaView::loadCharacter(const QString &characterName) {
@@ -184,7 +243,18 @@ void ArenaView::loadCharacter(const QString &characterName) {
     renderer->setActiveCharacter(characterName);
     
     // Load character appearance
-    CharacterAppearance appearance = characterManager->loadCharacterAppearance(characterName);
+    CharacterAppearance appearance;
+    try {
+        appearance = characterManager->loadCharacterAppearance(characterName);
+    } catch (const std::exception& e) {
+        qWarning() << "Error loading character appearance:" << e.what();
+        
+        // Set default values for appearance
+        appearance.spritePath = "";
+        appearance.collision.width = 1.0;
+        appearance.collision.height = 2.0;
+        appearance.collision.depth = 1.0;
+    }
     
     // Use default sprite if none set
     if (appearance.spritePath.isEmpty()) {

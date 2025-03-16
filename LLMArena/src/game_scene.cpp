@@ -1,19 +1,23 @@
-// src/game_scene.cpp
+// src/game_scene.cpp - Complete file with fixes for arena and collision handling
 #include "../include/game_scene.h"
 #include <QDebug>
 #include <cmath>
 
 GameScene::GameScene(QObject *parent) 
     : QObject(parent), arenaRadius(10.0), arenaWallHeight(2.0) {
+    qDebug() << "Creating GameScene with default arena radius:" << arenaRadius << "and wall height:" << arenaWallHeight;
 }
 
 void GameScene::addEntity(const GameEntity &entity) {
     entities[entity.id] = entity;
+    qDebug() << "Added entity:" << entity.id << "at position" 
+             << entity.position.x() << entity.position.y() << entity.position.z();
     emit entityAdded(entity);
 }
 
 void GameScene::removeEntity(const QString &id) {
     if (entities.contains(id)) {
+        qDebug() << "Removed entity:" << id;
         entities.remove(id);
         emit entityRemoved(id);
     }
@@ -22,6 +26,15 @@ void GameScene::removeEntity(const QString &id) {
 void GameScene::updateEntityPosition(const QString &id, const QVector3D &position) {
     if (entities.contains(id)) {
         GameEntity &entity = entities[id];
+        
+        // Debug position update if it's significant
+        QVector3D delta = position - entity.position;
+        if (delta.length() > 0.01) { // Only log if position changed significantly
+            qDebug() << "Entity" << id << "moved from" 
+                    << entity.position.x() << entity.position.y() << entity.position.z()
+                    << "to" << position.x() << position.y() << position.z();
+        }
+        
         entity.position = position;
         emit entityPositionUpdated(id, position);
     }
@@ -55,13 +68,14 @@ bool GameScene::checkCollision(const QString &entityId, const QVector3D &newPosi
     
     // First check if new position is inside the arena
     if (!isInsideArena(newPosition)) {
+        qDebug() << "Collision with arena boundary detected for entity:" << entityId;
         return true; // Collision with arena boundary
     }
     
     // Check collisions with other entities
     for (auto it = entities.begin(); it != entities.end(); ++it) {
-        // Skip self and non-collidable entities
-        if (it.key() == entityId) {
+        // Skip self, floor entity, and non-collidable entities
+        if (it.key() == entityId || it.key() == "arena_floor") {
             continue;
         }
         
@@ -71,6 +85,7 @@ bool GameScene::checkCollision(const QString &entityId, const QVector3D &newPosi
         
         if (areEntitiesColliding(tempEntity, it.value())) {
             // Emit collision event
+            qDebug() << "Collision detected between" << entityId << "and" << it.key();
             emit collisionDetected(entityId, it.key());
             return true;
         }
@@ -82,6 +97,8 @@ bool GameScene::checkCollision(const QString &entityId, const QVector3D &newPosi
 void GameScene::createOctagonalArena(double radius, double wallHeight) {
     arenaRadius = radius;
     arenaWallHeight = wallHeight;
+    
+    qDebug() << "Creating octagonal arena with radius:" << radius << "and wall height:" << wallHeight;
     
     // Remove any existing arena entities
     QVector<QString> arenaEntities;
@@ -99,7 +116,7 @@ void GameScene::createOctagonalArena(double radius, double wallHeight) {
     GameEntity floor;
     floor.id = "arena_floor";
     floor.type = "arena_floor";
-    floor.position = QVector3D(0, 0, 0);
+    floor.position = QVector3D(0, -0.05, 0); // Position slightly below 0 to avoid player collisions
     floor.dimensions = QVector3D(radius * 2, 0.1, radius * 2);
     floor.isStatic = true;
     addEntity(floor);
@@ -126,17 +143,22 @@ void GameScene::createOctagonalArena(double radius, double wallHeight) {
         
         // Calculate wall dimensions
         double wallLength = sqrt(pow(x2 - x1, 2) + pow(z2 - z1, 2));
-        wall.dimensions = QVector3D(wallLength, wallHeight, 0.1);
+        wall.dimensions = QVector3D(wallLength, wallHeight, 0.2); // Slightly thicker walls for better collisions
         wall.isStatic = true;
+        
+        qDebug() << "Created arena wall segment" << i << "at position" 
+                 << midX << wall.position.y() << midZ << "with length" << wallLength;
         
         addEntity(wall);
     }
 }
 
 bool GameScene::isInsideArena(const QVector3D &position) const {
-    // Simple check: is distance from center less than arena radius
+    // Check if distance from center is less than arena radius
     double distanceFromCenter = sqrt(position.x() * position.x() + position.z() * position.z());
-    return distanceFromCenter < (arenaRadius - 0.5); // 0.5 meter buffer
+    
+    // Use a small buffer (0.5m) to prevent getting too close to walls
+    return distanceFromCenter < (arenaRadius - 0.5);
 }
 
 bool GameScene::areEntitiesColliding(const GameEntity &entityA, const GameEntity &entityB) const {

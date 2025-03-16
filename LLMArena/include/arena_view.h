@@ -9,6 +9,7 @@
 #include <QLabel>
 #include <QComboBox>
 #include <QKeyEvent>
+#include <QFocusEvent>
 #include "arena_renderer.h"
 #include "character_persistence.h"
 #include "player_controller.h"
@@ -33,6 +34,10 @@ public:
 protected:
     // Make sure widget gets focus
     void showEvent(QShowEvent *event) override;
+    
+    // Track focus events
+    void focusInEvent(QFocusEvent *event) override;
+    void focusOutEvent(QFocusEvent *event) override;
 
 public slots:
     // Load characters into selector
