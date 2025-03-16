@@ -1,10 +1,6 @@
 #!/bin/bash
-# debug-build.sh - Simplified script with debugging
-
-# Set environment variables for WebGL rendering in software mode
-export QTWEBENGINE_CHROMIUM_FLAGS="--disable-gpu --disable-gpu-compositing --enable-software-compositing"
-export LIBGL_ALWAYS_SOFTWARE=1
-export QT_OPENGL=software
+# Modified build.sh - Removed software rendering enforcement
+# Original script forced software rendering which prevented hardware OpenGL acceleration
 
 # Print current directory
 echo "Current directory: $(pwd)"
@@ -34,6 +30,15 @@ cmake .. || { echo "CMake failed"; exit 1; }
 # Build the project
 echo "Building..."
 cmake --build . || { echo "Build failed"; exit 1; }
+
+
+# Clear any environment variables that force software rendering
+unset LIBGL_ALWAYS_SOFTWARE
+unset QT_OPENGL
+
+# Set environment variables to explicitly enable hardware acceleration
+export QTWEBENGINE_CHROMIUM_FLAGS="--enable-gpu --enable-webgl"
+export QT_OPENGL=desktop
 
 # If we get here, the build was successful
 echo "Build successful! Running application..."

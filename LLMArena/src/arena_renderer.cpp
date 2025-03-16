@@ -1,4 +1,4 @@
-// src/arena_renderer.cpp
+// src/arena_renderer.cpp - Modified to improve OpenGL detection and support
 #include "../include/arena_renderer.h"
 #include "../include/game_scene.h"
 #include "../include/player_controller.h"
@@ -6,6 +6,7 @@
 #include <QWebEngineSettings>
 #include <QWebEngineScript>
 #include <QWebEnginePage>
+#include <QWebEngineProfile> // Added this include for QWebEngineProfile
 #include <QMessageBox>
 #include <QDir>
 #include <QJsonDocument>
@@ -14,12 +15,21 @@
 #include <QDebug>
 #include <QOffscreenSurface>
 #include <QOpenGLContext>
+#include <QOpenGLFunctions>
 #include <stdexcept>
 
-// Helper function to check if WebGL is supported
+// Helper function to check if WebGL is supported with more detailed diagnostics
 bool isWebGLSupported() {
     // Create QOffscreenSurface
+    QSurfaceFormat format;
+    format.setDepthBufferSize(24);
+    format.setStencilBufferSize(8);
+    format.setVersion(2, 0); // OpenGL 2.0 is required for WebGL
+    format.setProfile(QSurfaceFormat::NoProfile);
+    format.setRenderableType(QSurfaceFormat::OpenGL); // Explicitly request OpenGL
+    
     QOffscreenSurface surface;
+    surface.setFormat(format);
     surface.create();
     if (!surface.isValid()) {
         qWarning() << "Failed to create valid offscreen surface for WebGL check";
@@ -28,6 +38,7 @@ bool isWebGLSupported() {
     
     // Create OpenGL context
     QOpenGLContext context;
+    context.setFormat(format);
     if (!context.create()) {
         qWarning() << "Failed to create OpenGL context for WebGL check";
         return false;
@@ -41,12 +52,30 @@ bool isWebGLSupported() {
     
     // Check if context is valid and get OpenGL version
     bool isValid = context.isValid();
-    QSurfaceFormat format = context.format();
-    int majorVersion = format.majorVersion();
-    int minorVersion = format.minorVersion();
+    QSurfaceFormat curFormat = context.format();
+    int majorVersion = curFormat.majorVersion();
+    int minorVersion = curFormat.minorVersion();
+    
+    // Get vendor and renderer strings
+    QOpenGLFunctions *f = context.functions();
+    QString vendor = QString::fromLatin1(reinterpret_cast<const char*>(f->glGetString(GL_VENDOR)));
+    QString renderer = QString::fromLatin1(reinterpret_cast<const char*>(f->glGetString(GL_RENDERER)));
+    QString version = QString::fromLatin1(reinterpret_cast<const char*>(f->glGetString(GL_VERSION)));
     
     qDebug() << "OpenGL context valid:" << isValid;
     qDebug() << "OpenGL version:" << majorVersion << "." << minorVersion;
+    qDebug() << "OpenGL vendor:" << vendor;
+    qDebug() << "OpenGL renderer:" << renderer;
+    qDebug() << "OpenGL version string:" << version;
+    
+    // Check if we're using software rendering
+    bool isSoftwareRenderer = renderer.contains("llvmpipe", Qt::CaseInsensitive) || 
+                             renderer.contains("software", Qt::CaseInsensitive) ||
+                             renderer.contains("swrast", Qt::CaseInsensitive);
+    
+    if (isSoftwareRenderer) {
+        qWarning() << "Software rendering detected, hardware acceleration may not be available";
+    }
     
     // WebGL requires at least OpenGL 2.0
     bool hasWebGL = isValid && (majorVersion > 2 || (majorVersion == 2 && minorVersion >= 0));
@@ -76,8 +105,11 @@ ArenaRenderer::ArenaRenderer(QWidget *parent, CharacterManager *charManager)
     webView->settings()->setAttribute(QWebEngineSettings::JavascriptCanOpenWindows, true);
     webView->settings()->setAttribute(QWebEngineSettings::LocalContentCanAccessRemoteUrls, true);
     
-    // Force software rendering
+    // Enable hardware rendering - no longer forcing software rendering
     webView->page()->settings()->setAttribute(QWebEngineSettings::WebGLEnabled, true);
+    
+    // Set additional WebEngine settings to prefer hardware acceleration
+    webView->page()->profile()->setHttpCacheType(QWebEngineProfile::MemoryHttpCache);
     
     // Connect signals for page loading
     connect(webView, &QWebEngineView::loadFinished, this, &ArenaRenderer::handleLoadFinished);
@@ -152,8 +184,34 @@ void ArenaRenderer::initialize() {
             height: 100%;
             background-color: #222;
             color: white;
+        }
+        #fallback-canvas {
+            background-color: #333;
+            margin: 20px;
+            border: 2px solid #555;
+        }
+        #fallback-info {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background-color: rgba(0,0,0,0.7);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+        }
+        #fallback-title {
+            margin-top: 10px;
             text-align: center;
-            padding-top: 20%;
+        }
+        #debug-info {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background-color: rgba(0,0,0,0.5);
+            color: white;
+            padding: 5px;
+            font-size: 10px;
+            z-index: 100;
         }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -161,6 +219,7 @@ void ArenaRenderer::initialize() {
 </head>
 <body>
     <div id="canvas-container"></div>
+    <div id="debug-info"></div>
     
     <div id="error-container">
         <h2>WebGL Not Available</h2>
@@ -169,9 +228,12 @@ void ArenaRenderer::initialize() {
     </div>
     
     <div id="fallback-container">
-        <h2>Using Fallback Mode</h2>
-        <p>3D rendering is disabled due to limited graphics capabilities.</p>
-        <p>Using basic visualization instead.</p>
+        <h3 id="fallback-title">Top-down 2D View (Fallback Mode)</h3>
+        <canvas id="fallback-canvas"></canvas>
+        <div id="fallback-info">
+            Using 2D fallback visualization (WebGL not available)<br>
+            ⬤ Player | ■ Characters | ○ Arena boundary
+        </div>
     </div>
     
     <script>
@@ -184,21 +246,66 @@ void ArenaRenderer::initialize() {
         let arenaRenderer;
         let webGLAvailable = true;
         let useFallback = false;
+        let fallbackCanvas, fallbackCtx;
+        let debugInfo = document.getElementById('debug-info');
 
-        // Check if WebGL is available
+        // Enhanced WebGL detection with detailed logging
         function checkWebGL() {
             try {
                 const canvas = document.createElement('canvas');
-                webGLAvailable = !!(window.WebGLRenderingContext && 
-                    (canvas.getContext('webgl') || canvas.getContext('experimental-webgl')));
+                const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
                 
-                // Log WebGL capability
-                console.log("WebGL available:", webGLAvailable);
+                if (!gl) {
+                    console.error("WebGL not available");
+                    updateDebugInfo("WebGL not available");
+                    return false;
+                }
                 
-                return webGLAvailable;
+                // Get WebGL info
+                const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+                let vendor = gl.getParameter(gl.VENDOR);
+                let renderer = gl.getParameter(gl.RENDERER);
+                
+                if (debugInfo) {
+                    vendor = gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL);
+                    renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+                }
+                
+                const version = gl.getParameter(gl.VERSION);
+                const glslVersion = gl.getParameter(gl.SHADING_LANGUAGE_VERSION);
+                const extensions = gl.getSupportedExtensions();
+                
+                console.log("WebGL Vendor:", vendor);
+                console.log("WebGL Renderer:", renderer);
+                console.log("WebGL Version:", version);
+                console.log("GLSL Version:", glslVersion);
+                console.log("WebGL Extensions:", extensions);
+                
+                updateDebugInfo(`WebGL: ${vendor} - ${renderer}`);
+                
+                // Check if using software rendering
+                const isSoftware = renderer.includes('SwiftShader') || 
+                                 renderer.includes('llvmpipe') || 
+                                 renderer.includes('Software') ||
+                                 renderer.includes('swrast');
+                
+                if (isSoftware) {
+                    console.warn("Software rendering detected");
+                    updateDebugInfo(`WebGL: Software rendering (${renderer})`);
+                }
+                
+                return true;
             } catch(e) {
                 console.error("WebGL detection failed:", e);
+                updateDebugInfo("WebGL detection error: " + e.message);
                 return false;
+            }
+        }
+        
+        // Update debug info display
+        function updateDebugInfo(message) {
+            if (debugInfo) {
+                debugInfo.textContent = message;
             }
         }
         
@@ -209,12 +316,128 @@ void ArenaRenderer::initialize() {
             document.getElementById('fallback-container').style.display = 'block';
             document.getElementById('canvas-container').style.display = 'none';
             
+            // Set up the 2D canvas for fallback rendering
+            fallbackCanvas = document.getElementById('fallback-canvas');
+            
+            // Adjust canvas size based on window size
+            const containerWidth = window.innerWidth - 40; // Account for margins
+            const containerHeight = window.innerHeight - 100; // Account for header and info
+            const size = Math.min(containerWidth, containerHeight);
+            
+            fallbackCanvas.width = size;
+            fallbackCanvas.height = size;
+            fallbackCtx = fallbackCanvas.getContext('2d');
+            
+            // Initial render of the arena
+            renderFallbackArena();
+            
             // Notify C++ that we're using fallback mode
             if (arenaRenderer) {
                 arenaRenderer.handleJavaScriptMessage("Using fallback visualization mode");
             }
             
             useFallback = true;
+        }
+        
+        // Render the 2D fallback arena and entities
+        function renderFallbackArena() {
+            if (!fallbackCtx) return;
+            
+            const canvas = fallbackCanvas;
+            const ctx = fallbackCtx;
+            const scale = canvas.width / (arenaRadius * 2.2); // Scale to fit with some margin
+            
+            // Clear canvas
+            ctx.fillStyle = '#333';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw arena boundary (octagon)
+            ctx.strokeStyle = '#777';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            
+            for (let i = 0; i < 8; i++) {
+                const angle = Math.PI * 2 * i / 8;
+                const x = canvas.width / 2 + Math.cos(angle) * arenaRadius * scale;
+                const y = canvas.height / 2 + Math.sin(angle) * arenaRadius * scale;
+                
+                if (i === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            }
+            
+            ctx.closePath();
+            ctx.stroke();
+            
+            // Draw grid
+            ctx.strokeStyle = '#444';
+            ctx.lineWidth = 1;
+            
+            // Draw center lines
+            ctx.beginPath();
+            ctx.moveTo(canvas.width / 2, 0);
+            ctx.lineTo(canvas.width / 2, canvas.height);
+            ctx.moveTo(0, canvas.height / 2);
+            ctx.lineTo(canvas.width, canvas.height / 2);
+            ctx.stroke();
+            
+            // Draw characters
+            for (let name in characters) {
+                const char = characters[name];
+                
+                // Convert world coordinates to canvas coordinates
+                const x = canvas.width / 2 + char.x * scale;
+                const y = canvas.height / 2 + char.z * scale;
+                
+                // Draw rectangle for character
+                if (char.missingTexture) {
+                    // Hot pink for missing textures
+                    ctx.fillStyle = '#FF00FF';
+                } else {
+                    // Normal character color
+                    ctx.fillStyle = '#4CAF50';
+                }
+                
+                const size = Math.max(char.width, char.depth) * scale;
+                ctx.fillRect(x - size/2, y - size/2, size, size);
+                
+                // Draw character name
+                ctx.fillStyle = 'white';
+                ctx.font = '10px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(name, x, y - size/2 - 5);
+            }
+            
+            // Draw player
+            if (player.x !== undefined) {
+                const x = canvas.width / 2 + player.x * scale;
+                const y = canvas.height / 2 + player.z * scale;
+                
+                // Draw circle for player
+                ctx.fillStyle = '#FFC107';
+                ctx.beginPath();
+                ctx.arc(x, y, 8, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Draw direction indicator
+                ctx.strokeStyle = '#FFC107';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(x, y);
+                ctx.lineTo(
+                    x + Math.cos(player.rotation) * 15, 
+                    y + Math.sin(player.rotation) * 15
+                );
+                ctx.stroke();
+                
+                // Label
+                ctx.fillStyle = 'white';
+                ctx.font = '10px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('Player', x, y - 15);
+            }
         }
 
         // Initialize WebGL when document is loaded
@@ -271,19 +494,21 @@ void ArenaRenderer::initialize() {
             camera.position.set(0, 1.6, 5); // Default player height is 1.6 meters
             
             // Create renderer with appropriate settings for compatibility
+            // This is a key change - using high-performance settings instead of forcing software rendering
             renderer = new THREE.WebGLRenderer({ 
-                antialias: false, // Disable antialiasing for better performance
-                precision: 'lowp', // Use lower precision for better compatibility
-                powerPreference: 'low-power', // Prefer low power mode
+                antialias: true, // Enable antialiasing for better quality
+                precision: 'highp', // Use high precision for better rendering
+                powerPreference: 'high-performance', // Prefer high performance mode
                 alpha: false, // Disable alpha for better performance
                 stencil: false, // Disable stencil for better performance
-                depth: true // Keep depth testing
+                depth: true, // Keep depth testing
+                failIfMajorPerformanceCaveat: false // Don't fail on performance issues
             });
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.getElementById('canvas-container').appendChild(renderer.domElement);
             
-            // Reduce rendering quality for better performance
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1));
+            // Set appropriate pixel ratio
+            renderer.setPixelRatio(window.devicePixelRatio);
             
             // Add lights
             const ambientLight = new THREE.AmbientLight(0x404040);
@@ -308,6 +533,9 @@ void ArenaRenderer::initialize() {
             
             // Handle window resize
             window.addEventListener('resize', onWindowResize);
+            
+            // Update debug info
+            updateDebugInfo("Three.js initialized successfully");
         }
         
         // Create octagonal arena walls
@@ -357,64 +585,155 @@ void ArenaRenderer::initialize() {
         
         // Create a billboard sprite for a character
         function createCharacterBillboard(characterName, spritePath, width, height, depth) {
-            if (useFallback) {
-                console.log(`Created fallback character ${characterName}`);
-                return;
+            // Check if character already exists and clean up if needed
+            if (characters[characterName]) {
+                if (!useFallback && characters[characterName].sprite) {
+                    scene.remove(characters[characterName].sprite);
+                    scene.remove(characters[characterName].collisionBox);
+                }
+                delete characters[characterName];
             }
             
-            // Check if character already exists
-            if (characters[characterName]) {
-                scene.remove(characters[characterName].sprite);
-                scene.remove(characters[characterName].collisionBox);
+            if (useFallback) {
+                console.log(`Created fallback character ${characterName}`);
+                
+                // Create a simple 2D representation for fallback mode
+                characters[characterName] = {
+                    x: 0,
+                    y: 0,
+                    z: 0,
+                    width: width,
+                    height: height,
+                    depth: depth,
+                    missingTexture: !spritePath || spritePath === ""
+                };
+                
+                // Render the fallback view
+                renderFallbackArena();
+                return;
             }
             
             // Load texture for sprite
             const textureLoader = new THREE.TextureLoader();
-            const texture = textureLoader.load(spritePath, function(texture) {
-                console.log("Sprite loaded: " + spritePath);
-            });
+            let missingTexture = false;
             
-            // Create sprite material
-            const spriteMaterial = new THREE.SpriteMaterial({ 
-                map: texture,
-                transparent: true
-            });
+            // Use default texture if path is missing
+            if (!spritePath || spritePath === "") {
+                missingTexture = true;
+                
+                // Create a neon pink texture for missing sprites
+                const canvas = document.createElement('canvas');
+                canvas.width = 128;
+                canvas.height = 256;
+                const ctx = canvas.getContext('2d');
+                
+                // Fill with neon pink
+                ctx.fillStyle = '#FF00FF';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Add text to indicate missing texture
+                ctx.fillStyle = 'white';
+                ctx.font = '20px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('MISSING', canvas.width/2, canvas.height/2 - 10);
+                ctx.fillText('TEXTURE', canvas.width/2, canvas.height/2 + 20);
+                
+                const texture = new THREE.CanvasTexture(canvas);
+                createSpriteWithTexture(texture);
+            } else {
+                // Load normal texture from file
+                textureLoader.load(
+                    spritePath, 
+                    function(texture) {
+                        console.log("Sprite loaded: " + spritePath);
+                        createSpriteWithTexture(texture);
+                    },
+                    undefined, // onProgress callback
+                    function(error) {
+                        console.error("Error loading texture: " + error);
+                        
+                        // Create a neon pink texture for error
+                        const canvas = document.createElement('canvas');
+                        canvas.width = 128;
+                        canvas.height = 256;
+                        const ctx = canvas.getContext('2d');
+                        
+                        // Fill with neon pink
+                        ctx.fillStyle = '#FF00FF';
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        
+                        // Add text to indicate error
+                        ctx.fillStyle = 'white';
+                        ctx.font = '20px Arial';
+                        ctx.textAlign = 'center';
+                        ctx.fillText('TEXTURE', canvas.width/2, canvas.height/2 - 10);
+                        ctx.fillText('ERROR', canvas.width/2, canvas.height/2 + 20);
+                        
+                        const texture = new THREE.CanvasTexture(canvas);
+                        createSpriteWithTexture(texture);
+                    }
+                );
+            }
             
-            // Create sprite
-            const sprite = new THREE.Sprite(spriteMaterial);
-            sprite.scale.set(width, height, 1);
-            sprite.position.set(0, height/2, 0); // Center position in arena
-            scene.add(sprite);
-            
-            // Create invisible collision box
-            const boxGeometry = new THREE.BoxGeometry(width, height, depth);
-            const boxMaterial = new THREE.MeshBasicMaterial({ 
-                transparent: true, 
-                opacity: 0.0, // Invisible
-                wireframe: true // Optional: make wireframe for debugging
-            });
-            
-            const collisionBox = new THREE.Mesh(boxGeometry, boxMaterial);
-            collisionBox.position.set(0, height/2, 0);
-            scene.add(collisionBox);
-            
-            // Store character data
-            characters[characterName] = {
-                sprite: sprite,
-                collisionBox: collisionBox,
-                width: width,
-                height: height,
-                depth: depth
-            };
-            
-            console.log(`Created character ${characterName} with dimensions: ${width}x${height}x${depth}`);
+            function createSpriteWithTexture(texture) {
+                // Create sprite material
+                const spriteMaterial = new THREE.SpriteMaterial({ 
+                    map: texture,
+                    transparent: true
+                });
+                
+                // Create sprite
+                const sprite = new THREE.Sprite(spriteMaterial);
+                sprite.scale.set(width, height, 1);
+                sprite.position.set(0, height/2, 0); // Center position in arena
+                scene.add(sprite);
+                
+                // Create invisible collision box
+                const boxGeometry = new THREE.BoxGeometry(width, height, depth);
+                const boxMaterial = new THREE.MeshBasicMaterial({ 
+                    transparent: true, 
+                    opacity: 0.0, // Invisible
+                    wireframe: true // Optional: make wireframe for debugging
+                });
+                
+                const collisionBox = new THREE.Mesh(boxGeometry, boxMaterial);
+                collisionBox.position.set(0, height/2, 0);
+                scene.add(collisionBox);
+                
+                // Store character data
+                characters[characterName] = {
+                    sprite: sprite,
+                    collisionBox: collisionBox,
+                    width: width,
+                    height: height,
+                    depth: depth,
+                    x: 0,
+                    y: 0,
+                    z: 0,
+                    missingTexture: missingTexture
+                };
+                
+                console.log(`Created character ${characterName} with dimensions: ${width}x${height}x${depth}`);
+            }
         }
         
         // Update character position
         function updateCharacterPosition(characterName, x, y, z) {
-            if (useFallback) return;
+            if (!characters[characterName]) return;
             
-            if (characters[characterName]) {
+            // Store position data for both 3D and fallback modes
+            characters[characterName].x = x;
+            characters[characterName].y = y;
+            characters[characterName].z = z;
+            
+            if (useFallback) {
+                // Update fallback visualization
+                renderFallbackArena();
+                return;
+            }
+            
+            // Update 3D objects
+            if (characters[characterName].sprite) {
                 characters[characterName].sprite.position.set(x, y + characters[characterName].height/2, z);
                 characters[characterName].collisionBox.position.set(x, y + characters[characterName].height/2, z);
             }
@@ -422,19 +741,44 @@ void ArenaRenderer::initialize() {
         
         // Update player position and camera
         function updatePlayerPosition(x, y, z, rotation) {
-            if (useFallback) return;
+            // Store player data for both modes
+            player = {
+                x: x,
+                y: y,
+                z: z,
+                rotation: rotation
+            };
             
-            // Update camera position based on player position
+            if (useFallback) {
+                // Update fallback visualization
+                renderFallbackArena();
+                return;
+            }
+            
+            // Update 3D camera
             camera.position.set(x, y + 1.6, z); // Player eye height at 1.6m
-            
-            // Update camera rotation
             camera.rotation.y = rotation;
         }
         
         // Handle window resize
         function onWindowResize() {
-            if (useFallback) return;
+            if (useFallback) {
+                // Resize fallback canvas
+                if (fallbackCanvas) {
+                    const containerWidth = window.innerWidth - 40;
+                    const containerHeight = window.innerHeight - 100;
+                    const size = Math.min(containerWidth, containerHeight);
+                    
+                    fallbackCanvas.width = size;
+                    fallbackCanvas.height = size;
+                    
+                    // Re-render
+                    renderFallbackArena();
+                }
+                return;
+            }
             
+            // Resize 3D view
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -460,21 +804,28 @@ void ArenaRenderer::initialize() {
         
         // JavaScript functions callable from C++
         function setArenaParameters(radius, wallHeight) {
-            if (useFallback) return;
+            // Update parameters for both modes
+            arenaRadius = radius;
+            wallHeight = wallHeight;
             
-            // Remove existing arena
+            if (useFallback) {
+                // Update fallback visualization
+                renderFallbackArena();
+                return;
+            }
+            
+            // 3D mode: remove existing arena
             for (let key in arena) {
                 scene.remove(arena[key].mesh);
             }
             arena = {};
             
-            // Update parameters
-            arenaRadius = radius;
-            wallHeight = wallHeight;
-            
             // Create new arena
             createArenaWalls(arenaRadius, wallHeight);
         }
+        
+        // Handle window resize events
+        window.addEventListener('resize', onWindowResize);
     </script>
 </body>
 </html>
@@ -497,6 +848,31 @@ void ArenaRenderer::initialize() {
 void ArenaRenderer::handleLoadFinished(bool ok) {
     if (ok) {
         qDebug() << "WebGL page loaded successfully";
+        
+        // Run diagnostic script to get WebGL details
+        webView->page()->runJavaScript(
+            "function getWebGLInfo() {"
+            "  try {"
+            "    const canvas = document.createElement('canvas');"
+            "    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');"
+            "    if (!gl) return 'WebGL not supported';"
+            "    const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');"
+            "    let vendor = gl.getParameter(gl.VENDOR);"
+            "    let renderer = gl.getParameter(gl.RENDERER);"
+            "    if (debugInfo) {"
+            "      vendor = gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL);"
+            "      renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);"
+            "    }"
+            "    return 'WebGL: ' + vendor + ' - ' + renderer;"
+            "  } catch(e) {"
+            "    return 'Error getting WebGL info: ' + e.message;"
+            "  }"
+            "}"
+            "getWebGLInfo();",
+            [this](const QVariant &result) {
+                qDebug() << "WebGL Info:" << result.toString();
+            }
+        );
         
         // Initialize WebGL context
         initializeWebGL();
@@ -529,6 +905,12 @@ void ArenaRenderer::initializeWebGL() {
         if (typeof useFallback !== 'undefined' && useFallback) {
             console.log("Using fallback visualization mode");
         }
+        
+        // Report WebGL capabilities
+        if (typeof checkWebGL === 'function') {
+            let webglSupport = checkWebGL();
+            console.log("WebGL support: " + webglSupport);
+        }
     )");
 }
 
@@ -554,13 +936,6 @@ void ArenaRenderer::loadCharacterSprite(const QString &characterName, const QStr
     
     qDebug() << "Loading character sprite:" << characterName << "path:" << spritePath;
     
-    // Check if sprite file exists
-    QFile spriteFile(spritePath);
-    if (!spriteFile.exists()) {
-        qWarning() << "Sprite file does not exist:" << spritePath;
-        return;
-    }
-    
     // Get character collision geometry
     CharacterCollisionGeometry geometry;
     
@@ -583,14 +958,38 @@ void ArenaRenderer::loadCharacterSprite(const QString &characterName, const QStr
         geometry.depth = 1.0;
     }
     
-    // Create the character billboard in WebGL
-    QString js = QString(
-        "createCharacterBillboard('%1', '%2', %3, %4, %5);")
-        .arg(characterName)
-        .arg(spritePath)
-        .arg(geometry.width)
-        .arg(geometry.height)
-        .arg(geometry.depth);
+    // Create the character billboard in WebGL or fallback
+    QString js;
+    
+    // If spritePath is empty, we'll use the missing texture indicator
+    if (spritePath.isEmpty()) {
+        js = QString(
+            "createCharacterBillboard('%1', '', %2, %3, %4);")
+            .arg(characterName)
+            .arg(geometry.width)
+            .arg(geometry.height)
+            .arg(geometry.depth);
+    } else {
+        // Check if sprite file exists
+        QFile spriteFile(spritePath);
+        if (!spriteFile.exists()) {
+            qWarning() << "Sprite file does not exist:" << spritePath;
+            js = QString(
+                "createCharacterBillboard('%1', '', %2, %3, %4);")
+                .arg(characterName)
+                .arg(geometry.width)
+                .arg(geometry.height)
+                .arg(geometry.depth);
+        } else {
+            js = QString(
+                "createCharacterBillboard('%1', '%2', %3, %4, %5);")
+                .arg(characterName)
+                .arg(spritePath)
+                .arg(geometry.width)
+                .arg(geometry.height)
+                .arg(geometry.depth);
+        }
+    }
     
     qDebug() << "Injecting JS for character billboard";
     injectJavaScript(js);

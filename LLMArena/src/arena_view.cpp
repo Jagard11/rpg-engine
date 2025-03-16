@@ -208,7 +208,10 @@ void ArenaView::loadCharacter(const QString &characterName) {
                 qDebug() << "Creating resources directory:" << resourceDir;
                 if (!dir.mkpath(resourceDir)) {
                     qWarning() << "Failed to create resources directory:" << resourceDir;
-                    return; // Exit if we can't create the directory
+                    
+                    // Just use empty path to trigger missing texture visualization
+                    renderer->loadCharacterSprite(characterName, "");
+                    return;
                 }
             }
             
@@ -243,15 +246,28 @@ void ArenaView::loadCharacter(const QString &characterName) {
                 qDebug() << "Saving default sprite to:" << appearance.spritePath;
                 if (!image.save(appearance.spritePath)) {
                     qWarning() << "Failed to save default sprite image";
+                    // Use empty path to trigger missing texture visualization
+                    renderer->loadCharacterSprite(characterName, "");
                     return;
                 }
                 qDebug() << "Default sprite saved successfully";
             }
             catch (const std::exception& e) {
                 qWarning() << "Exception creating default sprite:" << e.what();
+                // Use empty path to trigger missing texture visualization
+                renderer->loadCharacterSprite(characterName, "");
                 return;
             }
         }
+    }
+    
+    // Check if the sprite file exists
+    QFile spriteFile(appearance.spritePath);
+    if (!spriteFile.exists()) {
+        qWarning() << "Sprite file does not exist at path:" << appearance.spritePath;
+        // Use empty path to trigger missing texture visualization
+        renderer->loadCharacterSprite(characterName, "");
+        return;
     }
     
     try {

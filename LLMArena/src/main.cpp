@@ -1,4 +1,6 @@
-// src/main.cpp
+// src/main.cpp with Hardware OpenGL Support Enabled
+// Only modified the OpenGL-related parts - rest of the file remains unchanged
+
 #include <QApplication>
 #include <QMainWindow>
 #include <QVBoxLayout>
@@ -23,12 +25,13 @@
 
 // Helper function to check if OpenGL is available and working
 bool isOpenGLAvailable() {
-    // Create a minimal OpenGL context to check if it works
+    // Create a proper OpenGL context to check if hardware acceleration works
     QSurfaceFormat format;
     format.setDepthBufferSize(24);
     format.setStencilBufferSize(8);
     format.setVersion(2, 0); // OpenGL 2.0 is widely supported
     format.setProfile(QSurfaceFormat::NoProfile);
+    format.setRenderableType(QSurfaceFormat::OpenGL); // Explicitly request OpenGL
     
     QOffscreenSurface surface;
     surface.setFormat(format);
@@ -54,30 +57,47 @@ bool isOpenGLAvailable() {
         return false;
     }
     
+    // Check if we got hardware acceleration
+    QString vendor = QString::fromLatin1(reinterpret_cast<const char*>(context.functions()->glGetString(GL_VENDOR)));
+    QString renderer = QString::fromLatin1(reinterpret_cast<const char*>(context.functions()->glGetString(GL_RENDERER)));
+    
+    qDebug() << "OpenGL Vendor:" << vendor;
+    qDebug() << "OpenGL Renderer:" << renderer;
+    
+    // Check if renderer is software-based
+    bool isSoftware = renderer.contains("llvmpipe", Qt::CaseInsensitive) || 
+                      renderer.contains("software", Qt::CaseInsensitive) ||
+                      renderer.contains("swrast", Qt::CaseInsensitive);
+    
     context.doneCurrent();
-    return true;
+    return !isSoftware; // Return true if hardware acceleration is available
 }
 
 int main(int argc, char *argv[])
 {
-    // Set QtWebEngine and OpenGL environment variables before anything else
-    qputenv("QTWEBENGINE_CHROMIUM_FLAGS", "--disable-gpu --disable-software-rasterizer");
-    qputenv("QT_OPENGL", "software"); // Force software rendering
+    // Clear any environment variables that might force software rendering
+    qunsetenv("LIBGL_ALWAYS_SOFTWARE");
+    qunsetenv("QT_OPENGL");
+    
+    // Set QtWebEngine flags to enable hardware acceleration
+    qputenv("QTWEBENGINE_CHROMIUM_FLAGS", "--enable-gpu --enable-webgl");
     
     // Enable high DPI scaling
     QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
     QCoreApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
-    QCoreApplication::setAttribute(Qt::AA_UseSoftwareOpenGL); // Force software OpenGL
+    
+    // Use hardware OpenGL if available
+    QCoreApplication::setAttribute(Qt::AA_UseDesktopOpenGL);
     
     // Important: Initialize QtWebEngine before creating QApplication
     QtWebEngine::initialize();
     
-    // Set default surface format for OpenGL with software fallback
+    // Set default surface format for OpenGL with hardware acceleration
     QSurfaceFormat format;
     format.setDepthBufferSize(24);
     format.setStencilBufferSize(8);
-    format.setVersion(2, 0); // Use OpenGL 2.0 which is widely supported
-    format.setProfile(QSurfaceFormat::NoProfile);
+    format.setVersion(3, 0); // Try to use OpenGL 3.0 if available
+    format.setProfile(QSurfaceFormat::CoreProfile);
     format.setSwapBehavior(QSurfaceFormat::DoubleBuffer);
     format.setRenderableType(QSurfaceFormat::OpenGL);
     QSurfaceFormat::setDefaultFormat(format);
@@ -87,7 +107,7 @@ int main(int argc, char *argv[])
     
     // Check if OpenGL is available before trying to use it
     bool openglAvailable = isOpenGLAvailable();
-    qDebug() << "OpenGL availability:" << openglAvailable;
+    qDebug() << "Hardware OpenGL availability:" << openglAvailable;
     
     // Create the main application window
     QMainWindow mainWindow;
