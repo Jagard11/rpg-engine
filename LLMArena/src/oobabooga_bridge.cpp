@@ -26,14 +26,30 @@ OobaboogaBridge::OobaboogaBridge(CharacterManager *charManager, QObject *parent)
 
 // Set the Oobabooga API URL
 void OobaboogaBridge::setApiUrl(const QString &url) {
-    apiUrl = url;
-    qDebug() << "API URL set to:" << apiUrl;
-    emit apiUrlChanged(apiUrl);
+    // Store the raw URL (without http://) for display purposes
+    rawApiUrl = url.trimmed();
+    
+    // Create a properly formatted URL with http:// protocol for actual requests
+    // Remove any existing protocol
+    apiUrl = rawApiUrl;
+    if (apiUrl.startsWith("http://")) {
+        apiUrl.remove(0, 7);
+    } else if (apiUrl.startsWith("https://")) {
+        apiUrl.remove(0, 8);
+    }
+    
+    // Always use http:// protocol for actual requests
+    apiUrl = "http://" + apiUrl;
+    
+    qDebug() << "Raw API URL: " << rawApiUrl;
+    qDebug() << "Formatted API URL for requests: " << apiUrl;
+    
+    emit apiUrlChanged(rawApiUrl); // Emit the raw URL for display
 }
 
 // Get the current API URL
 QString OobaboogaBridge::getApiUrl() const {
-    return apiUrl;
+    return rawApiUrl; // Return the raw URL for display in UI
 }
 
 // Set the active character
@@ -47,15 +63,21 @@ QString OobaboogaBridge::getActiveCharacter() const {
     return activeCharacter;
 }
 
-// Test the API connection
+// Test the API connection using the /v1/models endpoint
 void OobaboogaBridge::testApiConnection() {
     if (apiUrl.isEmpty()) {
         emit errorOccurred("API URL is not set");
         return;
     }
 
-    // Create a network request with the base URL
-    QNetworkRequest request{QUrl{apiUrl}};
+    // Use the /v1/models endpoint which returns a list of available models
+    // This is a standard OpenAI API endpoint that OobaboogaAPI supports
+    QString endpoint = apiUrl + "/v1/models";
+    qDebug() << "Testing connection to URL:" << endpoint;
+    
+    // Create a QUrl object with the formatted URL
+    QUrl url(endpoint);
+    QNetworkRequest request(url);
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
     
     // Send GET request
@@ -63,7 +85,7 @@ void OobaboogaBridge::testApiConnection() {
     activeReplies[reply] = "test";
 }
 
-// Send a message to the Oobabooga API with character context
+// Send a message to the Oobabooga API with character context using the OpenAI API format
 void OobaboogaBridge::sendMessageToLLM(const QString &message, const QString &gameContext) {
     if (apiUrl.isEmpty()) {
         emit errorOccurred("API URL is not set");
@@ -87,31 +109,52 @@ void OobaboogaBridge::sendMessageToLLM(const QString &message, const QString &ga
         }
     }
     
-    // Construct a prompt in chat format
-    QString fullPrompt = systemPrompt + "\n\nUser: " + message + "\nCharacter:";
-    
-    // Create the request body using the text-generation-webui format
+    // Create the request body using the OpenAI chat completion format
     QJsonObject jsonObject;
-    jsonObject["prompt"] = fullPrompt;
     
-    // Text generation parameters
-    QJsonObject paramsObject;
-    paramsObject["max_new_tokens"] = 500;
-    paramsObject["temperature"] = 0.7;
-    paramsObject["top_p"] = 0.9;
-    paramsObject["do_sample"] = true;
-    QJsonArray stoppingStrings;
-    stoppingStrings.append("User:");
-    stoppingStrings.append("\nUser:");
-    paramsObject["stopping_strings"] = stoppingStrings;
+    // Create the messages array
+    QJsonArray messagesArray;
     
-    jsonObject["parameters"] = paramsObject;
+    // Add system message
+    QJsonObject systemMessage;
+    systemMessage["role"] = "system";
+    systemMessage["content"] = systemPrompt;
+    messagesArray.append(systemMessage);
+    
+    // Add user message
+    QJsonObject userMessage;
+    userMessage["role"] = "user";
+    userMessage["content"] = message;
+    messagesArray.append(userMessage);
+    
+    // Add messages array to request
+    jsonObject["messages"] = messagesArray;
+    
+    // Add other parameters
+    jsonObject["model"] = "default"; // Use whatever model is currently loaded
+    jsonObject["temperature"] = 0.7;
+    jsonObject["max_tokens"] = 500;
+    jsonObject["top_p"] = 0.9;
+    
+    // For character mode
+    if (!activeCharacter.isEmpty()) {
+        jsonObject["mode"] = "chat";
+        jsonObject["character"] = activeCharacter;
+    } else {
+        jsonObject["mode"] = "instruct"; // Default to instruct mode when not using a character
+    }
     
     QJsonDocument doc(jsonObject);
     QByteArray data = doc.toJson();
 
-    // Create request with the API endpoint for text-generation-webui
-    QNetworkRequest request{QUrl{apiUrl + "/api/v1/generate"}};
+    // Use the /v1/chat/completions endpoint for chat
+    QString endpoint = apiUrl + "/v1/chat/completions";
+    qDebug() << "Sending request to:" << endpoint;
+    qDebug() << "Request data:" << data;
+    
+    // Create request with the API endpoint
+    QUrl url(endpoint);
+    QNetworkRequest request(url);
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
 
     // Send POST request
@@ -133,8 +176,13 @@ void OobaboogaBridge::saveConfig(const QString &apiUrl) {
 // Load configuration
 void OobaboogaBridge::loadConfig() {
     QSettings settings("OobaboogaRPG", "ArenaApp");
-    apiUrl = settings.value("apiUrl", "").toString();
+    rawApiUrl = settings.value("apiUrl", "").toString();
     activeCharacter = settings.value("lastCharacter", "").toString();
+    
+    // If we have a saved URL, format it properly
+    if (!rawApiUrl.isEmpty()) {
+        setApiUrl(rawApiUrl);
+    }
 }
 
 // Add current interaction as a memory for the active character
@@ -197,8 +245,14 @@ void OobaboogaBridge::handleNetworkReply(QNetworkReply *reply) {
     // Get the reply type from the active replies map
     QString replyType = activeReplies.value(reply, "");
     
+    // Debug information
+    qDebug() << "Network reply received for type:" << replyType;
+    qDebug() << "Error:" << reply->error();
+    qDebug() << "Error string:" << reply->errorString();
+    
     if (reply->error() == QNetworkReply::NoError) {
         QByteArray data = reply->readAll();
+        qDebug() << "Response data (first 200 chars):" << data.left(200);
         
         if (replyType == "generate") {
             // Parse JSON response
@@ -206,49 +260,59 @@ void OobaboogaBridge::handleNetworkReply(QNetworkReply *reply) {
             if (!doc.isNull() && doc.isObject()) {
                 QJsonObject obj = doc.object();
                 
-                // Handle text-generation-webui response format
-                if (obj.contains("results") && obj["results"].isArray()) {
-                    QJsonArray results = obj["results"].toArray();
-                    if (results.size() > 0 && results[0].isObject()) {
-                        QString responseText = results[0].toObject()["text"].toString();
-                        
-                        // Clean up the response - some formatting might be needed
-                        responseText = responseText.trimmed();
-                        
-                        // Look for logical end of response
-                        int userPos = responseText.indexOf("\nUser:", Qt::CaseInsensitive);
-                        if (userPos > 0) {
-                            responseText = responseText.left(userPos).trimmed();
+                // Handle OpenAI API response format for chat completions
+                if (obj.contains("choices") && obj["choices"].isArray()) {
+                    QJsonArray choices = obj["choices"].toArray();
+                    if (choices.size() > 0 && choices[0].isObject()) {
+                        QJsonObject choice = choices[0].toObject();
+                        if (choice.contains("message") && choice["message"].isObject()) {
+                            QString responseText = choice["message"].toObject()["content"].toString();
+                            
+                            // Clean up the response
+                            responseText = responseText.trimmed();
+                            
+                            // Store response for potential memory creation
+                            lastResponseText = responseText;
+                            
+                            // Process for automatic memory creation if active character exists
+                            if (!activeCharacter.isEmpty()) {
+                                processForMemoryCreation(lastMessageContext, responseText);
+                            }
+                            
+                            emit responseReceived(responseText);
+                        } else {
+                            emit errorOccurred("Invalid response format: missing message content");
                         }
-                        
-                        // Store response for potential memory creation
-                        lastResponseText = responseText;
-                        
-                        // Process for automatic memory creation if active character exists
-                        if (!activeCharacter.isEmpty()) {
-                            processForMemoryCreation(lastMessageContext, responseText);
-                        }
-                        
-                        emit responseReceived(responseText);
                     } else {
-                        emit errorOccurred("Invalid response format: missing result data");
+                        emit errorOccurred("Invalid response format: choices array empty or invalid");
                     }
                 } else {
-                    emit errorOccurred("Invalid response format: " + QString(data));
+                    emit errorOccurred("Invalid response format: missing choices array. Response: " + 
+                                      QString(data.left(200)) + "...");
                 }
             } else {
                 emit errorOccurred("Failed to parse API response: not valid JSON");
             }
         } else if (replyType == "test") {
-            // Even if we get an odd response, if we can connect at all, consider it a success
-            emit statusMessage("API server found at " + apiUrl);
+            // For test connection, try to parse the models list response
+            QJsonDocument doc = QJsonDocument::fromJson(data);
+            if (!doc.isNull() && doc.isObject() && doc.object().contains("data")) {
+                // Successful models list API response
+                emit statusMessage("API connection successful! Server running at " + rawApiUrl);
+            } else {
+                // Got a response but not in the expected format
+                emit statusMessage("Connected to server at " + rawApiUrl + ", but unexpected response format.");
+            }
         }
     } else {
         // Handle error conditions
         if (replyType == "test") {
             // Special handling for test connection
-            emit errorOccurred("Network error: " + reply->errorString() + 
-                              "\nTry using 'localhost:5000' or '127.0.0.1:5000' instead.");
+            emit errorOccurred("Connection error: " + reply->errorString() + 
+                              "\n\nTry these formats:\n" +
+                              "- 0.0.0.0:5000 (recommended)\n" +
+                              "- 127.0.0.1:5000\n" +
+                              "- localhost:5000");
         } else {
             emit errorOccurred("Network error: " + reply->errorString());
         }
@@ -470,15 +534,8 @@ QStringList OobaboogaBridge::extractTopics(const QString &text) {
 
 // Determine API endpoint based on prompt size
 QString OobaboogaBridge::selectModelEndpoint(const QString &systemPrompt) {
-    // Rough token count estimation
-    int estimatedTokens = systemPrompt.split(QRegExp("\\s+")).size() * 1.3;
-    
-    // This is just an example - adjust based on your actual API setup
-    if (estimatedTokens > 4000) {
-        return "/api/v1/generate-large";  // Hypothetical endpoint for larger model
-    } else {
-        return "/api/v1/generate";        // Standard endpoint
-    }
+    // Always use the OpenAI-compatible chat completions endpoint
+    return "/v1/chat/completions";
 }
 
 // Process a response for potential memory creation

@@ -85,7 +85,8 @@ private slots:
     void handleNetworkReply(QNetworkReply *reply);
 
 private:
-    QString apiUrl;
+    QString apiUrl;  // Formatted URL with http:// protocol
+    QString rawApiUrl; // Raw URL as entered by user
     QString activeCharacter;
     QNetworkAccessManager *networkManager;
     QMap<QNetworkReply*, QString> activeReplies;

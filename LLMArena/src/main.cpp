@@ -53,19 +53,21 @@ int main(int argc, char *argv[])
         dialog.exec();
     });
     
-    // Replace the configureAPIBtn click handler in main.cpp with this improved version
+    // Updated configureAPIBtn connection function for main.cpp
     QObject::connect(configureAPIBtn, &QPushButton::clicked, [&]() {
         // Simple dialog to configure API URL
         QString apiUrl = bridge->getApiUrl();
         bool ok;
         apiUrl = QInputDialog::getText(&mainWindow, "API Configuration",
-                                    "Enter Oobabooga API URL:", 
+                                    "Enter Oobabooga API URL (e.g., 0.0.0.0:5000):", 
                                     QLineEdit::Normal, 
-                                    apiUrl.isEmpty() ? "http://localhost:5000" : apiUrl, &ok);
+                                    apiUrl.isEmpty() ? "0.0.0.0:5000" : apiUrl, &ok);
         if (ok && !apiUrl.isEmpty()) {
-            // Ensure URL has a protocol
-            if (!apiUrl.startsWith("http://") && !apiUrl.startsWith("https://")) {
-                apiUrl = "http://" + apiUrl;
+            // Remove any http:// prefix if the user included it
+            if (apiUrl.startsWith("http://")) {
+                apiUrl.remove(0, 7); // Remove "http://"
+            } else if (apiUrl.startsWith("https://")) {
+                apiUrl.remove(0, 8); // Remove "https://"
             }
             
             bridge->setApiUrl(apiUrl);
