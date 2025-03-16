@@ -4,9 +4,6 @@
 
 #include <QObject>
 #include <QString>
-#include <QWebEngineView>
-#include <QWebChannel>
-#include <QUrl>
 #include "character_persistence.h"
 
 // Forward declarations
@@ -23,9 +20,6 @@ public:
     
     // Initialize the renderer with WebGL
     void initialize();
-    
-    // Get the web view for embedding in UI
-    QWebEngineView* getView() const { return webView; }
     
     // Set the active character to display
     Q_INVOKABLE void setActiveCharacter(const QString &name);
@@ -69,8 +63,10 @@ signals:
     void collisionDetected(const QString &objectA, const QString &objectB);
 
 private:
-    QWebEngineView *webView;
-    QWebChannel *webChannel;
+    // Forward declaration of private implementation
+    class Private;
+    Private *d;
+    
     GameScene *gameScene;
     PlayerController *playerController;
     QString activeCharacter;

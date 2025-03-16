@@ -10,9 +10,12 @@
 #include <QComboBox>
 #include <QKeyEvent>
 #include <QFocusEvent>
-#include "arena_renderer.h"
+
 #include "character_persistence.h"
 #include "player_controller.h"
+
+// Forward declarations
+class GLArenaWidget;
 
 // Main widget for the 3D arena view
 class ArenaView : public QWidget {
@@ -24,10 +27,10 @@ public:
     // Initialize the arena
     void initialize();
     
-    // Get the renderer
-    ArenaRenderer* getRenderer() const { return renderer; }
+    // Get the player controller
+    PlayerController* getPlayerController() const;
     
-    // Override key event handlers to pass to player controller
+    // Override key event handlers to pass to GL widget
     void keyPressEvent(QKeyEvent *event) override;
     void keyReleaseEvent(QKeyEvent *event) override;
     
@@ -57,7 +60,7 @@ private slots:
     void onRendererInitialized();
 
 private:
-    ArenaRenderer *renderer;
+    GLArenaWidget *glWidget;            // OpenGL widget for rendering
     CharacterManager *characterManager;
     QComboBox *characterSelector;
     QPushButton *resetButton;

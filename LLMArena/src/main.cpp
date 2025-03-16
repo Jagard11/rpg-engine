@@ -1,6 +1,4 @@
-// src/main.cpp with Hardware OpenGL Support Enabled
-// Only modified the OpenGL-related parts - rest of the file remains unchanged
-
+// src/main.cpp - Fixed version with safer Arena tab initialization and compilation fixes
 #include <QApplication>
 #include <QMainWindow>
 #include <QVBoxLayout>
@@ -12,35 +10,37 @@
 #include <QLabel>
 #include <QDebug>
 #include <QSurfaceFormat>
-#include <QWebEngineSettings>
-#include <QtWebEngine/QtWebEngine>
 #include <QProcess>
-#include <QOffscreenSurface>
 #include <QOpenGLContext>
+#include <QOffscreenSurface>
+#include <QOpenGLFunctions>
+#include <QTimer>
 
 #include "../include/character_editor_ui.h"
 #include "../include/character_persistence.h"
 #include "../include/oobabooga_bridge.h"
 #include "../include/arena_view.h"
 
+// Global crash handler to display errors and prevent immediate exit
+void globalCrashHandler() {
+    try {
+        QMessageBox::critical(nullptr, "Application Error",
+                             "An unhandled exception occurred. The application will now close.\n\n"
+                             "Please report this issue with detailed steps to reproduce.");
+    } catch (...) {
+        // If even showing a message box fails, at least print to console
+        qCritical() << "CRITICAL ERROR: Unhandled exception in application.";
+    }
+}
+
 // Helper function to check if OpenGL is available and working
 bool isOpenGLAvailable() {
-    // Create a proper OpenGL context to check if hardware acceleration works
+    // Create a proper OpenGL context and check if it works
     QSurfaceFormat format;
     format.setDepthBufferSize(24);
     format.setStencilBufferSize(8);
-    format.setVersion(2, 0); // OpenGL 2.0 is widely supported
-    format.setProfile(QSurfaceFormat::NoProfile);
-    format.setRenderableType(QSurfaceFormat::OpenGL); // Explicitly request OpenGL
-    
-    QOffscreenSurface surface;
-    surface.setFormat(format);
-    surface.create();
-    
-    if (!surface.isValid()) {
-        qWarning() << "Failed to create valid offscreen surface";
-        return false;
-    }
+    format.setVersion(3, 3); // Require OpenGL 3.3 (core profile)
+    format.setProfile(QSurfaceFormat::CoreProfile);
     
     QOpenGLContext context;
     context.setFormat(format);
@@ -51,67 +51,87 @@ bool isOpenGLAvailable() {
         return false;
     }
     
+    // Check OpenGL version and vendor
+    QOffscreenSurface surface;
+    surface.setFormat(format);
+    surface.create();
+    
+    if (!surface.isValid()) {
+        qWarning() << "Failed to create valid surface";
+        return false;
+    }
+    
     bool makeCurrent = context.makeCurrent(&surface);
     if (!makeCurrent) {
         qWarning() << "Failed to make OpenGL context current";
         return false;
     }
     
-    // Check if we got hardware acceleration
-    QString vendor = QString::fromLatin1(reinterpret_cast<const char*>(context.functions()->glGetString(GL_VENDOR)));
-    QString renderer = QString::fromLatin1(reinterpret_cast<const char*>(context.functions()->glGetString(GL_RENDERER)));
+    // Get functions interface properly
+    QOpenGLFunctions *f = context.functions();
+    if (!f) {
+        qWarning() << "Failed to get OpenGL functions";
+        return false;
+    }
+    
+    // Get OpenGL info safely
+    const GLubyte* vendorStr = f->glGetString(GL_VENDOR);
+    const GLubyte* rendererStr = f->glGetString(GL_RENDERER);
+    const GLubyte* versionStr = f->glGetString(GL_VERSION);
+    
+    QString vendor = vendorStr ? QString::fromUtf8(reinterpret_cast<const char*>(vendorStr)) : "Unknown";
+    QString renderer = rendererStr ? QString::fromUtf8(reinterpret_cast<const char*>(rendererStr)) : "Unknown";
+    QString version = versionStr ? QString::fromUtf8(reinterpret_cast<const char*>(versionStr)) : "Unknown";
     
     qDebug() << "OpenGL Vendor:" << vendor;
     qDebug() << "OpenGL Renderer:" << renderer;
-    
-    // Check if renderer is software-based
-    bool isSoftware = renderer.contains("llvmpipe", Qt::CaseInsensitive) || 
-                      renderer.contains("software", Qt::CaseInsensitive) ||
-                      renderer.contains("swrast", Qt::CaseInsensitive);
+    qDebug() << "OpenGL Version:" << version;
     
     context.doneCurrent();
-    return !isSoftware; // Return true if hardware acceleration is available
+    
+    // Simple check for software rendering (most software renderers include these terms)
+    bool isSoftware = renderer.contains("llvmpipe", Qt::CaseInsensitive) || 
+                     renderer.contains("software", Qt::CaseInsensitive) ||
+                     renderer.contains("swrast", Qt::CaseInsensitive);
+    
+    // For this application, even software OpenGL is acceptable
+    return true;
 }
 
 int main(int argc, char *argv[])
 {
-    // Clear any environment variables that might force software rendering
-    qunsetenv("LIBGL_ALWAYS_SOFTWARE");
-    qunsetenv("QT_OPENGL");
+    // Set up global crash handler to catch unhandled exceptions
+    std::set_terminate(globalCrashHandler);
     
-    // Set QtWebEngine flags to enable hardware acceleration
-    qputenv("QTWEBENGINE_CHROMIUM_FLAGS", "--enable-gpu --enable-webgl");
+    // Set environment variables to ensure OpenGL is properly configured
+    qputenv("QT_OPENGL", "desktop");                  // Prefer desktop OpenGL
+    qputenv("QSG_RENDER_LOOP", "basic");              // Use basic render loop for stability
     
-    // Enable high DPI scaling
-    QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
-    QCoreApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
-    
-    // Use hardware OpenGL if available
-    QCoreApplication::setAttribute(Qt::AA_UseDesktopOpenGL);
-    
-    // Important: Initialize QtWebEngine before creating QApplication
-    QtWebEngine::initialize();
-    
-    // Set default surface format for OpenGL with hardware acceleration
+    // Set OpenGL format for the entire application
     QSurfaceFormat format;
     format.setDepthBufferSize(24);
     format.setStencilBufferSize(8);
-    format.setVersion(3, 0); // Try to use OpenGL 3.0 if available
+    format.setVersion(3, 3); // Require OpenGL 3.3
     format.setProfile(QSurfaceFormat::CoreProfile);
     format.setSwapBehavior(QSurfaceFormat::DoubleBuffer);
-    format.setRenderableType(QSurfaceFormat::OpenGL);
+    format.setSamples(0); // Disable multisampling for better compatibility
     QSurfaceFormat::setDefaultFormat(format);
+    
+    // High DPI support
+    QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
+    QCoreApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
+    QCoreApplication::setAttribute(Qt::AA_ShareOpenGLContexts);  // Share OpenGL contexts
     
     // Initialize Qt application
     QApplication app(argc, argv);
     
     // Check if OpenGL is available before trying to use it
     bool openglAvailable = isOpenGLAvailable();
-    qDebug() << "Hardware OpenGL availability:" << openglAvailable;
+    qDebug() << "OpenGL availability:" << openglAvailable;
     
     // Create the main application window
     QMainWindow mainWindow;
-    mainWindow.setWindowTitle("Oobabooga RPG Arena");
+    mainWindow.setWindowTitle("RPG Arena (OpenGL)");
     mainWindow.resize(1024, 768);
     
     // Create central widget with layout
@@ -135,12 +155,11 @@ int main(int argc, char *argv[])
     QVBoxLayout* homeLayout = new QVBoxLayout(homeTab);
     
     // Create UI elements for home tab
-    QLabel* titleLabel = new QLabel("<h1>Oobabooga RPG Arena</h1>", homeTab);
-    QLabel* subtitleLabel = new QLabel("Connect RPG mechanics with LLM character interactions", homeTab);
+    QLabel* titleLabel = new QLabel("<h1>RPG Arena (OpenGL)</h1>", homeTab);
+    QLabel* subtitleLabel = new QLabel("Connect RPG mechanics with LLM character interactions using native OpenGL rendering", homeTab);
     
     QPushButton* manageCharactersBtn = new QPushButton("Manage Characters", homeTab);
     QPushButton* configureAPIBtn = new QPushButton("Configure API Connection", homeTab);
-    QPushButton* about3DBtn = new QPushButton("About 3D Arena", homeTab);
     QPushButton* aboutBtn = new QPushButton("About", homeTab);
     
     // Add buttons to home layout
@@ -149,7 +168,6 @@ int main(int argc, char *argv[])
     homeLayout->addStretch();
     homeLayout->addWidget(manageCharactersBtn);
     homeLayout->addWidget(configureAPIBtn);
-    homeLayout->addWidget(about3DBtn);
     homeLayout->addWidget(aboutBtn);
     homeLayout->addStretch();
     
@@ -218,39 +236,15 @@ int main(int argc, char *argv[])
     // Add the conversation tab
     tabWidget->addTab(conversationTab, "Conversation");
     
-    // Try to create the 3D arena - with graceful fallback
-    ArenaView* arenaView = nullptr;
-    QWidget* fallbackWidget = nullptr;
+    // Create a placeholder tab for the 3D arena that will be replaced later
+    QWidget* arenaPlaceholder = new QWidget(tabWidget);
+    QVBoxLayout* placeholderLayout = new QVBoxLayout(arenaPlaceholder);
     
-    // Only try to create 3D arena if OpenGL is available
-    if (openglAvailable) {
-        try {
-            // Create arena view but don't initialize immediately
-            arenaView = new ArenaView(characterManager, &mainWindow);
-            tabWidget->addTab(arenaView, "3D Arena");
-        } catch (const std::exception& e) {
-            qWarning() << "Failed to create 3D Arena view:" << e.what();
-            openglAvailable = false;
-        }
-    }
+    QLabel* loadingLabel = new QLabel("<h2>3D Arena Loading...</h2><p>Please wait while the OpenGL environment initializes.</p>", arenaPlaceholder);
+    loadingLabel->setAlignment(Qt::AlignCenter);
+    placeholderLayout->addWidget(loadingLabel);
     
-    // If OpenGL is not available or arena creation failed, add fallback tab
-    if (!openglAvailable || !arenaView) {
-        fallbackWidget = new QWidget();
-        QVBoxLayout* fallbackLayout = new QVBoxLayout(fallbackWidget);
-        
-        QLabel* errorLabel = new QLabel(
-            "<h2>3D Arena Not Available</h2>"
-            "<p>Your system does not have the required OpenGL support to run the 3D arena.</p>"
-            "<p>Please use the Conversation tab instead for text-based character interactions.</p>"
-            "<p>You can still create and manage characters as normal.</p>",
-            fallbackWidget
-        );
-        errorLabel->setAlignment(Qt::AlignCenter);
-        
-        fallbackLayout->addWidget(errorLabel);
-        tabWidget->addTab(fallbackWidget, "3D Arena (Unavailable)");
-    }
+    int arenaTabIndex = tabWidget->addTab(arenaPlaceholder, "3D Arena (Loading)");
     
     // Add tab widget to main layout
     mainLayout->addWidget(tabWidget);
@@ -260,18 +254,12 @@ int main(int argc, char *argv[])
         CharacterManagerDialog dialog(characterManager, &mainWindow);
         dialog.exec();
         
-        // Refresh character lists
-        if (arenaView) {
-            arenaView->loadCharacters();
-        }
-        
         // Update conversation character selector
         characterSelectorCombo->clear();
         characterSelectorCombo->addItem("None", "");
         characterSelectorCombo->addItems(characterManager->listCharacters());
     });
     
-    // Updated configureAPIBtn connection function
     QObject::connect(configureAPIBtn, &QPushButton::clicked, [&]() {
         // Simple dialog to configure API URL
         QString apiUrl = bridge->getApiUrl();
@@ -296,30 +284,17 @@ int main(int argc, char *argv[])
         }
     });
     
-    QObject::connect(about3DBtn, &QPushButton::clicked, [&]() {
-        QMessageBox::about(&mainWindow, "About 3D Arena",
-                         "3D Arena Mode\n\n"
-                         "The 3D arena provides a Doom-style environment where characters are represented by billboarded sprites.\n\n"
-                         "Controls:\n"
-                         "W/S - Move forward/backward\n"
-                         "A/D - Rotate left/right\n"
-                         "Q/E - Strafe left/right\n\n"
-                         "Character sprites can be configured in the Character Editor.\n\n"
-                         "Note: 3D mode requires OpenGL 2.0 support. If your system doesn't support this,\n"
-                         "you can still use the Conversation tab for text-based interactions.");
-    });
-    
     QObject::connect(aboutBtn, &QPushButton::clicked, [&]() {
-        QMessageBox::about(&mainWindow, "About Oobabooga RPG Arena",
-                          "Oobabooga RPG Arena\n\n"
+        QMessageBox::about(&mainWindow, "About RPG Arena (OpenGL)",
+                          "RPG Arena (OpenGL)\n\n"
                           "A tool for connecting LLMs with RPG mechanics.\n"
                           "Create persistent characters with memory and roleplay with them in a game environment.\n\n"
                           "Features:\n"
                           "- Character persistence with memory system\n"
-                          "- 3D visualization with Doom-style billboarded sprites (when OpenGL is available)\n"
+                          "- Native OpenGL 3D visualization\n"
                           "- Text-based conversation interface\n"
                           "- Integration with Oobabooga's LLM API\n\n"
-                          "Version: 0.2.1");
+                          "Version: 1.0.0");
     });
     
     // Connect bridge signals
@@ -331,22 +306,62 @@ int main(int argc, char *argv[])
         QMessageBox::critical(&mainWindow, "Error", error);
     });
     
-    // Connect tab changed signal to ensure focus for arena
-    QObject::connect(tabWidget, &QTabWidget::currentChanged, [&](int index) {
-        if (arenaView && tabWidget->widget(index) == arenaView) {
-            // Initialize if not already done
-            arenaView->initialize();
-            
-            // Ensure focus for keyboard events
-            arenaView->setFocus();
-        }
-    });
-    
     // Set the central widget
     mainWindow.setCentralWidget(centralWidget);
     
-    // Show the window
+    // Fix: Use reference capture for mainWindow to prevent copy attempt
+    QObject::connect(tabWidget, &QTabWidget::currentChanged, [&mainWindow, tabWidget, arenaTabIndex](int index) {
+        if (index == arenaTabIndex && tabWidget->tabText(index) == "3D Arena (Loading)") {
+            // Switch back to home tab
+            tabWidget->setCurrentIndex(0);
+            // Fix: Pass pointer directly without & operator
+            QMessageBox::information(&mainWindow, "Loading",
+                                   "The 3D Arena is still loading. Please wait a moment.");
+        }
+    });
+    
+    // Show the window immediately with just the basic tabs
     mainWindow.show();
+    
+    // Create and initialize the ArenaView with a longer delay to ensure proper initialization
+    QTimer::singleShot(2000, [&mainWindow, tabWidget, arenaTabIndex, characterManager]() {
+        try {
+            // Keep the first two tabs and replace the arena placeholder
+            while (tabWidget->count() > 2) {
+                tabWidget->removeTab(2);  // Remove arena tab if it exists
+            }
+            
+            // Create the arena view
+            ArenaView* arenaView = new ArenaView(characterManager, &mainWindow);
+            tabWidget->addTab(arenaView, "3D Arena");
+            
+            // Initialize arena after it's been added to the tab widget
+            QTimer::singleShot(500, [arenaView]() {
+                try {
+                    arenaView->initialize();
+                } catch (const std::exception& e) {
+                    qWarning() << "Failed to initialize arena view:" << e.what();
+                }
+            });
+        } catch (const std::exception& e) {
+            qWarning() << "Failed to create 3D Arena view:" << e.what();
+            
+            // Create a placeholder tab with error message
+            QWidget* errorTab = new QWidget();
+            QVBoxLayout* errorLayout = new QVBoxLayout(errorTab);
+            
+            QLabel* errorLabel = new QLabel(
+                "<h3>3D Visualization Unavailable</h3>"
+                "<p>Your system does not have the required OpenGL capabilities.</p>"
+                "<p>Please use the Conversation tab instead.</p>"
+            );
+            errorLabel->setAlignment(Qt::AlignCenter);
+            errorLayout->addWidget(errorLabel);
+            
+            // Add the error tab
+            tabWidget->addTab(errorTab, "3D Arena (Unavailable)");
+        }
+    });
     
     return app.exec();
 }

@@ -1,4 +1,4 @@
-// src/game_scene.cpp - Complete file with fixes for arena and collision handling
+// src/game_scene.cpp - Fixed version
 #include "../include/game_scene.h"
 #include <QDebug>
 #include <cmath>
@@ -9,6 +9,11 @@ GameScene::GameScene(QObject *parent)
 }
 
 void GameScene::addEntity(const GameEntity &entity) {
+    // Check if entity already exists and remove it first
+    if (entities.contains(entity.id)) {
+        removeEntity(entity.id);
+    }
+    
     entities[entity.id] = entity;
     qDebug() << "Added entity:" << entity.id << "at position" 
              << entity.position.x() << entity.position.y() << entity.position.z();
@@ -68,14 +73,14 @@ bool GameScene::checkCollision(const QString &entityId, const QVector3D &newPosi
     
     // First check if new position is inside the arena
     if (!isInsideArena(newPosition)) {
-        qDebug() << "Collision with arena boundary detected for entity:" << entityId;
         return true; // Collision with arena boundary
     }
     
     // Check collisions with other entities
-    for (auto it = entities.begin(); it != entities.end(); ++it) {
-        // Skip self, floor entity, and non-collidable entities
-        if (it.key() == entityId || it.key() == "arena_floor") {
+    for (auto it = entities.constBegin(); it != entities.constEnd(); ++it) {
+        // Skip self, floor entity, non-collidable entities, and static-static collisions
+        if (it.key() == entityId || it.key() == "arena_floor" || 
+            (entity.isStatic && it.value().isStatic)) {
             continue;
         }
         
@@ -85,7 +90,6 @@ bool GameScene::checkCollision(const QString &entityId, const QVector3D &newPosi
         
         if (areEntitiesColliding(tempEntity, it.value())) {
             // Emit collision event
-            qDebug() << "Collision detected between" << entityId << "and" << it.key();
             emit collisionDetected(entityId, it.key());
             return true;
         }
@@ -95,13 +99,14 @@ bool GameScene::checkCollision(const QString &entityId, const QVector3D &newPosi
 }
 
 void GameScene::createOctagonalArena(double radius, double wallHeight) {
+    // Store the parameters
     arenaRadius = radius;
     arenaWallHeight = wallHeight;
     
     qDebug() << "Creating octagonal arena with radius:" << radius << "and wall height:" << wallHeight;
     
-    // Remove any existing arena entities
-    QVector<QString> arenaEntities;
+    // Remove any existing arena entities before recreating
+    QStringList arenaEntities;
     for (auto it = entities.constBegin(); it != entities.constEnd(); ++it) {
         if (it.value().type == "arena_wall" || it.value().type == "arena_floor") {
             arenaEntities.append(it.key());
@@ -146,9 +151,6 @@ void GameScene::createOctagonalArena(double radius, double wallHeight) {
         wall.dimensions = QVector3D(wallLength, wallHeight, 0.2); // Slightly thicker walls for better collisions
         wall.isStatic = true;
         
-        qDebug() << "Created arena wall segment" << i << "at position" 
-                 << midX << wall.position.y() << midZ << "with length" << wallLength;
-        
         addEntity(wall);
     }
 }
@@ -167,15 +169,15 @@ bool GameScene::areEntitiesColliding(const GameEntity &entityA, const GameEntity
         return false;
     }
     
-    // Simple AABB collision check
+    // Simple AABB collision check with relaxed tolerances
     bool xOverlap = fabs(entityA.position.x() - entityB.position.x()) < 
-        (entityA.dimensions.x() / 2 + entityB.dimensions.x() / 2);
+        (entityA.dimensions.x() / 2 + entityB.dimensions.x() / 2) * 0.9;
         
     bool yOverlap = fabs(entityA.position.y() - entityB.position.y()) < 
-        (entityA.dimensions.y() / 2 + entityB.dimensions.y() / 2);
+        (entityA.dimensions.y() / 2 + entityB.dimensions.y() / 2) * 0.9;
         
     bool zOverlap = fabs(entityA.position.z() - entityB.position.z()) < 
-        (entityA.dimensions.z() / 2 + entityB.dimensions.z() / 2);
+        (entityA.dimensions.z() / 2 + entityB.dimensions.z() / 2) * 0.9;
     
     return xOverlap && yOverlap && zOverlap;
 }
