@@ -1,6 +1,11 @@
 #!/bin/bash
 # debug-build.sh - Simplified script with debugging
 
+# Set environment variables for WebGL rendering in software mode
+export QTWEBENGINE_CHROMIUM_FLAGS="--disable-gpu --disable-gpu-compositing --enable-software-compositing"
+export LIBGL_ALWAYS_SOFTWARE=1
+export QT_OPENGL=software
+
 # Print current directory
 echo "Current directory: $(pwd)"
 echo "Script location: $0"

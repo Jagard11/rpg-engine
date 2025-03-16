@@ -12,6 +12,7 @@
 #include <QPushButton>
 #include <QComboBox>
 #include <QSpinBox>
+#include <QDoubleSpinBox>
 #include <QTabWidget>
 #include <QListWidget>
 #include <QListWidgetItem>
@@ -30,6 +31,8 @@
 #include <QTableWidget>
 #include <QTableWidgetItem>
 #include <QHeaderView>
+#include <QPixmap>
+#include <QPainter>
 #include <QDebug>
 
 #include "character_persistence.h"
@@ -59,6 +62,12 @@ private slots:
     
     // Test memory retrieval
     void testMemoryRetrieval();
+    
+    // Browse for a sprite image
+    void browseSprite();
+    
+    // Update sprite preview
+    void updateSpritePreview(const QString &path);
 
 private:
     // Create the basic info tab
@@ -73,6 +82,9 @@ private:
     // Create the memories tab
     void createMemoriesTab();
     
+    // Create the 3D visualization tab
+    void create3DVisualizationTab();
+    
     // Fill in UI fields from character stats
     void fillBasicInfoFields(const CharacterStats &stats);
     
@@ -81,6 +93,9 @@ private:
     
     // Fill in UI fields from character personality
     void fillPersonalityFields(const CharacterPersonality &personality);
+    
+    // Fill in UI fields for 3D visualization
+    void fill3DVisualizationFields(const CharacterAppearance &appearance);
     
     // Fill in memories table from memories vector
     void fillMemoriesTable();
@@ -93,6 +108,9 @@ private:
     
     // Collect personality fields into character personality
     CharacterPersonality collectPersonalityFields();
+    
+    // Collect 3D visualization fields and update appearance
+    CharacterAppearance collect3DVisualizationFields(CharacterAppearance appearance);
 
 private:
     // UI elements
@@ -131,6 +149,13 @@ private:
     
     // Memories tab
     QTableWidget *memoriesTable;
+    
+    // 3D Visualization tab
+    QLineEdit *spritePathEdit;
+    QDoubleSpinBox *widthSpin;
+    QDoubleSpinBox *heightSpin;
+    QDoubleSpinBox *depthSpin;
+    QLabel *spritePreview;
     
     // Character data
     CharacterManager *characterManager;

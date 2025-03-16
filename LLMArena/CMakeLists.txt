@@ -9,7 +9,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Improved Qt5 detection
 # First try to find Qt5 with default config
-find_package(Qt5 COMPONENTS Core Widgets WebEngineWidgets WebChannel Network QUIET)
+find_package(Qt5 COMPONENTS Core Widgets WebEngineWidgets WebChannel Network WebEngine QUIET)
 
 # If Qt5 wasn't found, try common locations
 if(NOT Qt5_FOUND)
@@ -33,7 +33,7 @@ if(NOT Qt5_FOUND)
         if(EXISTS "${QT_PATH}")
             message(STATUS "Trying Qt in: ${QT_PATH}")
             set(CMAKE_PREFIX_PATH "${QT_PATH}")
-            find_package(Qt5 COMPONENTS Core Widgets WebEngineWidgets WebChannel Network QUIET)
+            find_package(Qt5 COMPONENTS Core Widgets WebEngineWidgets WebChannel Network WebEngine QUIET)
             if(Qt5_FOUND)
                 break()
             endif()
@@ -46,8 +46,8 @@ if(NOT Qt5_FOUND)
     message(FATAL_ERROR "
     Qt5 not found. Please install Qt5 or set the correct path.
     
-    On Ubuntu/Debian: sudo apt-get install qtbase5-dev qtwebengine5-dev libqt5webchannel5-dev
-    On Fedora: sudo dnf install qt5-qtbase-devel qt5-qtwebengine-devel qt5-qtwebchannel-devel
+    On Ubuntu/Debian: sudo apt-get install qtbase5-dev qtwebengine5-dev libqt5webchannel5-dev qtwebengine5-dev
+    On Fedora: sudo dnf install qt5-qtbase-devel qt5-qtwebengine-devel qt5-qtwebchannel-devel qt5-qtwebengine-devel
     
     If Qt5 is installed in a custom location, set CMAKE_PREFIX_PATH:
     cmake -DCMAKE_PREFIX_PATH=/path/to/qt5 ..
@@ -74,6 +74,23 @@ endif()
 
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/oobabooga_bridge.cpp")
     list(APPEND SOURCES src/oobabooga_bridge.cpp)
+endif()
+
+# Add 3D Arena source files
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/arena_view.cpp")
+    list(APPEND SOURCES src/arena_view.cpp)
+endif()
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/arena_renderer.cpp")
+    list(APPEND SOURCES src/arena_renderer.cpp)
+endif()
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/game_scene.cpp")
+    list(APPEND SOURCES src/game_scene.cpp)
+endif()
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/player_controller.cpp")
+    list(APPEND SOURCES src/player_controller.cpp)
 endif()
 
 # Add moc_registration.cpp for Qt meta-object handling (signals/slots)
@@ -138,6 +155,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     Qt5::WebEngineWidgets
     Qt5::WebChannel
     Qt5::Network
+    Qt5::WebEngine
 )
 
 # Installation

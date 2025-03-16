@@ -211,6 +211,31 @@ struct CharacterStats {
     }
 };
 
+// Structure for character collision geometry
+struct CharacterCollisionGeometry {
+    double width;
+    double height;
+    double depth;
+    
+    CharacterCollisionGeometry() : width(1.0), height(2.0), depth(1.0) {}
+    
+    QJsonObject toJson() const {
+        QJsonObject json;
+        json["width"] = width;
+        json["height"] = height;
+        json["depth"] = depth;
+        return json;
+    }
+    
+    static CharacterCollisionGeometry fromJson(const QJsonObject &json) {
+        CharacterCollisionGeometry geometry;
+        geometry.width = json["width"].toDouble(1.0);
+        geometry.height = json["height"].toDouble(2.0);
+        geometry.depth = json["depth"].toDouble(1.0);
+        return geometry;
+    }
+};
+
 // Structure to represent a character's appearance
 struct CharacterAppearance {
     QString gender;
@@ -224,6 +249,10 @@ struct CharacterAppearance {
     QString clothing;
     QString distinguishingFeatures;
     QString generalDescription;
+    
+    // 3D visualization properties
+    QString spritePath;                   // Path to the character sprite image
+    CharacterCollisionGeometry collision; // Collision geometry dimensions
     
     // Create a JSON object from this appearance
     QJsonObject toJson() const {
@@ -239,6 +268,8 @@ struct CharacterAppearance {
         json["clothing"] = clothing;
         json["distinguishingFeatures"] = distinguishingFeatures;
         json["generalDescription"] = generalDescription;
+        json["spritePath"] = spritePath;
+        json["collision"] = collision.toJson();
         return json;
     }
     
@@ -256,6 +287,12 @@ struct CharacterAppearance {
         appearance.clothing = json["clothing"].toString();
         appearance.distinguishingFeatures = json["distinguishingFeatures"].toString();
         appearance.generalDescription = json["generalDescription"].toString();
+        appearance.spritePath = json["spritePath"].toString();
+        
+        if (json.contains("collision") && json["collision"].isObject()) {
+            appearance.collision = CharacterCollisionGeometry::fromJson(json["collision"].toObject());
+        }
+        
         return appearance;
     }
 };
@@ -292,6 +329,13 @@ public:
     
     // Save character appearance
     Q_INVOKABLE bool saveCharacterAppearance(const QString &name, const CharacterAppearance &appearance);
+    
+    // Set character sprite
+    Q_INVOKABLE bool setCharacterSprite(const QString &name, const QString &spritePath);
+    
+    // Set character collision geometry
+    Q_INVOKABLE bool setCharacterCollisionGeometry(const QString &name, 
+                                                const CharacterCollisionGeometry &geometry);
     
     // Add a memory to a character
     Q_INVOKABLE bool addMemory(const QString &characterName, const Memory &memory);
@@ -386,6 +430,17 @@ public:
     // Determine the type of context (emotional, combat, exploration, etc.)
     QString determineContextType(const QString &context);
     
+signals:
+    // Signal for when a character's appearance is updated
+    void characterAppearanceUpdated(const QString &characterName);
+    
+    // Signal for when a character's sprite is changed
+    void characterSpriteChanged(const QString &characterName, const QString &spritePath);
+    
+    // Signal for when a character's collision geometry is changed
+    void characterCollisionGeometryChanged(const QString &characterName, 
+                                        const CharacterCollisionGeometry &geometry);
+
 private:
     QString baseDir;
     

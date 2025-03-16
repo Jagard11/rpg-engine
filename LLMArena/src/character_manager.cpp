@@ -901,3 +901,44 @@ bool CharacterManager::addMemory(const QString &characterName, const Memory &mem
     // Save all memories
     return saveMemories(characterName, memories);
 }
+
+// Add these methods to src/character_manager.cpp
+
+// Set character sprite
+bool CharacterManager::setCharacterSprite(const QString &name, const QString &spritePath) {
+    // Load current appearance
+    CharacterAppearance appearance = loadCharacterAppearance(name);
+    
+    // Update sprite path
+    appearance.spritePath = spritePath;
+    
+    // Save updated appearance
+    bool result = saveCharacterAppearance(name, appearance);
+    
+    // Emit signal if successful
+    if (result) {
+        emit characterSpriteChanged(name, spritePath);
+    }
+    
+    return result;
+}
+
+// Set character collision geometry
+bool CharacterManager::setCharacterCollisionGeometry(const QString &name, 
+                                                const CharacterCollisionGeometry &geometry) {
+    // Load current appearance
+    CharacterAppearance appearance = loadCharacterAppearance(name);
+    
+    // Update collision geometry
+    appearance.collision = geometry;
+    
+    // Save updated appearance
+    bool result = saveCharacterAppearance(name, appearance);
+    
+    // Emit signal if successful
+    if (result) {
+        emit characterCollisionGeometryChanged(name, geometry);
+    }
+    
+    return result;
+}

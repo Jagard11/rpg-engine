@@ -2,79 +2,9 @@
 #include "../include/character_editor_ui.h"
 #include "../include/character_persistence.h"
 
-// CharacterEditorDialog implementation
 
-CharacterEditorDialog::CharacterEditorDialog(CharacterManager *manager, QWidget *parent)
-    : QDialog(parent), characterManager(manager)
-{
-    setWindowTitle("Character Editor");
-    setMinimumSize(800, 600);
-    
-    tabWidget = new QTabWidget(this);
-    
-    // Create tabs
-    createBasicInfoTab();
-    createAppearanceTab();
-    createPersonalityTab();
-    createMemoriesTab();
-    
-    // Dialog buttons
-    QDialogButtonBox *buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
-    connect(buttonBox, &QDialogButtonBox::accepted, this, &CharacterEditorDialog::saveCharacter);
-    connect(buttonBox, &QDialogButtonBox::rejected, this, &QDialog::reject);
-    
-    // Main layout
-    QVBoxLayout *mainLayout = new QVBoxLayout(this);
-    mainLayout->addWidget(tabWidget);
-    mainLayout->addWidget(buttonBox);
-    
-    setLayout(mainLayout);
-}
 
-void CharacterEditorDialog::setCharacter(const QString &name)
-{
-    characterName = name;
-    
-    if (!characterName.isEmpty()) {
-        // Load existing character data
-        CharacterStats stats = characterManager->loadCharacterStats(characterName);
-        CharacterAppearance appearance = characterManager->loadCharacterAppearance(characterName);
-        CharacterPersonality personality = characterManager->loadCharacterPersonality(characterName);
-        memories = characterManager->loadMemories(characterName);
-        
-        // Fill UI fields with loaded data
-        fillBasicInfoFields(stats);
-        fillAppearanceFields(appearance);
-        fillPersonalityFields(personality);
-        fillMemoriesTable();
-    }
-}
 
-void CharacterEditorDialog::saveCharacter()
-{
-    bool isNew = characterName.isEmpty();
-    
-    // Collect data from UI fields
-    CharacterStats stats = collectBasicInfoFields();
-    CharacterAppearance appearance = collectAppearanceFields();
-    CharacterPersonality personality = collectPersonalityFields();
-    
-    if (isNew) {
-        // Create a new character
-        characterName = stats.name;
-        characterManager->createCharacter(characterName, stats, personality, appearance);
-    } else {
-        // Update existing character
-        characterManager->saveCharacterStats(characterName, stats);
-        characterManager->saveCharacterAppearance(characterName, appearance);
-        characterManager->saveCharacterPersonality(characterName, personality);
-    }
-    
-    // Save memories
-    characterManager->saveMemories(characterName, memories);
-    
-    accept();
-}
 
 void CharacterEditorDialog::createBasicInfoTab()
 {
@@ -632,4 +562,208 @@ void CharacterManagerDialog::refreshCharacterList()
 {
     characterList->clear();
     characterList->addItems(characterManager->listCharacters());
+}
+// Add these methods to src/character_editor.cpp
+
+// Create a new tab for 3D visualization settings
+void CharacterEditorDialog::create3DVisualizationTab()
+{
+    QWidget *tab = new QWidget();
+    QFormLayout *formLayout = new QFormLayout(tab);
+    
+    // Sprite selection
+    QHBoxLayout *spriteLayout = new QHBoxLayout();
+    
+    spritePathEdit = new QLineEdit(tab);
+    QPushButton *browseSpriteBtn = new QPushButton("Browse...", tab);
+    
+    spriteLayout->addWidget(spritePathEdit);
+    spriteLayout->addWidget(browseSpriteBtn);
+    
+    // Collision geometry settings
+    QGroupBox *collisionGroup = new QGroupBox("Collision Geometry", tab);
+    QFormLayout *collisionLayout = new QFormLayout(collisionGroup);
+    
+    widthSpin = new QDoubleSpinBox(tab);
+    widthSpin->setRange(0.1, 10.0);
+    widthSpin->setSingleStep(0.1);
+    widthSpin->setValue(1.0);
+    widthSpin->setSuffix(" m");
+    
+    heightSpin = new QDoubleSpinBox(tab);
+    heightSpin->setRange(0.1, 10.0);
+    heightSpin->setSingleStep(0.1);
+    heightSpin->setValue(2.0);
+    heightSpin->setSuffix(" m");
+    
+    depthSpin = new QDoubleSpinBox(tab);
+    depthSpin->setRange(0.1, 10.0);
+    depthSpin->setSingleStep(0.1);
+    depthSpin->setValue(1.0);
+    depthSpin->setSuffix(" m");
+    
+    collisionLayout->addRow("Width:", widthSpin);
+    collisionLayout->addRow("Height:", heightSpin);
+    collisionLayout->addRow("Depth:", depthSpin);
+    
+    collisionGroup->setLayout(collisionLayout);
+    
+    // Preview section (placeholder for future sprite preview)
+    QLabel *previewLabel = new QLabel("Sprite Preview:", tab);
+    spritePreview = new QLabel(tab);
+    spritePreview->setMinimumSize(200, 200);
+    spritePreview->setAlignment(Qt::AlignCenter);
+    spritePreview->setFrameShape(QFrame::Box);
+    spritePreview->setText("No sprite selected");
+    
+    // Add to form layout
+    formLayout->addRow("Sprite Path:", spriteLayout);
+    formLayout->addRow(collisionGroup);
+    formLayout->addRow(previewLabel);
+    formLayout->addRow(spritePreview);
+    
+    // Connect signals
+    connect(browseSpriteBtn, &QPushButton::clicked, this, &CharacterEditorDialog::browseSprite);
+    connect(spritePathEdit, &QLineEdit::textChanged, this, &CharacterEditorDialog::updateSpritePreview);
+    
+    tab->setLayout(formLayout);
+    tabWidget->addTab(tab, "3D Visualization");
+}
+
+// Browse for a sprite image
+void CharacterEditorDialog::browseSprite()
+{
+    QString filePath = QFileDialog::getOpenFileName(this, 
+        "Select Character Sprite", 
+        "", 
+        "Image Files (*.png *.jpg *.jpeg *.bmp)");
+    
+    if (!filePath.isEmpty()) {
+        spritePathEdit->setText(filePath);
+    }
+}
+
+// Update sprite preview
+void CharacterEditorDialog::updateSpritePreview(const QString &path)
+{
+    if (path.isEmpty()) {
+        spritePreview->setText("No sprite selected");
+        return;
+    }
+    
+    QPixmap pixmap(path);
+    if (pixmap.isNull()) {
+        spritePreview->setText("Invalid image file");
+        return;
+    }
+    
+    // Scale pixmap to fit preview, maintaining aspect ratio
+    pixmap = pixmap.scaled(spritePreview->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation);
+    spritePreview->setPixmap(pixmap);
+}
+
+// Fill 3D visualization fields from character appearance
+void CharacterEditorDialog::fill3DVisualizationFields(const CharacterAppearance &appearance)
+{
+    spritePathEdit->setText(appearance.spritePath);
+    widthSpin->setValue(appearance.collision.width);
+    heightSpin->setValue(appearance.collision.height);
+    depthSpin->setValue(appearance.collision.depth);
+    
+    // Update preview
+    updateSpritePreview(appearance.spritePath);
+}
+
+// Collect 3D visualization fields
+CharacterAppearance CharacterEditorDialog::collect3DVisualizationFields(CharacterAppearance appearance)
+{
+    appearance.spritePath = spritePathEdit->text();
+    
+    CharacterCollisionGeometry geometry;
+    geometry.width = widthSpin->value();
+    geometry.height = heightSpin->value();
+    geometry.depth = depthSpin->value();
+    appearance.collision = geometry;
+    
+    return appearance;
+}
+
+// Update the CharacterEditorDialog::setCharacter method to include 3D visualization
+void CharacterEditorDialog::setCharacter(const QString &name)
+{
+    characterName = name;
+    
+    if (!characterName.isEmpty()) {
+        // Load existing character data
+        CharacterStats stats = characterManager->loadCharacterStats(characterName);
+        CharacterAppearance appearance = characterManager->loadCharacterAppearance(characterName);
+        CharacterPersonality personality = characterManager->loadCharacterPersonality(characterName);
+        memories = characterManager->loadMemories(characterName);
+        
+        // Fill UI fields with loaded data
+        fillBasicInfoFields(stats);
+        fillAppearanceFields(appearance);
+        fillPersonalityFields(personality);
+        fill3DVisualizationFields(appearance);
+        fillMemoriesTable();
+    }
+}
+
+// Update the CharacterEditorDialog::saveCharacter method to include 3D visualization
+void CharacterEditorDialog::saveCharacter()
+{
+    bool isNew = characterName.isEmpty();
+    
+    // Collect data from UI fields
+    CharacterStats stats = collectBasicInfoFields();
+    CharacterAppearance appearance = collectAppearanceFields();
+    CharacterPersonality personality = collectPersonalityFields();
+    
+    // Update appearance with 3D visualization settings
+    appearance = collect3DVisualizationFields(appearance);
+    
+    if (isNew) {
+        // Create a new character
+        characterName = stats.name;
+        characterManager->createCharacter(characterName, stats, personality, appearance);
+    } else {
+        // Update existing character
+        characterManager->saveCharacterStats(characterName, stats);
+        characterManager->saveCharacterAppearance(characterName, appearance);
+        characterManager->saveCharacterPersonality(characterName, personality);
+    }
+    
+    // Save memories
+    characterManager->saveMemories(characterName, memories);
+    
+    accept();
+}
+
+// Update the CharacterEditorDialog constructor to create the 3D visualization tab
+CharacterEditorDialog::CharacterEditorDialog(CharacterManager *manager, QWidget *parent)
+    : QDialog(parent), characterManager(manager)
+{
+    setWindowTitle("Character Editor");
+    setMinimumSize(800, 600);
+    
+    tabWidget = new QTabWidget(this);
+    
+    // Create tabs
+    createBasicInfoTab();
+    createAppearanceTab();
+    createPersonalityTab();
+    createMemoriesTab();
+    create3DVisualizationTab();
+    
+    // Dialog buttons
+    QDialogButtonBox *buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+    connect(buttonBox, &QDialogButtonBox::accepted, this, &CharacterEditorDialog::saveCharacter);
+    connect(buttonBox, &QDialogButtonBox::rejected, this, &QDialog::reject);
+    
+    // Main layout
+    QVBoxLayout *mainLayout = new QVBoxLayout(this);
+    mainLayout->addWidget(tabWidget);
+    mainLayout->addWidget(buttonBox);
+    
+    setLayout(mainLayout);
 }
