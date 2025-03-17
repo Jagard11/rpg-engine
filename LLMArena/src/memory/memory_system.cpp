@@ -1,5 +1,4 @@
 // src/memory/memory_system.cpp
-// src/memory_system.cpp
 #include "../include/memory/memory_system.h"
 #include "../include/character/character_persistence.h"
 
@@ -10,6 +9,7 @@
 #include <QJsonObject>
 #include <QDateTime>
 #include <QDebug>
+#include <QRandomGenerator>
 #include <cmath>
 #include <algorithm>
 
@@ -99,7 +99,7 @@ double calculateRecallFrequencyScore(const Memory &memory) {
     return qMin(1.0, memory.recallCount / 10.0);
 }
 
-// Helper function to extract entities from text - implementation for global function
+// Helper function to extract entities from text
 QStringList extractEntities(const QString &text) {
     QStringList potentialEntities;
     QStringList words = text.split(QRegExp("\\s+"));
@@ -116,12 +116,12 @@ QStringList extractEntities(const QString &text) {
         }
     }
     
-    // Remove duplicates - updated to avoid deprecated methods
+    // Remove duplicates
     QSet<QString> uniqueEntities(potentialEntities.begin(), potentialEntities.end());
     return uniqueEntities.values();
 }
 
-// Helper function to extract locations from text - implementation for global function
+// Helper function to extract locations from text
 QStringList extractLocations(const QString &text, const QStringList &knownLocations) {
     QStringList foundLocations;
     
@@ -140,9 +140,37 @@ QStringList extractLocations(const QString &text, const QStringList &knownLocati
         pos += locationRegex.matchedLength();
     }
     
-    // Remove duplicates - updated to avoid deprecated methods
+    // Remove duplicates
     QSet<QString> uniqueLocations(foundLocations.begin(), foundLocations.end());
     return uniqueLocations.values();
+}
+
+// Calculate emotional intensity based on text content
+int calculateEmotionalIntensity(const QString &text) {
+    // Base intensity
+    int intensity = 3;
+    
+    // Check for intensifiers
+    QStringList intensifiers = {"very", "extremely", "incredibly", "absolutely", "deeply"};
+    for (const QString &intensifier : intensifiers) {
+        if (text.contains(intensifier, Qt::CaseInsensitive)) {
+            intensity += 1;
+        }
+    }
+    
+    // Check for strong emotional words
+    QStringList strongEmotions = {"furious", "ecstatic", "heartbroken", "terrified", "adore"};
+    for (const QString &emotion : strongEmotions) {
+        if (text.contains(emotion, Qt::CaseInsensitive)) {
+            intensity += 2;
+        }
+    }
+    
+    // Check for exclamation marks
+    intensity += text.count('!');
+    
+    // Cap at 10
+    return qMin(intensity, 10);
 }
 
 // Implementation of the relevance scoring from CharacterManager
@@ -335,36 +363,9 @@ QString CharacterManager::generateMemoriesContext(const QString &characterName,
     return context;
 }
 
-// Calculate emotional intensity based on text content
-int calculateEmotionalIntensity(const QString &text) {
-    // Base intensity
-    int intensity = 3;
-    
-    // Check for intensifiers
-    QStringList intensifiers = {"very", "extremely", "incredibly", "absolutely", "deeply"};
-    for (const QString &intensifier : intensifiers) {
-        if (text.contains(intensifier, Qt::CaseInsensitive)) {
-            intensity += 1;
-        }
-    }
-    
-    // Check for strong emotional words
-    QStringList strongEmotions = {"furious", "ecstatic", "heartbroken", "terrified", "adore"};
-    for (const QString &emotion : strongEmotions) {
-        if (text.contains(emotion, Qt::CaseInsensitive)) {
-            intensity += 2;
-        }
-    }
-    
-    // Check for exclamation marks
-    intensity += text.count('!');
-    
-    // Cap at 10
-    return qMin(intensity, 10);
-}
-
 // Process text for possible memory creation
-void CharacterManager::processForMemoryCreation(const QString &userMessage, const QString &aiResponse, 
+void CharacterManager::processForMemoryCreation(const QString &userMessage, 
+                                             const QString &aiResponse,
                                              const QString &characterName) {
     // Skip trivial exchanges
     if (userMessage.length() < 10 || aiResponse.length() < 20) {
@@ -400,7 +401,7 @@ void CharacterManager::processForMemoryCreation(const QString &userMessage, cons
         memory.timestamp = QDateTime::currentDateTime();
         memory.type = "conversation";
         memory.title = "Significant Exchange: " + truncateText(userMessage, 30);
-        memory.description = "User: " + userMessage + "\nCharacter: " + aiResponse;
+        memory.description = "User said: \"" + userMessage + "\"\nCharacter: " + aiResponse;
         
         // Extract emotions
         for (const QString &emotion : emotionalKeywords) {

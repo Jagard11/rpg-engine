@@ -1,4 +1,4 @@
-# CMakeLists.txt - Fixed for Qt MOC processing
+# CMakeLists.txt - Fixed for Qt MOC processing and duplicate definitions
 cmake_minimum_required(VERSION 3.14)
 project(OobaboogaRPGArena LANGUAGES CXX)
 
@@ -28,6 +28,9 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui
     ${CMAKE_CURRENT_SOURCE_DIR}/include/character
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/character/models
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/character/manager
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/character/ui
     ${CMAKE_CURRENT_SOURCE_DIR}/include/llm
     ${CMAKE_CURRENT_SOURCE_DIR}/include/game
     ${CMAKE_CURRENT_SOURCE_DIR}/include/rendering
@@ -37,8 +40,8 @@ include_directories(
 # Explicitly list all header files that contain Q_OBJECT macro
 set(HEADERS
     include/ui/arena_view.h
-    include/ui/character_editor_ui.h
-    include/character/character_persistence.h
+    include/character/manager/character_manager.h
+    include/character/ui/character_editor.h
     include/llm/oobabooga_bridge.h
     include/game/game_scene.h
     include/game/player_controller.h
@@ -51,20 +54,29 @@ set(SOURCES
     src/main.cpp
 )
 
-# Character module
+# Character module - use modular approach instead of monolithic
 set(CHARACTER_SOURCES
-    src/character/character_manager.cpp
+    src/character/manager/character_manager_core.cpp
+    src/character/manager/character_manager_appearance.cpp
+    src/character/manager/character_manager_personality.cpp
+    src/character/manager/character_manager_memory.cpp
+    src/character/manager/character_manager_context.cpp
+    src/character/ui/character_editor_basic.cpp
+    src/character/ui/character_editor_appearance.cpp
+    src/character/ui/character_editor_personality.cpp
+    src/character/ui/character_editor_memory.cpp
+    src/character/ui/character_manager_dialog.cpp
 )
 
-# Memory module
+# Memory module - use the fixed helper file instead of full memory_system.cpp
 set(MEMORY_SOURCES
-    src/memory/memory_system.cpp
+    src/memory/memory_system_helpers.cpp
 )
 
-# UI module
+# UI module - exclude character_editor.cpp which has duplicate definitions
 set(UI_SOURCES
     src/ui/arena_view.cpp
-    src/ui/character_editor.cpp
+    # src/ui/character_editor.cpp  # Commented out to avoid duplicate definitions
 )
 
 # LLM module

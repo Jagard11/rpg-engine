@@ -1,5 +1,4 @@
 // src/llm/oobabooga_bridge.cpp
-// src/oobabooga_bridge.cpp
 #include "../include/llm/oobabooga_bridge.h"
 #include "../include/character/character_persistence.h"
 #include "../include/memory/memory_system.h"
@@ -15,6 +14,7 @@
 #include <QRegExp>
 #include <QFile>
 #include <QDir>
+#include <QRandomGenerator> // Add missing include
 
 // Constructor
 OobaboogaBridge::OobaboogaBridge(CharacterManager *charManager, QObject *parent) 

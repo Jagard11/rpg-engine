@@ -1,5 +1,4 @@
 // src/ui/arena_view.cpp
-// src/arena_view.cpp - Updated to fix focus and event handling
 #include "../include/ui/arena_view.h"
 #include "../include/rendering/gl_arena_widget.h"
 #include <QDebug>
@@ -7,6 +6,7 @@
 #include <QTimer>
 #include <QCoreApplication>
 #include <QPainter>
+#include <QDir>  // Added missing include for QDir
 
 // ArenaView constructor
 ArenaView::ArenaView(CharacterManager *charManager, QWidget *parent)
