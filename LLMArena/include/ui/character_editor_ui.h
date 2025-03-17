@@ -1,4 +1,4 @@
-// include/character_editor_ui.h
+// include/ui/character_editor_ui.h
 #ifndef CHARACTER_EDITOR_UI_H
 #define CHARACTER_EDITOR_UI_H
 

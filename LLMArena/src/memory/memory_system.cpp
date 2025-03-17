@@ -1,6 +1,7 @@
+// src/memory/memory_system.cpp
 // src/memory_system.cpp
-#include "../include/memory_system.h"
-#include "../include/character_persistence.h"
+#include "../include/memory/memory_system.h"
+#include "../include/character/character_persistence.h"
 
 #include <QDir>
 #include <QFileInfo>

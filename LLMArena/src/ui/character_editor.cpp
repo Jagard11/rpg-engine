@@ -1,6 +1,7 @@
+// src/ui/character_editor.cpp
 // src/character_editor.cpp
-#include "../include/character_editor_ui.h"
-#include "../include/character_persistence.h"
+#include "../include/ui/character_editor_ui.h"
+#include "../include/character/character_persistence.h"
 
 
 

@@ -1,123 +1,103 @@
-# CMakeLists.txt - Updated for OpenGL rendering
+# CMakeLists.txt - Fixed for Qt MOC processing
 cmake_minimum_required(VERSION 3.14)
 project(OobaboogaRPGArena LANGUAGES CXX)
 
+# Ensure CMake handles Qt properly
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTOUIC ON)
+set(CMAKE_AUTORCC ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Improved Qt5 detection
-# First try to find Qt5 with default config
-find_package(Qt5 COMPONENTS Core Widgets Network OpenGL Gui QUIET)
+# Find the required Qt packages
+find_package(Qt5 COMPONENTS 
+    Core 
+    Widgets 
+    Network 
+    OpenGL 
+    Gui 
+    WebEngine 
+    WebEngineWidgets 
+    REQUIRED
+)
 
-# If Qt5 wasn't found, try common locations
-if(NOT Qt5_FOUND)
-    message(STATUS "Qt5 not found with default search. Trying common locations...")
-    
-    # Common installation paths
-    set(QT_PATH_HINTS
-        "/usr/local/Qt-5.15.2"
-        "/usr/local/Qt5"
-        "/opt/Qt5"
-        "/opt/Qt"
-        "/usr/lib/qt5"
-        "/usr/lib/x86_64-linux-gnu/qt5"
-        "/usr/lib/qt"
-        "$ENV{HOME}/Qt/5.15.2/gcc_64"
-        "$ENV{HOME}/Qt5"
-    )
-    
-    # Try each path
-    foreach(QT_PATH ${QT_PATH_HINTS})
-        if(EXISTS "${QT_PATH}")
-            message(STATUS "Trying Qt in: ${QT_PATH}")
-            set(CMAKE_PREFIX_PATH "${QT_PATH}")
-            find_package(Qt5 COMPONENTS Core Widgets Network OpenGL Gui QUIET)
-            if(Qt5_FOUND)
-                break()
-            endif()
-        endif()
-    endforeach()
-endif()
+# Include directories for header files
+include_directories(
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/character
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/llm
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/game
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/rendering
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/memory
+)
 
-# Final check if Qt was found
-if(NOT Qt5_FOUND)
-    message(FATAL_ERROR "
-    Qt5 not found. Please install Qt5 or set the correct path.
-    
-    On Ubuntu/Debian: sudo apt-get install qtbase5-dev libqt5opengl5-dev
-    On Fedora: sudo dnf install qt5-qtbase-devel qt5-qtbase-private-devel
-    
-    If Qt5 is installed in a custom location, set CMAKE_PREFIX_PATH:
-    cmake -DCMAKE_PREFIX_PATH=/path/to/qt5 ..
-    ")
-endif()
+# Explicitly list all header files that contain Q_OBJECT macro
+set(HEADERS
+    include/ui/arena_view.h
+    include/ui/character_editor_ui.h
+    include/character/character_persistence.h
+    include/llm/oobabooga_bridge.h
+    include/game/game_scene.h
+    include/game/player_controller.h
+    include/rendering/arena_renderer.h
+    include/rendering/gl_arena_widget.h
+)
 
-# Make sure MOC is run on our header files
-set(CMAKE_AUTOMOC ON)
-
-# Source files
+# Main source file
 set(SOURCES
     src/main.cpp
 )
 
-# Check if source files exist before adding them
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/character_manager.cpp")
-    list(APPEND SOURCES src/character_manager.cpp)
-endif()
+# Character module
+set(CHARACTER_SOURCES
+    src/character/character_manager.cpp
+)
 
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/character_editor.cpp")
-    list(APPEND SOURCES src/character_editor.cpp)
-endif()
+# Memory module
+set(MEMORY_SOURCES
+    src/memory/memory_system.cpp
+)
 
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/memory_system.cpp")
-    list(APPEND SOURCES src/memory_system.cpp)
-endif()
+# UI module
+set(UI_SOURCES
+    src/ui/arena_view.cpp
+    src/ui/character_editor.cpp
+)
 
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/oobabooga_bridge.cpp")
-    list(APPEND SOURCES src/oobabooga_bridge.cpp)
-endif()
+# LLM module
+set(LLM_SOURCES
+    src/llm/oobabooga_bridge.cpp
+)
 
-# Add OpenGL rendering files
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/gl_arena_widget.cpp")
-    list(APPEND SOURCES src/gl_arena_widget.cpp)
-endif()
+# Rendering module
+set(RENDERING_SOURCES
+    src/rendering/arena_renderer.cpp
+    src/rendering/gl_arena_widget.cpp
+    src/rendering/gl_arena_widget_signals.cpp
+)
 
-# We don't need the signals implementation file - MOC handles signal implementations
-# The file is causing duplicate symbol definitions
-# if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/gl_arena_widget_signals.cpp")
-#     list(APPEND SOURCES src/gl_arena_widget_signals.cpp)
-# endif()
+# Game module
+set(GAME_SOURCES
+    src/game/game_scene.cpp
+    src/game/player_controller.cpp
+)
 
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/arena_view.cpp")
-    list(APPEND SOURCES src/arena_view.cpp)
-endif()
-
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/game_scene.cpp")
-    list(APPEND SOURCES src/game_scene.cpp)
-endif()
-
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/player_controller.cpp")
-    list(APPEND SOURCES src/player_controller.cpp)
-endif()
-
-# Add moc_registration.cpp for Qt meta-object handling (signals/slots)
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/moc_registration.cpp")
-    list(APPEND SOURCES src/moc_registration.cpp)
-endif()
-
-# Include directories
-include_directories(include)
+# Combine all sources
+list(APPEND SOURCES 
+    ${CHARACTER_SOURCES}
+    ${MEMORY_SOURCES}
+    ${UI_SOURCES}
+    ${LLM_SOURCES}
+    ${RENDERING_SOURCES}
+    ${GAME_SOURCES}
+)
 
 # Check for resources directory
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/resources")
-    # Resource files
-    set(RESOURCES
-        resources.qrc
-    )
-
-    # Generate resource file
+    # Create resources
     file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/resources.qrc 
     "<!DOCTYPE RCC>
     <RCC>
@@ -130,10 +110,10 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/resources")
     </RCC>
     ")
 
-    # Create shader directory and files if they don't exist
+    # Create shader directory and files
     file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/shaders)
 
-    # Basic vertex shader
+    # Shader generation logic here (kept from previous version)
     file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/shaders/basic.vert
     "#version 330 core
     layout(location = 0) in vec3 position;
@@ -153,7 +133,6 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/resources")
     }
     ")
 
-    # Basic fragment shader
     file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/shaders/basic.frag
     "#version 330 core
     in vec3 fragNormal;
@@ -164,17 +143,14 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/resources")
     uniform vec3 viewPos;
     out vec4 fragColor;
     void main() {
-        // Ambient lighting
         float ambientStrength = 0.3;
         vec3 ambient = ambientStrength * vec3(1.0, 1.0, 1.0);
         
-        // Diffuse lighting
         vec3 norm = normalize(fragNormal);
         vec3 lightDir = normalize(lightPos - fragPos);
         float diff = max(dot(norm, lightDir), 0.0);
         vec3 diffuse = diff * vec3(1.0, 1.0, 1.0);
         
-        // Specular lighting
         float specularStrength = 0.5;
         vec3 viewDir = normalize(viewPos - fragPos);
         vec3 reflectDir = reflect(-lightDir, norm);
@@ -186,12 +162,10 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/resources")
     }
     ")
 
-    # Billboard vertex shader
     file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/shaders/billboard.vert
     "#version 330 core
     layout(location = 0) in vec3 position;
     layout(location = 1) in vec2 texCoord;
-    uniform mat4 model;
     uniform mat4 view;
     uniform mat4 projection;
     uniform vec3 cameraRight;
@@ -200,13 +174,14 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/resources")
     uniform vec2 billboardSize;
     out vec2 fragTexCoord;
     void main() {
-        vec3 vertPos = billboardPos + cameraRight * position.x * billboardSize.x + cameraUp * position.y * billboardSize.y;
+        vec3 vertPos = billboardPos;
+        vertPos += cameraRight * position.x * billboardSize.x;
+        vertPos += cameraUp * position.y * billboardSize.y;
         gl_Position = projection * view * vec4(vertPos, 1.0);
         fragTexCoord = texCoord;
     }
     ")
 
-    # Billboard fragment shader
     file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/shaders/billboard.frag
     "#version 330 core
     in vec2 fragTexCoord;
@@ -214,19 +189,20 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/resources")
     out vec4 fragColor;
     void main() {
         vec4 texColor = texture(textureSampler, fragTexCoord);
-        if(texColor.a < 0.1) discard;
         fragColor = texColor;
     }
     ")
     
     # Add the executable with resources
     add_executable(${PROJECT_NAME} 
+        ${HEADERS}
         ${SOURCES}
         ${CMAKE_CURRENT_BINARY_DIR}/resources.qrc
     )
 else()
     # Add the executable without resources
     add_executable(${PROJECT_NAME} 
+        ${HEADERS}
         ${SOURCES}
     )
 endif()
@@ -241,7 +217,15 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     Qt5::Network
     Qt5::OpenGL
     Qt5::Gui
+    Qt5::WebEngine
+    Qt5::WebEngineWidgets
     ${OPENGL_LIBRARIES}
+)
+
+# Force the build system to regenerate Qt moc files
+set_target_properties(${PROJECT_NAME} PROPERTIES
+    AUTOMOC TRUE
+    AUTOMOC_MOC_OPTIONS "--no-notes"
 )
 
 # Installation

@@ -1,4 +1,4 @@
-// include/game_scene.h
+// include/game/game_scene.h
 #ifndef GAME_SCENE_H
 #define GAME_SCENE_H
 

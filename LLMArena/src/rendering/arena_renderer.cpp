@@ -1,7 +1,8 @@
-// src/arena_renderer.cpp - Complete file with fixes for player movement visualization
-#include "../include/arena_renderer.h"
-#include "../include/game_scene.h"
-#include "../include/player_controller.h"
+// src/rendering/arena_renderer.cpp
+// src/rendering/arena_renderer.cpp
+#include "../include/rendering/arena_renderer.h"
+#include "../include/game/game_scene.h"
+#include "../include/game/player_controller.h"
 #include <QFile>
 #include <QWebEngineSettings>
 #include <QWebEngineScript>

@@ -1,5 +1,6 @@
+// src/character/character_manager.cpp
 // src/character_manager.cpp
-#include "../include/character_persistence.h"
+#include "../include/character/character_persistence.h"
 
 #include <QDir>
 #include <QFile>

@@ -1,6 +1,7 @@
+// src/game/player_controller.cpp
 // src/player_controller.cpp - Fixed version
-#include "../include/player_controller.h"
-#include "../include/game_scene.h"
+#include "../include/game/player_controller.h"
+#include "../include/game/game_scene.h"
 #include <QDebug>
 #include <cmath>
 

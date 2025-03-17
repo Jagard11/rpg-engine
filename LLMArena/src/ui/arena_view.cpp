@@ -1,6 +1,7 @@
+// src/ui/arena_view.cpp
 // src/arena_view.cpp - Updated to fix focus and event handling
-#include "../include/arena_view.h"
-#include "../include/gl_arena_widget.h"
+#include "../include/ui/arena_view.h"
+#include "../include/rendering/gl_arena_widget.h"
 #include <QDebug>
 #include <QMessageBox>
 #include <QTimer>

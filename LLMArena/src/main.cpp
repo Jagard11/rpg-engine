@@ -1,4 +1,5 @@
-// src/main.cpp - Fixed version with safer Arena tab initialization and compilation fixes
+// src/main.cpp
+// src/main.cpp - Fixed version with safer Arena tab initialization and updated include paths
 #include <QApplication>
 #include <QMainWindow>
 #include <QVBoxLayout>
@@ -16,10 +17,10 @@
 #include <QOpenGLFunctions>
 #include <QTimer>
 
-#include "../include/character_editor_ui.h"
-#include "../include/character_persistence.h"
-#include "../include/oobabooga_bridge.h"
-#include "../include/arena_view.h"
+#include "ui/character_editor_ui.h"
+#include "character/character_persistence.h"
+#include "llm/oobabooga_bridge.h"
+#include "ui/arena_view.h"
 
 // Global crash handler to display errors and prevent immediate exit
 void globalCrashHandler() {

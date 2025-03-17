@@ -1,5 +1,6 @@
+// src/rendering/gl_arena_widget.cpp
 // src/gl_arena_widget.cpp - Fixed version with improved OpenGL handling
-#include "../include/gl_arena_widget.h"
+#include "../include/rendering/gl_arena_widget.h"
 #include <QImage>
 #include <QDebug>
 #include <QPainter>

@@ -1,4 +1,4 @@
-// include/arena_view.h
+// include/ui/arena_view.h
 #ifndef ARENA_VIEW_H
 #define ARENA_VIEW_H
 

@@ -1,9 +1,11 @@
-// include/arena_renderer.h
+// include/rendering/arena_renderer.h
 #ifndef ARENA_RENDERER_H
 #define ARENA_RENDERER_H
 
 #include <QObject>
 #include <QString>
+#include <QWebEngineView>
+#include <QWebChannel>
 #include "character_persistence.h"
 
 // Forward declarations
@@ -72,6 +74,10 @@ private:
     QString activeCharacter;
     bool initialized;
     CharacterManager *characterManager; // Store CharacterManager reference
+    
+    // Add the missing member variables that were being used in the cpp file
+    QWebEngineView *webView;
+    QWebChannel *webChannel;
     
     // Helper method to inject custom JavaScript
     void injectJavaScript(const QString &script);

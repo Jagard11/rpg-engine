@@ -1,5 +1,6 @@
+// src/game/game_scene.cpp
 // src/game_scene.cpp - Fixed version
-#include "../include/game_scene.h"
+#include "../include/game/game_scene.h"
 #include <QDebug>
 #include <cmath>
 

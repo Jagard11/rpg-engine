@@ -1,4 +1,4 @@
-// include/character_persistence.h
+// include/character/character_persistence.h
 #ifndef CHARACTER_PERSISTENCE_H
 #define CHARACTER_PERSISTENCE_H
 
