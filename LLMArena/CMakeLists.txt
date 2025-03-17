@@ -1,4 +1,4 @@
-# CMakeLists.txt - Fixed for Qt MOC processing and duplicate definitions
+# CMakeLists.txt - Modular Arena Renderer Structure
 cmake_minimum_required(VERSION 3.14)
 project(OobaboogaRPGArena LANGUAGES CXX)
 
@@ -68,15 +68,14 @@ set(CHARACTER_SOURCES
     src/character/ui/character_manager_dialog.cpp
 )
 
-# Memory module - use the fixed helper file instead of full memory_system.cpp
+# Memory module
 set(MEMORY_SOURCES
     src/memory/memory_system_helpers.cpp
 )
 
-# UI module - exclude character_editor.cpp which has duplicate definitions
+# UI module
 set(UI_SOURCES
     src/ui/arena_view.cpp
-    # src/ui/character_editor.cpp  # Commented out to avoid duplicate definitions
 )
 
 # LLM module
@@ -84,11 +83,21 @@ set(LLM_SOURCES
     src/llm/oobabooga_bridge.cpp
 )
 
-# Rendering module
+# Rendering module - UPDATED: Modular structure
 set(RENDERING_SOURCES
-    src/rendering/arena_renderer.cpp
-    src/rendering/gl_arena_widget.cpp
-    src/rendering/gl_arena_widget_signals.cpp
+    # Modular GL Arena Widget
+    src/rendering/gl_arena/gl_arena_widget_core.cpp
+    src/rendering/gl_arena/gl_arena_character.cpp
+    src/rendering/gl_arena/gl_arena_widget_rendering.cpp
+    src/rendering/gl_arena/gl_arena_widget_shaders.cpp
+    src/rendering/gl_arena/gl_arena_widget_geometry.cpp
+    src/rendering/gl_arena/gl_arena_widget_input.cpp
+    
+    # Modular Arena Renderer
+    src/rendering/arena_renderer/arena_renderer_core.cpp
+    src/rendering/arena_renderer/arena_renderer_webgl.cpp
+    src/rendering/arena_renderer/arena_renderer_scene.cpp
+    src/rendering/arena_renderer/arena_renderer_characters.cpp
 )
 
 # Game module
@@ -201,6 +210,7 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/resources")
     out vec4 fragColor;
     void main() {
         vec4 texColor = texture(textureSampler, fragTexCoord);
+        if (texColor.a < 0.01) discard;
         fragColor = texColor;
     }
     ")

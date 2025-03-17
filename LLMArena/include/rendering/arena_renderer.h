@@ -12,6 +12,9 @@
 class GameScene;
 class PlayerController;
 
+// Helper function to check for WebGL support
+bool isWebGLSupported();
+
 // Class to handle 3D rendering of the arena using WebGL
 class ArenaRenderer : public QObject {
     Q_OBJECT
@@ -27,10 +30,10 @@ public:
     Q_INVOKABLE void setActiveCharacter(const QString &name);
     
     // Get the game scene
-    GameScene* getGameScene() const { return gameScene; }
+    GameScene* getGameScene() const;
     
     // Get the player controller
-    PlayerController* getPlayerController() const { return playerController; }
+    PlayerController* getPlayerController() const;
     
     // Load a character sprite
     Q_INVOKABLE void loadCharacterSprite(const QString &characterName, const QString &spritePath);
@@ -43,6 +46,14 @@ public:
     
     // Set arena parameters
     Q_INVOKABLE void setArenaParameters(double radius, double wallHeight);
+    
+    // Create the arena
+    Q_INVOKABLE void createArena(double radius, double wallHeight);
+    
+    // Create a character billboard
+    Q_INVOKABLE void createCharacterBillboard(const QString &characterName, 
+                                            const QString &spritePath, 
+                                            const CharacterCollisionGeometry &collisionGeometry);
 
 public slots:
     // Handle JavaScript messages
@@ -65,17 +76,11 @@ signals:
     void collisionDetected(const QString &objectA, const QString &objectB);
 
 private:
-    // Forward declaration of private implementation
-    class Private;
-    Private *d;
-    
     GameScene *gameScene;
     PlayerController *playerController;
     QString activeCharacter;
     bool initialized;
-    CharacterManager *characterManager; // Store CharacterManager reference
-    
-    // Add the missing member variables that were being used in the cpp file
+    CharacterManager *characterManager;
     QWebEngineView *webView;
     QWebChannel *webChannel;
     
@@ -85,12 +90,13 @@ private:
     // Initialize the WebGL context
     void initializeWebGL();
     
-    // Create the octagonal arena
-    void createArena(double radius, double wallHeight);
+    // Create HTML file with WebGL setup
+    bool createArenaHtmlFile(const QString &filePath);
     
-    // Create a character billboard
-    void createCharacterBillboard(const QString &characterName, const QString &spritePath, 
-                                 const CharacterCollisionGeometry &collisionGeometry);
+    // Scene initialization functions
+    void appendThreeJsSceneInit();
+    void appendCharacterBillboardCode();
+    void appendPlayerMovementCode();
 };
 
 #endif // ARENA_RENDERER_H
