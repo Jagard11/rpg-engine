@@ -111,7 +111,10 @@ set(RENDERING_SOURCES
 # Game module
 set(GAME_SOURCES
     src/game/game_scene.cpp
-    src/game/player_controller.cpp
+    src/game/player_controller_core.cpp
+    src/game/player_controller_input.cpp
+    src/game/player_controller_movement.cpp
+    src/game/player_controller_stance.cpp
 )
 
 # Voxel module

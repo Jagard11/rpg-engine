@@ -1,0 +1,232 @@
+// src/game/player_controller_movement.cpp
+#include "../include/game/player_controller.h"
+#include "../include/game/game_scene.h"
+#include <QDebug>
+#include <QMutex>
+#include <cmath>
+
+// External reference to movement mutex
+extern QMutex playerMovementMutex;
+
+void PlayerController::updatePosition() {
+    // Skip update if mutex can't be acquired immediately
+    if (!playerMovementMutex.tryLock()) {
+        return;
+    }
+    
+    // Ensure mutex is released when function exits
+    struct MutexReleaser {
+        QMutex& mutex;
+        MutexReleaser(QMutex& m) : mutex(m) {}
+        ~MutexReleaser() { mutex.unlock(); }
+    } releaser(playerMovementMutex);
+    
+    // Ensure game scene exists
+    if (!gameScene) {
+        return;
+    }
+    
+    try {
+        // Verify the player entity exists
+        bool playerExists = false;
+        try {
+            GameEntity playerEntity = gameScene->getEntity("player");
+            playerExists = !playerEntity.id.isEmpty();
+        } catch (...) {
+            // Ignore exceptions
+        }
+        
+        if (!playerExists) {
+            createPlayerEntity();
+            return;
+        }
+        
+        // Calculate new position and rotation
+        QVector3D newPosition = position;
+        float newRotation = rotation;
+        
+        // Apply rotation changes
+        bool rotationHasChanged = false;
+        if (rotatingLeft) {
+            newRotation -= rotationSpeed;
+            rotationHasChanged = true;
+        }
+        if (rotatingRight) {
+            newRotation += rotationSpeed;
+            rotationHasChanged = true;
+        }
+        
+        // Normalize rotation to 0-2π
+        while (newRotation < 0) newRotation += 2 * M_PI;
+        while (newRotation >= 2 * M_PI) newRotation -= 2 * M_PI;
+        
+        // Handle jumping physics
+        if (jumping) {
+            // Apply gravity to jump velocity
+            jumpVelocity -= gravity;
+            
+            // Update vertical position
+            newPosition.setY(newPosition.y() + jumpVelocity);
+            
+            // Check if we've landed
+            if (newPosition.y() <= 0.9f) {
+                newPosition.setY(0.9f);
+                jumping = false;
+                jumpVelocity = 0.0f;
+            }
+        }
+        
+        // Apply movement changes at speed based on stance
+        bool positionHasChanged = false;
+        
+        // Reset target velocity to zero
+        targetVelocity = QVector3D(0, 0, 0);
+        
+        // Calculate movement direction
+        if (movingForward || movingBackward || movingLeft || movingRight) {
+            QVector3D movementVector(0, 0, 0);
+            
+            // Calculate raw direction based on inputs
+            if (movingForward) {
+                movementVector += QVector3D(cos(rotation), 0, sin(rotation));
+            }
+            if (movingBackward) {
+                movementVector -= QVector3D(cos(rotation), 0, sin(rotation));
+            }
+            if (movingLeft) {
+                movementVector -= QVector3D(cos(rotation + M_PI/2), 0, sin(rotation + M_PI/2));
+            }
+            if (movingRight) {
+                movementVector += QVector3D(cos(rotation + M_PI/2), 0, sin(rotation + M_PI/2));
+            }
+            
+            // Apply movement with appropriate speed multiplier
+            if (movementVector.length() > 0.01) {
+                movementVector.normalize();
+                float speedMult = getSpeedMultiplier();
+                
+                // Set target velocity based on input
+                targetVelocity = movementVector * (movementSpeed * speedMult);
+            }
+        }
+        
+        // Apply physics: gradually change current velocity toward target velocity
+        velocity.setX(velocity.x() + (targetVelocity.x() - velocity.x()) * acceleration);
+        velocity.setZ(velocity.z() + (targetVelocity.z() - velocity.z()) * acceleration);
+        
+        // Apply friction when no input in that direction
+        if (qAbs(targetVelocity.x()) < 0.001f) {
+            velocity.setX(velocity.x() * (1.0f - friction));
+        }
+        if (qAbs(targetVelocity.z()) < 0.001f) {
+            velocity.setZ(velocity.z() * (1.0f - friction));
+        }
+        
+        // Update position with current velocity
+        if (velocity.length() > 0.001f) {
+            QVector3D newPositionBeforeConstraints = newPosition + velocity;
+            
+            // Check for collisions with voxel walls using the game scene's collision detection
+            if (gameScene && gameScene->checkCollision("player", newPositionBeforeConstraints)) {
+                // Try X movement only
+                QVector3D xOnlyPosition = QVector3D(newPositionBeforeConstraints.x(), newPosition.y(), newPosition.z());
+                
+                // Try Z movement only
+                QVector3D zOnlyPosition = QVector3D(newPosition.x(), newPosition.y(), newPositionBeforeConstraints.z());
+                
+                // Check if we can move along either axis
+                bool canMoveX = !gameScene->checkCollision("player", xOnlyPosition);
+                bool canMoveZ = !gameScene->checkCollision("player", zOnlyPosition);
+                
+                // Choose the valid axis to slide along, or none if both are invalid
+                if (canMoveX) {
+                    newPosition = xOnlyPosition;
+                } else if (canMoveZ) {
+                    newPosition = zOnlyPosition;
+                } else {
+                    // Can't move along either axis, just stop movement in this direction
+                    // Reduce velocity to create a sliding effect
+                    velocity *= 0.5f;
+                }
+            } else {
+                // No collision, move normally
+                newPosition = newPositionBeforeConstraints;
+            }
+            
+            positionHasChanged = true;
+        }
+        
+        // Apply vertical boundary limit only
+        if (newPosition.y() < 0.9f && !jumping) newPosition.setY(0.9f);
+        
+        // Update position if changed
+        if (positionHasChanged || jumping) {
+            // Final collision check to ensure we don't end up inside a wall
+            if (!gameScene || !gameScene->checkCollision("player", newPosition)) {
+                position = newPosition;
+                
+                // Update entity position
+                try {
+                    gameScene->updateEntityPosition("player", position);
+                    emit positionChanged(position);
+                } catch (...) {
+                    // Ignore exceptions
+                }
+            }
+        }
+        
+        // Update rotation if changed
+        if (rotationHasChanged) {
+            rotation = newRotation;
+            emit rotationChanged(rotation);
+        }
+    }
+    catch (const std::exception& e) {
+        qWarning() << "Exception in PlayerController::updatePosition:" << e.what();
+    }
+    catch (...) {
+        qWarning() << "Unknown exception in PlayerController::updatePosition";
+    }
+}
+
+float PlayerController::getEyeHeight() const {
+    switch (stance) {
+        case PlayerStance::Standing:
+            return 1.6f; // Default eye level
+        case PlayerStance::Crouching:
+            return 0.8f; // Half height
+        case PlayerStance::Prone:
+            return 0.2f; // Ground level
+        case PlayerStance::Jumping:
+            return 1.6f + jumpVelocity; // Add jump height
+        default:
+            return 1.6f;
+    }
+}
+
+float PlayerController::getSpeedMultiplier() const {
+    // Base multiplier from stance
+    float multiplier = 1.0f;
+    
+    switch (stance) {
+        case PlayerStance::Standing:
+            multiplier = 1.0f;
+            break;
+        case PlayerStance::Crouching:
+            multiplier = 0.5f; // Half speed
+            break;
+        case PlayerStance::Prone:
+            multiplier = 0.25f; // Quarter speed
+            break;
+        case PlayerStance::Jumping:
+            multiplier = 1.0f;
+            break;
+    }
+    
+    // Apply sprint multiplier if sprinting and allowed to sprint
+    if (sprinting && stance == PlayerStance::Standing) {
+        multiplier *= 2.0f; // Double speed when sprinting
+    }
+    
+    return multiplier;
+}

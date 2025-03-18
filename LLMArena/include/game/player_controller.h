@@ -110,7 +110,10 @@ private:
     
     // Apply movement constraints (walls, etc.)
     QVector3D applyConstraints(const QVector3D &newPosition);
-    
+        
+    // Calculate the normal vector of the closest wall for proper bouncing
+    QVector3D calculateWallNormal(const QVector3D &pos);
+
     // Get current speed multiplier based on stance and sprint
     float getSpeedMultiplier() const;
     
