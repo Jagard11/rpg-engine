@@ -12,19 +12,14 @@ struct Vertex {
 
 void GLArenaWidget::createFloor(double radius)
 {
-    qDebug() << ">> createFloor: Starting with radius:" << radius;
-
     // Step 1: Clean up existing buffers if they exist
     if (m_floorVAO.isCreated()) {
-        qDebug() << ">> createFloor: Destroying existing floor VAO";
         m_floorVAO.destroy();
     }
     if (m_floorVBO.isCreated()) {
-        qDebug() << ">> createFloor: Destroying existing floor VBO";
         m_floorVBO.destroy();
     }
     if (m_floorIBO.isCreated()) {
-        qDebug() << ">> createFloor: Destroying existing floor IBO";
         m_floorIBO.destroy();
     }
 
@@ -36,7 +31,6 @@ void GLArenaWidget::createFloor(double radius)
     std::vector<unsigned int> indices;   // Indices for triangle fan
 
     // Center vertex
-    qDebug() << ">> createFloor: Adding center vertex";
     vertices.push_back(0.0f);  // x
     vertices.push_back(0.0f);  // y
     vertices.push_back(0.0f);  // z
@@ -45,7 +39,6 @@ void GLArenaWidget::createFloor(double radius)
     vertices.push_back(0.0f);  // normal z
 
     // Outer rim vertices
-    qDebug() << ">> createFloor: Adding outer rim vertices";
     for (int i = 0; i <= segments; ++i) {
         float angle = i * angleStep;
         float x = radius * cos(angle);
@@ -59,7 +52,6 @@ void GLArenaWidget::createFloor(double radius)
     }
 
     // Indices for triangle fan
-    qDebug() << ">> createFloor: Creating indices for triangle fan";
     for (int i = 1; i < segments; ++i) {
         indices.push_back(0);       // Center vertex
         indices.push_back(i);       // Current vertex
@@ -71,41 +63,34 @@ void GLArenaWidget::createFloor(double radius)
     indices.push_back(1);
 
     m_floorIndexCount = indices.size();
-    qDebug() << ">> createFloor: Index count set to:" << m_floorIndexCount;
 
     // Step 3: Set up OpenGL buffers
     // Create and bind VAO
-    qDebug() << ">> createFloor: Creating VAO";
     m_floorVAO.create();
     m_floorVAO.bind();
 
     // Create and populate VBO
-    qDebug() << ">> createFloor: Creating VBO";
     m_floorVBO.create();
     m_floorVBO.bind();
     m_floorVBO.allocate(vertices.data(), vertices.size() * sizeof(float));
 
     // Configure vertex attributes
-    qDebug() << ">> createFloor: Setting up vertex attributes";
     glEnableVertexAttribArray(0); // Position
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(1); // Normal
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
 
     // Create and populate IBO
-    qDebug() << ">> createFloor: Creating IBO";
     m_floorIBO.create();
     m_floorIBO.bind();
     m_floorIBO.allocate(indices.data(), indices.size() * sizeof(unsigned int));
 
     // Step 4: Release bindings
-    qDebug() << ">> createFloor: Releasing bindings";
     m_floorVAO.release();
     m_floorVBO.release();
     m_floorIBO.release();
 
     // Step 5: Update game scene
-    qDebug() << ">> createFloor: Updating game scene";
     
     // First, remove old floor entity if exists
     m_gameScene->removeEntity("arena_floor");
@@ -120,8 +105,6 @@ void GLArenaWidget::createFloor(double radius)
     
     // Add entity to game scene
     m_gameScene->addEntity(floorEntity);
-
-    qDebug() << ">> createFloor: Floor creation completed";
 }
 
 void GLArenaWidget::createArena(double radius, double wallHeight)
@@ -134,8 +117,6 @@ void GLArenaWidget::createArena(double radius, double wallHeight)
     m_walls.clear();
     
     try {
-        qDebug() << ">> createArena: Starting with radius:" << radius << "height:" << wallHeight;
-        
         // Create octagonal arena walls
         const int numWalls = 8;
         m_walls.resize(numWalls);
@@ -156,8 +137,6 @@ void GLArenaWidget::createArena(double radius, double wallHeight)
             
             // Calculate wall length
             float wallLength = QVector2D(x2 - x1, z2 - z1).length();
-            
-            qDebug() << ">> createArena: Creating wall" << i << "from" << x1 << z1 << "to" << x2 << z2;
             
             // Create vertices for wall
             Vertex vertices[4];
@@ -184,8 +163,6 @@ void GLArenaWidget::createArena(double radius, double wallHeight)
             // Indices for two triangles
             GLuint indices[6] = { 0, 1, 2, 2, 3, 0 };
             
-            qDebug() << ">> createArena: Setting up wall" << i << "GL objects";
-            
             // Create new WallGeometry
             WallGeometry& wall = m_walls[i];
             
@@ -196,14 +173,14 @@ void GLArenaWidget::createArena(double radius, double wallHeight)
             
             // Create and bind VAO first
             if (!wall.vao->create()) {
-                qWarning() << ">> createArena: Failed to create VAO for wall" << i;
+                qWarning() << "Failed to create VAO for wall" << i;
                 continue;
             }
             wall.vao->bind();
             
             // Create and bind VBO
             if (!wall.vbo->create()) {
-                qWarning() << ">> createArena: Failed to create VBO for wall" << i;
+                qWarning() << "Failed to create VBO for wall" << i;
                 wall.vao->release();
                 continue;
             }
@@ -225,7 +202,7 @@ void GLArenaWidget::createArena(double radius, double wallHeight)
             
             // Create and bind IBO
             if (!wall.ibo->create()) {
-                qWarning() << ">> createArena: Failed to create IBO for wall" << i;
+                qWarning() << "Failed to create IBO for wall" << i;
                 wall.vbo->release();
                 wall.vao->release();
                 continue;
@@ -240,8 +217,6 @@ void GLArenaWidget::createArena(double radius, double wallHeight)
             wall.vbo->release();
             wall.vao->release();
             
-            qDebug() << ">> createArena: Adding wall" << i << "entity to game scene";
-            
             // Create wall entity in game scene
             GameEntity wallEntity;
             wallEntity.id = QString("arena_wall_%1").arg(i);
@@ -253,30 +228,21 @@ void GLArenaWidget::createArena(double radius, double wallHeight)
             m_gameScene->addEntity(wallEntity);
         }
         
-        qDebug() << ">> createArena: Creating floor";
         createFloor(radius);
-        
-        qDebug() << ">> createArena: Creating grid";
         createGrid(radius * 2, 20);
-        
-        qDebug() << ">> createArena: Arena creation completed successfully";
     } catch (const std::exception& e) {
-        qCritical() << ">> createArena: Exception in createArena:" << e.what();
+        qCritical() << "Exception in createArena:" << e.what();
     }
 }
 
 void GLArenaWidget::createGrid(double size, int divisions)
 {
     try {
-        qDebug() << ">> createGrid: Starting with size:" << size << "divisions:" << divisions;
-        
         // Clean up existing grid if needed
         if (m_gridVAO.isCreated()) {
-            qDebug() << ">> createGrid: Destroying existing grid VAO";
             m_gridVAO.destroy();
         }
         if (m_gridVBO.isCreated()) {
-            qDebug() << ">> createGrid: Destroying existing grid VBO";
             m_gridVBO.destroy();
         }
         
@@ -286,7 +252,6 @@ void GLArenaWidget::createGrid(double size, int divisions)
         float step = size / divisions;
         float halfSize = size / 2.0f;
         
-        qDebug() << ">> createGrid: Creating X-axis lines";
         // Create grid lines along x-axis
         for (int i = 0; i <= divisions; i++) {
             float x = -halfSize + i * step;
@@ -294,7 +259,6 @@ void GLArenaWidget::createGrid(double size, int divisions)
             lineVertices.append(QVector3D(x, -0.04f, halfSize));  // End point
         }
         
-        qDebug() << ">> createGrid: Creating Z-axis lines";
         // Create grid lines along z-axis
         for (int i = 0; i <= divisions; i++) {
             float z = -halfSize + i * step;
@@ -302,40 +266,32 @@ void GLArenaWidget::createGrid(double size, int divisions)
             lineVertices.append(QVector3D(halfSize, -0.04f, z));  // End point
         }
         
-        qDebug() << ">> createGrid: Total line vertices:" << lineVertices.size();
-        
-        qDebug() << ">> createGrid: Creating VAO";
         // Create VAO
         if (!m_gridVAO.create()) {
-            qWarning() << ">> createGrid: Failed to create grid VAO";
+            qWarning() << "Failed to create grid VAO";
             return;
         }
         m_gridVAO.bind();
         
-        qDebug() << ">> createGrid: Creating VBO";
         // Create VBO
         if (!m_gridVBO.create()) {
-            qWarning() << ">> createGrid: Failed to create grid VBO";
+            qWarning() << "Failed to create grid VBO";
             m_gridVAO.release();
             return;
         }
         m_gridVBO.bind();
         m_gridVBO.allocate(lineVertices.constData(), lineVertices.size() * sizeof(QVector3D));
         
-        qDebug() << ">> createGrid: Setting up vertex attributes";
         // Set vertex attribute
         glEnableVertexAttribArray(0);
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(QVector3D), nullptr);
         
         m_gridVertexCount = lineVertices.size();
         
-        qDebug() << ">> createGrid: Releasing bindings";
         // Release bindings
         m_gridVBO.release();
         m_gridVAO.release();
-        
-        qDebug() << ">> createGrid: Grid creation completed successfully";
     } catch (const std::exception& e) {
-        qCritical() << ">> createGrid: Exception in createGrid:" << e.what();
+        qCritical() << "Exception in createGrid:" << e.what();
     }
 }

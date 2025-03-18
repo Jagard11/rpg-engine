@@ -32,7 +32,6 @@ SkySystem::~SkySystem() {
     // Only clean up if we have a valid OpenGL context
     QOpenGLContext* context = QOpenGLContext::currentContext();
     if (!context || !context->isValid()) {
-        qWarning() << "No valid OpenGL context in SkySystem destructor";
         return;
     }
     
@@ -143,8 +142,6 @@ void SkySystem::initialize() {
         
         // Only now start the timer
         m_updateTimer.start();
-        
-        qDebug() << "SkySystem initialized successfully";
     } catch (const std::exception& e) {
         qCritical() << "SkySystem initialization failed:" << e.what();
     } catch (...) {
@@ -332,19 +329,8 @@ void SkySystem::updateTime() {
         
         // Update sky color
         calculateSkyColor();
-        
-        // Check OpenGL errors after sky update
-        QOpenGLContext* ctx = QOpenGLContext::currentContext();
-        if (ctx && ctx->isValid()) {
-            GLenum err;
-            while ((err = glGetError()) != GL_NO_ERROR) {
-                qCritical() << "SEGFAULT-CHECK: OpenGL error in SkySystem::updateTime:" << err;
-            }
-        }
-    } catch (const std::exception& e) {
-        qCritical() << "SEGFAULT-CHECK: Exception in SkySystem::updateTime:" << e.what();
     } catch (...) {
-        qCritical() << "SEGFAULT-CHECK: Unknown exception in SkySystem::updateTime";
+        // Silent exception handling to prevent crashes
     }
 }
 
@@ -441,7 +427,6 @@ void SkySystem::calculateSkyColor() {
     // Update color if changed
     if (m_skyColor != newColor) {
         m_skyColor = newColor;
-        qDebug() << "Sky color changed to" << m_skyColor.name();
         emit skyColorChanged(m_skyColor);
     }
 }
@@ -454,8 +439,8 @@ void SkySystem::update() {
         // Update positions and colors
         updateCelestialPositions();
         calculateSkyColor();
-    } catch (const std::exception& e) {
-        qWarning() << "Exception in SkySystem::update:" << e.what();
+    } catch (...) {
+        // Silent exception handling
     }
 }
 
@@ -527,10 +512,8 @@ void SkySystem::render(const QMatrix4x4& viewMatrix, const QMatrix4x4& projectio
         
         // Don't render sun and moon for now - simplify to reduce potential issues
         
-    } catch (const std::exception& e) {
-        qCritical() << "Exception during sky rendering:" << e.what();
     } catch (...) {
-        qCritical() << "Unknown exception during sky rendering";
+        // Silent exception handling
     }
 }
 

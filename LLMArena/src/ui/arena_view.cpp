@@ -6,7 +6,7 @@
 #include <QTimer>
 #include <QCoreApplication>
 #include <QPainter>
-#include <QDir>  // Added missing include for QDir
+#include <QDir>
 
 // ArenaView constructor
 ArenaView::ArenaView(CharacterManager *charManager, QWidget *parent)
@@ -53,8 +53,6 @@ ArenaView::ArenaView(CharacterManager *charManager, QWidget *parent)
         focusTimer->start(2000); // Check every two seconds - less aggressive
         
     } catch (const std::exception& e) {
-        qWarning() << "Failed to create GLArenaWidget:" << e.what();
-        
         // Create a simplified UI with an error message
         QVBoxLayout *errorLayout = new QVBoxLayout(this);
         QLabel *errorLabel = new QLabel(
@@ -78,7 +76,6 @@ ArenaView::ArenaView(CharacterManager *charManager, QWidget *parent)
 void ArenaView::initialize() {
     // Don't immediately initialize the arena - this will happen in onRendererInitialized
     // after the voxel system is properly set up
-    qDebug() << "ArenaView initialized - waiting for renderer initialization";
 }
 
 void ArenaView::setupUI() {
@@ -224,8 +221,6 @@ void ArenaView::showEvent(QShowEvent *event) {
 
 // Override focus events to debug focus issues
 void ArenaView::focusInEvent(QFocusEvent *event) {
-    qDebug() << "ArenaView received focus";
-    
     // Forward focus to OpenGL widget if it exists
     if (glWidget) {
         glWidget->setFocus();
@@ -235,8 +230,6 @@ void ArenaView::focusInEvent(QFocusEvent *event) {
 }
 
 void ArenaView::focusOutEvent(QFocusEvent *event) {
-    qDebug() << "ArenaView lost focus";
-    
     // Let the base class handle the event
     QWidget::focusOutEvent(event);
 }
@@ -252,7 +245,6 @@ void ArenaView::onCharacterSelected(const QString &characterName) {
 void ArenaView::onResetArena() {
     // Reset arena parameters and player position if OpenGL widget is available
     if (glWidget) {
-        qDebug() << "Resetting arena to 20m width with 2m height";
         glWidget->initializeArena(20.0, 2.0);
         
         if (glWidget->getPlayerController()) {
@@ -272,14 +264,11 @@ void ArenaView::onArenaParametersChanged() {
 }
 
 void ArenaView::onRendererInitialized() {
-    qDebug() << "OpenGL rendering initialized";
-    
     // Now that the renderer is initialized, it's safe to initialize the arena
     // The voxel system should be created by now
     if (glWidget) {
         // Use a short delay to ensure VoxelSystem is fully set up
         QTimer::singleShot(100, this, [this]() {
-            qDebug() << "Initializing arena with default parameters";
             glWidget->initializeArena(10.0, 2.0);
         });
     }
@@ -327,24 +316,17 @@ void ArenaView::loadCharacter(const QString &characterName) {
         
         // Use default sprite if none set
         if (appearance.spritePath.isEmpty()) {
-            qDebug() << "No sprite set for character, using default";
-            
             // Use absolute path for resources
             QString resourceDir = QDir::currentPath() + "/resources";
             QString defaultSpritePath = resourceDir + "/default_character.png";
             appearance.spritePath = defaultSpritePath;
             
-            qDebug() << "Default sprite path:" << defaultSpritePath;
-            
             // Create default sprite file if it doesn't exist
             QFile defaultSprite(appearance.spritePath);
             if (!defaultSprite.exists()) {
-                qDebug() << "Creating default sprite file";
-                
                 // Ensure resources directory exists
                 QDir dir;
                 if (!dir.exists(resourceDir)) {
-                    qDebug() << "Creating resources directory:" << resourceDir;
                     if (!dir.mkpath(resourceDir)) {
                         qWarning() << "Failed to create resources directory:" << resourceDir;
                         
@@ -358,8 +340,6 @@ void ArenaView::loadCharacter(const QString &characterName) {
                     // Create a simple placeholder image
                     QImage image(128, 256, QImage::Format_ARGB32);
                     image.fill(Qt::transparent);
-                    
-                    qDebug() << "Drawing default sprite";
                     
                     // Draw a simple figure
                     QPainter painter(&image);
@@ -382,14 +362,12 @@ void ArenaView::loadCharacter(const QString &characterName) {
                     painter.drawRect(40, 170, 20, 80);
                     painter.drawRect(68, 170, 20, 80);
                     
-                    qDebug() << "Saving default sprite to:" << appearance.spritePath;
                     if (!image.save(appearance.spritePath)) {
                         qWarning() << "Failed to save default sprite image";
                         // Use empty path to trigger missing texture visualization
                         glWidget->loadCharacterSprite(characterName, "");
                         return;
                     }
-                    qDebug() << "Default sprite saved successfully";
                 }
                 catch (const std::exception& e) {
                     qWarning() << "Exception creating default sprite:" << e.what();

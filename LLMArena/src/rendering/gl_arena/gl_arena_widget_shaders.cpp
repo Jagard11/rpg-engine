@@ -29,8 +29,6 @@ const char* billboardFragmentShaderSource =
 
 bool GLArenaWidget::initShaders()
 {
-    qDebug() << "Initializing ultra simple billboard shader";
-    
     // Clean up existing shader
     if (m_billboardProgram) {
         delete m_billboardProgram;
@@ -43,13 +41,11 @@ bool GLArenaWidget::initShaders()
         m_billboardProgram = new QOpenGLShaderProgram(this);
         
         // Compile billboard shader
-        qDebug() << "Compiling vertex shader";
         if (!m_billboardProgram->addShaderFromSourceCode(QOpenGLShader::Vertex, billboardVertexShaderSource)) {
             qWarning() << "Failed to compile billboard vertex shader:" << m_billboardProgram->log();
             return false;
         }
         
-        qDebug() << "Compiling fragment shader";
         if (!m_billboardProgram->addShaderFromSourceCode(QOpenGLShader::Fragment, billboardFragmentShaderSource)) {
             qWarning() << "Failed to compile billboard fragment shader:" << m_billboardProgram->log();
             return false;
@@ -59,21 +55,9 @@ bool GLArenaWidget::initShaders()
         m_billboardProgram->bindAttributeLocation("vertexPosition", 0);
         m_billboardProgram->bindAttributeLocation("vertexTexCoord", 1);
         
-        qDebug() << "Linking shader program";
         if (!m_billboardProgram->link()) {
             qWarning() << "Failed to link billboard shader program:" << m_billboardProgram->log();
             return false;
-        }
-        
-        qDebug() << "Billboard shader program linked successfully";
-        
-        // Verify and print uniform locations for debugging
-        qDebug() << "Billboard Shader Uniforms:";
-        QStringList uniforms = {"view", "projection", "position", "size", "textureSampler"};
-        
-        for (const QString &name : uniforms) {
-            int loc = m_billboardProgram->uniformLocation(name);
-            qDebug() << "  Uniform" << name << "location:" << loc;
         }
         
         return true;

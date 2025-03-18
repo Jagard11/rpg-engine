@@ -17,7 +17,10 @@ void GameScene::addEntity(const GameEntity &entity) {
     if (!entity.id.startsWith("voxel_") && 
         entity.id != "sun" && 
         entity.id != "moon") {
-        qDebug() << "Added entity:" << entity.id;
+        // Only log player and character entities
+        if (entity.id == "player" || entity.type == "character") {
+            qDebug() << "Added entity:" << entity.id;
+        }
     }
     
     entities[entity.id] = entity;
@@ -34,6 +37,7 @@ void GameScene::removeEntity(const QString &id) {
 void GameScene::updateEntityPosition(const QString &id, const QVector3D &position) {
     if (entities.contains(id)) {
         GameEntity &entity = entities[id];
+        // Silently update position without any logging
         entity.position = position;
         emit entityPositionUpdated(id, position);
     }
@@ -85,7 +89,7 @@ bool GameScene::checkCollision(const QString &entityId, const QVector3D &newPosi
     
     GameEntity &entity = entities[entityId];
     
-    // SEGFAULT-FIX: First check if new position is inside the arena
+    // First check if new position is inside the arena
     if (!isInsideArena(newPosition)) {
         return true; // Collision with arena boundary
     }
@@ -103,7 +107,7 @@ bool GameScene::checkCollision(const QString &entityId, const QVector3D &newPosi
             continue;
         }
         
-        // SEGFAULT-FIX: Skip voxel and celestial entities after a certain count
+        // Skip voxel and celestial entities after a certain count
         // to prevent excessive checking
         if ((it.key().startsWith("voxel_") || it.key() == "sun" || it.key() == "moon") && 
             checkCount > MAX_CHECKS) {
@@ -117,8 +121,6 @@ bool GameScene::checkCollision(const QString &entityId, const QVector3D &newPosi
         tempEntity.position = newPosition;
         
         if (areEntitiesColliding(tempEntity, it.value())) {
-            // Emit collision event
-            qDebug() << "SEGFAULT-FIX: Collision detected between" << entityId << "and" << it.key();
             emit collisionDetected(entityId, it.key());
             return true;
         }
@@ -196,7 +198,7 @@ bool GameScene::areEntitiesColliding(const GameEntity &entityA, const GameEntity
         return false;
     }
     
-    // SEGFAULT-FIX: Extra safety checks for null dimensions
+    // Extra safety checks for null dimensions
     float aWidth = entityA.dimensions.x() > 0 ? entityA.dimensions.x() : 1.0f;
     float aHeight = entityA.dimensions.y() > 0 ? entityA.dimensions.y() : 1.0f;
     float aDepth = entityA.dimensions.z() > 0 ? entityA.dimensions.z() : 1.0f;

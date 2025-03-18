@@ -109,8 +109,6 @@ void PlayerController::beginStanceTransition(PlayerStance newStance) {
     
     // Start the timer if there's a transition time
     if (transitionTime > 0) {
-        qDebug() << "Starting stance transition from" << (int)stance << "to" << (int)targetStance 
-                 << "with duration" << transitionTime << "ms";
         stanceTransitionTimer.start(transitionTime);
     } else {
         // Complete immediately if no transition time
@@ -122,7 +120,6 @@ void PlayerController::completeStanceTransition() {
     if (!inStanceTransition)
         return;
     
-    qDebug() << "Completed stance transition to" << (int)targetStance;
     stance = targetStance;
     inStanceTransition = false;
     
@@ -265,7 +262,6 @@ void PlayerController::handleMouseMove(QMouseEvent *event) {
 
 void PlayerController::createPlayerEntity() {
     if (!gameScene) {
-        qWarning() << "Cannot create player entity: no game scene";
         return;
     }
     
@@ -315,9 +311,6 @@ void PlayerController::createPlayerEntity() {
         // Initial rotation (facing toward center of room)
         rotation = atan2(-position.z(), -position.x());
         
-        qDebug() << "Player entity created at position:" << position.x() << position.y() << position.z()
-                << "with rotation:" << rotation;
-        
         // Emit initial position and stance
         emit positionChanged(position);
         emit rotationChanged(rotation);
@@ -332,12 +325,10 @@ void PlayerController::createPlayerEntity() {
 }
 
 void PlayerController::startUpdates() {
-    qDebug() << "Starting position updates at" << updateTimer.interval() << "ms interval";
     updateTimer.start();
 }
 
 void PlayerController::stopUpdates() {
-    qDebug() << "Stopping position updates";
     updateTimer.stop();
 }
 
@@ -370,7 +361,6 @@ void PlayerController::updatePosition() {
         }
         
         if (!playerExists) {
-            qWarning() << "Player entity not found in scene, recreating";
             createPlayerEntity();
             return;
         }

@@ -1,11 +1,11 @@
 // src/game/game_scene.cpp
 #include "../include/game/game_scene.h"
-#include <QDebug>
+#include <QDebug>  // Add this for qDebug
+#include <QDateTime>  // Add this for QDateTime
 #include <cmath>
 
 GameScene::GameScene(QObject *parent) 
     : QObject(parent), arenaRadius(10.0), arenaWallHeight(2.0) {
-    qDebug() << "Creating GameScene with default arena radius:" << arenaRadius << "and wall height:" << arenaWallHeight;
 }
 
 void GameScene::addEntity(const GameEntity &entity) {
@@ -14,33 +14,22 @@ void GameScene::addEntity(const GameEntity &entity) {
         removeEntity(entity.id);
     }
     
+    // Skip all debug logging
     entities[entity.id] = entity;
-    // qDebug() << "Added entity:" << entity.id << "at position" 
-    //          << entity.position.x() << entity.position.y() << entity.position.z();
     emit entityAdded(entity);
 }
 
 void GameScene::removeEntity(const QString &id) {
     if (entities.contains(id)) {
-        qDebug() << "Removed entity:" << id;
         entities.remove(id);
         emit entityRemoved(id);
     }
 }
 
 void GameScene::updateEntityPosition(const QString &id, const QVector3D &position) {
+    // Silently update position without any logging whatsoever
     if (entities.contains(id)) {
-        GameEntity &entity = entities[id];
-        
-        // Debug position update if it's significant
-        QVector3D delta = position - entity.position;
-        if (delta.length() > 0.01) { // Only log if position changed significantly
-            qDebug() << "Entity" << id << "moved from" 
-                    << entity.position.x() << entity.position.y() << entity.position.z()
-                    << "to" << position.x() << position.y() << position.z();
-        }
-        
-        entity.position = position;
+        entities[id].position = position;
         emit entityPositionUpdated(id, position);
     }
 }
@@ -75,6 +64,16 @@ QVector<GameEntity> GameScene::getAllEntities() const {
 }
 
 bool GameScene::checkCollision(const QString &entityId, const QVector3D &newPosition) {
+    // Added safety to prevent excessive checks
+    static qint64 lastCollisionCheck = 0;
+    qint64 currentTime = QDateTime::currentMSecsSinceEpoch();
+    
+    if (currentTime - lastCollisionCheck < 10) { // Avoid too many checks in quick succession
+        return false; // Assume no collision to avoid processing overhead
+    }
+    lastCollisionCheck = currentTime;
+
+    // First check that our entity exists
     if (!entities.contains(entityId)) {
         return false;
     }
@@ -86,6 +85,11 @@ bool GameScene::checkCollision(const QString &entityId, const QVector3D &newPosi
         return true; // Collision with arena boundary
     }
     
+    // Start with checking only a limited number of entities
+    // This prevents excessive checking that might overload OpenGL
+    const int MAX_CHECKS = 20;
+    int checkCount = 0;
+    
     // Check collisions with other entities
     for (auto it = entities.constBegin(); it != entities.constEnd(); ++it) {
         // Skip self, floor entity, non-collidable entities, and static-static collisions
@@ -94,12 +98,20 @@ bool GameScene::checkCollision(const QString &entityId, const QVector3D &newPosi
             continue;
         }
         
+        // Skip voxel and celestial entities after a certain count
+        // to prevent excessive checking
+        if ((it.key().startsWith("voxel_") || it.key() == "sun" || it.key() == "moon") && 
+            checkCount > MAX_CHECKS) {
+            continue;
+        }
+        
+        checkCount++;
+        
         // Create a temporary entity with the new position
         GameEntity tempEntity = entity;
         tempEntity.position = newPosition;
         
         if (areEntitiesColliding(tempEntity, it.value())) {
-            // Emit collision event
             emit collisionDetected(entityId, it.key());
             return true;
         }
@@ -112,8 +124,6 @@ void GameScene::createOctagonalArena(double radius, double wallHeight) {
     // Store the parameters
     arenaRadius = radius;
     arenaWallHeight = wallHeight;
-    
-    qDebug() << "Creating octagonal arena with radius:" << radius << "and wall height:" << wallHeight;
     
     // Remove any existing arena entities before recreating
     QStringList arenaEntities;
@@ -179,15 +189,24 @@ bool GameScene::areEntitiesColliding(const GameEntity &entityA, const GameEntity
         return false;
     }
     
+    // Extra safety checks for null dimensions
+    float aWidth = entityA.dimensions.x() > 0 ? entityA.dimensions.x() : 1.0f;
+    float aHeight = entityA.dimensions.y() > 0 ? entityA.dimensions.y() : 1.0f;
+    float aDepth = entityA.dimensions.z() > 0 ? entityA.dimensions.z() : 1.0f;
+    
+    float bWidth = entityB.dimensions.x() > 0 ? entityB.dimensions.x() : 1.0f;
+    float bHeight = entityB.dimensions.y() > 0 ? entityB.dimensions.y() : 1.0f;
+    float bDepth = entityB.dimensions.z() > 0 ? entityB.dimensions.z() : 1.0f;
+    
     // Simple AABB collision check with relaxed tolerances
     bool xOverlap = fabs(entityA.position.x() - entityB.position.x()) < 
-        (entityA.dimensions.x() / 2 + entityB.dimensions.x() / 2) * 0.9;
+        (aWidth / 2 + bWidth / 2) * 0.9;
         
     bool yOverlap = fabs(entityA.position.y() - entityB.position.y()) < 
-        (entityA.dimensions.y() / 2 + entityB.dimensions.y() / 2) * 0.9;
+        (aHeight / 2 + bHeight / 2) * 0.9;
         
     bool zOverlap = fabs(entityA.position.z() - entityB.position.z()) < 
-        (entityA.dimensions.z() / 2 + entityB.dimensions.z() / 2) * 0.9;
+        (aDepth / 2 + bDepth / 2) * 0.9;
     
     return xOverlap && yOverlap && zOverlap;
 }

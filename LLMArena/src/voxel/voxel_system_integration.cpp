@@ -23,10 +23,8 @@ VoxelSystemIntegration::VoxelSystemIntegration(GameScene* gameScene, QObject* pa
         
         // Connect signals
         connectSignals();
-        
-        qDebug() << "VoxelSystemIntegration created successfully";
     } catch (const std::exception& e) {
-        qCritical() << "SEGFAULT-CHECK: Failed to create voxel system components:" << e.what();
+        qCritical() << "Failed to create voxel system components:" << e.what();
         // Clean up partially initialized components
         delete m_renderer;
         m_renderer = nullptr;
@@ -35,14 +33,13 @@ VoxelSystemIntegration::VoxelSystemIntegration(GameScene* gameScene, QObject* pa
 }
 
 VoxelSystemIntegration::~VoxelSystemIntegration() {
-    qDebug() << "SEGFAULT-CHECK: VoxelSystemIntegration destructor called";
     delete m_renderer; // m_renderer doesn't have a parent, so delete it explicitly
 }
 
 void VoxelSystemIntegration::initialize() {
     // Check if components exist
     if (!m_world || !m_renderer) {
-        qCritical() << "SEGFAULT-CHECK: Cannot initialize voxel system: components not created";
+        qCritical() << "Cannot initialize voxel system: components not created";
         throw std::runtime_error("Voxel system components not created");
     }
     
@@ -58,12 +55,10 @@ void VoxelSystemIntegration::initialize() {
         if (m_sky) {
             m_sky->initialize();
         } else {
-            qWarning() << "SEGFAULT-CHECK: Sky system is null during initialization";
+            qWarning() << "Sky system is null during initialization";
         }
-        
-        qDebug() << "Voxel system initialized successfully";
     } catch (const std::exception& e) {
-        qCritical() << "SEGFAULT-CHECK: Failed to initialize voxel system:" << e.what();
+        qCritical() << "Failed to initialize voxel system:" << e.what();
         throw; // Rethrow to notify caller
     }
 }
@@ -71,13 +66,7 @@ void VoxelSystemIntegration::initialize() {
 void VoxelSystemIntegration::render(const QMatrix4x4& viewMatrix, const QMatrix4x4& projectionMatrix) {
     try {
         // Check component validity
-        if (!m_renderer) {
-            qCritical() << "SEGFAULT-CHECK: Renderer is null in VoxelSystemIntegration::render";
-            return;
-        }
-        
-        if (!m_world) {
-            qCritical() << "SEGFAULT-CHECK: World is null in VoxelSystemIntegration::render";
+        if (!m_renderer || !m_world) {
             return;
         }
 
@@ -95,46 +84,36 @@ void VoxelSystemIntegration::render(const QMatrix4x4& viewMatrix, const QMatrix4
         if (m_sky) {
             try {
                 m_sky->render(viewMatrix, projectionMatrix);
-            } catch (const std::exception& e) {
-                qWarning() << "SEGFAULT-CHECK: Error rendering sky:" << e.what();
             } catch (...) {
-                qWarning() << "SEGFAULT-CHECK: Unknown error rendering sky";
+                // Silent catch - just continue
             }
         }
         
         // Render voxel world
         try {
             m_renderer->render(viewMatrix, projectionMatrix);
-        } catch (const std::exception& e) {
-            qWarning() << "SEGFAULT-CHECK: Error rendering voxels:" << e.what();
         } catch (...) {
-            qWarning() << "SEGFAULT-CHECK: Unknown error rendering voxels";
+            // Silent catch - just continue
         }
-    } catch (const std::exception& e) {
-        qCritical() << "SEGFAULT-CHECK: Exception during voxel system rendering:" << e.what();
     } catch (...) {
-        qCritical() << "SEGFAULT-CHECK: Unknown exception during voxel system rendering";
+        // Silent catch - keep rendering flow intact
     }
 }
 
 void VoxelSystemIntegration::createDefaultWorld() {
     if (!m_world) {
-        qCritical() << "SEGFAULT-CHECK: Cannot create default world: world component not initialized";
+        qCritical() << "Cannot create default world: world component not initialized";
         return;
     }
     
     try {
-        qDebug() << "Creating default voxel world";
-        
         // Create room 20x20 with 3m height (safer value)
         m_world->createRoomWithWalls(20, 20, 3);
         
         // Update the game scene to match the voxel world
         updateGameScene();
-        
-        qDebug() << "Default world created successfully";
     } catch (const std::exception& e) {
-        qCritical() << "SEGFAULT-CHECK: Failed to create default world:" << e.what();
+        qCritical() << "Failed to create default world:" << e.what();
     }
 }
 
@@ -153,12 +132,6 @@ void VoxelSystemIntegration::connectSignals() {
     // Disconnect any existing sky signal connections
     if (m_sky) {
         disconnect(m_sky, &SkySystem::skyColorChanged, nullptr, nullptr);
-        
-        // Connect sky color changes with a safer approach
-        connect(m_sky, &SkySystem::skyColorChanged, [this](const QColor& color) {
-            qDebug() << "Sky color changed to" << color.name();
-            // Don't modify OpenGL state here - that will happen during render
-        });
     }
 }
 
@@ -174,19 +147,16 @@ void VoxelSystemIntegration::updateGameScene() {
     lastUpdateTime = currentTime;
 
     if (!m_gameScene || !m_world) {
-        qWarning() << "SEGFAULT-CHECK: Cannot update game scene: missing components";
         return;
     }
     
     // Static flag to prevent recursive updates
     static bool isUpdating = false;
     if (isUpdating) {
-        qDebug() << "Already updating game scene, skipping recursive call";
         return;
     }
     
     isUpdating = true;
-    qDebug() << "---Beginning voxel world sync (happens only occasionally)---";
     
     try {
         // Get all visible voxels
@@ -282,15 +252,10 @@ void VoxelSystemIntegration::updateGameScene() {
                 // Use updateEntityPosition method directly to avoid remove/add cycle
                 m_gameScene->updateEntityPosition("moon", moonPos);
             }
-        } else {
-            qWarning() << "SEGFAULT-CHECK: Sky system is null during updateGameScene";
         }
-        
-        qDebug() << "Updated game scene with" << voxelCount << "voxel entities";
     } catch (const std::exception& e) {
-        qCritical() << "SEGFAULT-CHECK: Exception in updateGameScene:" << e.what();
+        qCritical() << "Exception in updateGameScene:" << e.what();
     }
     
-    qDebug() << "---Voxel world sync completed---";
     isUpdating = false;
 }

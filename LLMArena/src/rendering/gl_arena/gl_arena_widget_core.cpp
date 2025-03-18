@@ -35,43 +35,28 @@ GLArenaWidget::GLArenaWidget(CharacterManager* charManager, QWidget* parent)
 
 GLArenaWidget::~GLArenaWidget()
 {
-    qDebug() << "SEGFAULT-CHECK: GLArenaWidget destructor called";
-    
     try {
         makeCurrent();
         
         // Clean up character sprites
-        qDebug() << "SEGFAULT-CHECK: Deleting" << m_characterSprites.size() << "character sprites";
         for (auto it = m_characterSprites.begin(); it != m_characterSprites.end(); ++it) {
             if (it.value()) {
-                try {
-                    qDebug() << "SEGFAULT-CHECK: Deleting sprite for" << it.key();
-                    delete it.value();
-                } catch (const std::exception& e) {
-                    qCritical() << "SEGFAULT-CHECK: Exception deleting sprite:" << e.what();
-                } catch (...) {
-                    qCritical() << "SEGFAULT-CHECK: Unknown exception deleting sprite";
-                }
+                delete it.value();
             }
         }
         m_characterSprites.clear();
         
         // Clean up shader programs
-        qDebug() << "SEGFAULT-CHECK: Deleting shader programs";
         delete m_billboardProgram;
         m_billboardProgram = nullptr;
         
         // Delete voxel system
-        qDebug() << "SEGFAULT-CHECK: Deleting voxel system";
         delete m_voxelSystem;
         m_voxelSystem = nullptr;
         
-        qDebug() << "SEGFAULT-CHECK: Resources deleted successfully";
         doneCurrent();
-    } catch (const std::exception& e) {
-        qCritical() << "SEGFAULT-CHECK: Exception in GLArenaWidget destructor:" << e.what();
     } catch (...) {
-        qCritical() << "SEGFAULT-CHECK: Unknown exception in GLArenaWidget destructor";
+        // Silent cleanup error - we're already destructing
     }
 }
 
@@ -95,7 +80,6 @@ void GLArenaWidget::initializeGL()
         // Initialize the voxel system with a try-catch to handle any errors
         try {
             m_voxelSystem->initialize();
-            qDebug() << "Voxel system successfully initialized";
         } catch (const std::exception& e) {
             qCritical() << "Failed to initialize voxel system:" << e.what();
             // Keep the voxel system object but mark it as not initialized
@@ -129,13 +113,11 @@ void GLArenaWidget::initializeArena(double width, double height)
 {
     // Check if we're properly initialized
     if (!m_initialized) {
-        qWarning() << "Cannot initialize arena: OpenGL not initialized";
         return;
     }
     
-    // Check if voxel system is initialized with more details
+    // Check if voxel system is initialized
     if (!m_voxelSystem) {
-        qWarning() << "Cannot initialize arena: voxel system not initialized";
         return;
     }
     
@@ -145,19 +127,8 @@ void GLArenaWidget::initializeArena(double width, double height)
         m_wallHeight = height;
         
         // Create a default room with the voxel system
-        qDebug() << "Creating default world in voxel system";
         m_voxelSystem->createDefaultWorld();
-        
-        qDebug() << "Arena initialized with radius" << m_arenaRadius << "and height" << m_wallHeight;
     } catch (const std::exception& e) {
         qCritical() << "Exception in initializeArena:" << e.what();
-    }
-}
-
-// Helper function to check OpenGL errors
-static void checkGLError(const char* step) {
-    GLenum err = glGetError();
-    if (err != GL_NO_ERROR) {
-        qCritical() << "OpenGL error at" << step << ":" << err;
     }
 }

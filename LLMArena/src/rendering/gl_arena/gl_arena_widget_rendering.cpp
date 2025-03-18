@@ -11,14 +11,6 @@ static int errorCount = 0;  // To limit error reporting
 
 void GLArenaWidget::paintGL()
 {
-    // Log render cycles occasionally
-    static int renderCounter = 0;
-    renderCounter++;
-    
-    if (renderCounter % 300 == 0) {
-        qDebug() << "Render cycle #" << renderCounter;
-    }
-    
     // Try to lock mutex - skip frame if can't acquire immediately
     if (!renderingMutex.tryLock()) {
         return;

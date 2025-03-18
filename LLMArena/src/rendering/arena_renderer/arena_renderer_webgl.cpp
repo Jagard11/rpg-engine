@@ -20,7 +20,6 @@ bool isWebGLSupported() {
     surface.setFormat(format);
     surface.create();
     if (!surface.isValid()) {
-        qWarning() << "Failed to create valid offscreen surface for WebGL check";
         return false;
     }
     
@@ -28,13 +27,11 @@ bool isWebGLSupported() {
     QOpenGLContext context;
     context.setFormat(format);
     if (!context.create()) {
-        qWarning() << "Failed to create OpenGL context for WebGL check";
         return false;
     }
     
     // Make it current
     if (!context.makeCurrent(&surface)) {
-        qWarning() << "Failed to make OpenGL context current for WebGL check";
         return false;
     }
     
@@ -43,32 +40,6 @@ bool isWebGLSupported() {
     QSurfaceFormat curFormat = context.format();
     int majorVersion = curFormat.majorVersion();
     int minorVersion = curFormat.minorVersion();
-    
-    // Get vendor and renderer strings
-    QOpenGLFunctions *f = context.functions();
-    if (!f) {
-        qWarning() << "Failed to get OpenGL functions";
-        return false;
-    }
-    
-    QString vendor = QString::fromLatin1(reinterpret_cast<const char*>(f->glGetString(GL_VENDOR)));
-    QString renderer = QString::fromLatin1(reinterpret_cast<const char*>(f->glGetString(GL_RENDERER)));
-    QString version = QString::fromLatin1(reinterpret_cast<const char*>(f->glGetString(GL_VERSION)));
-    
-    qDebug() << "OpenGL context valid:" << isValid;
-    qDebug() << "OpenGL version:" << majorVersion << "." << minorVersion;
-    qDebug() << "OpenGL vendor:" << vendor;
-    qDebug() << "OpenGL renderer:" << renderer;
-    qDebug() << "OpenGL version string:" << version;
-    
-    // Check if we're using software rendering
-    bool isSoftwareRenderer = renderer.contains("llvmpipe", Qt::CaseInsensitive) || 
-                             renderer.contains("software", Qt::CaseInsensitive) ||
-                             renderer.contains("swrast", Qt::CaseInsensitive);
-    
-    if (isSoftwareRenderer) {
-        qWarning() << "Software rendering detected, hardware acceleration may not be available";
-    }
     
     // WebGL requires at least OpenGL 2.0
     bool hasWebGL = isValid && (majorVersion > 2 || (majorVersion == 2 && minorVersion >= 0));
@@ -80,18 +51,7 @@ bool isWebGLSupported() {
 void ArenaRenderer::initializeWebGL() {
     // Execute JavaScript setup code
     injectJavaScript(R"(
-        console.log("WebGL initialization from C++");
-        
-        // Check if fallback mode is active
-        if (typeof useFallback !== 'undefined' && useFallback) {
-            console.log("Using fallback visualization mode");
-        }
-        
-        // Report WebGL capabilities
-        if (typeof checkWebGL === 'function') {
-            let webglSupport = checkWebGL();
-            console.log("WebGL support: " + webglSupport);
-        }
+        console.log("WebGL initialization started");
     )");
 }
 
@@ -105,7 +65,6 @@ bool ArenaRenderer::createArenaHtmlFile(const QString &filePath) {
     QFile htmlFile(filePath);
     
     if (!htmlFile.open(QIODevice::WriteOnly)) {
-        qWarning() << "Failed to open file for writing:" << filePath;
         return false;
     }
     
@@ -229,48 +188,11 @@ bool ArenaRenderer::createArenaHtmlFile(const QString &filePath) {
                 const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
                 
                 if (!gl) {
-                    console.error("WebGL not available");
-                    updateDebugInfo("WebGL not available");
                     return false;
-                }
-                
-                // Get WebGL info
-                const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
-                let vendor = gl.getParameter(gl.VENDOR);
-                let renderer = gl.getParameter(gl.RENDERER);
-                
-                if (debugInfo) {
-                    vendor = gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL);
-                    renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
-                }
-                
-                const version = gl.getParameter(gl.VERSION);
-                const glslVersion = gl.getParameter(gl.SHADING_LANGUAGE_VERSION);
-                const extensions = gl.getSupportedExtensions();
-                
-                console.log("WebGL Vendor:", vendor);
-                console.log("WebGL Renderer:", renderer);
-                console.log("WebGL Version:", version);
-                console.log("GLSL Version:", glslVersion);
-                console.log("WebGL Extensions:", extensions);
-                
-                updateDebugInfo(`WebGL: ${vendor} - ${renderer}`);
-                
-                // Check if using software rendering
-                const isSoftware = renderer.includes('SwiftShader') || 
-                                 renderer.includes('llvmpipe') || 
-                                 renderer.includes('Software') ||
-                                 renderer.includes('swrast');
-                
-                if (isSoftware) {
-                    console.warn("Software rendering detected");
-                    updateDebugInfo(`WebGL: Software rendering (${renderer})`);
                 }
                 
                 return true;
             } catch(e) {
-                console.error("WebGL detection failed:", e);
-                updateDebugInfo("WebGL detection error: " + e.message);
                 return false;
             }
         }
@@ -291,8 +213,6 @@ bool ArenaRenderer::createArenaHtmlFile(const QString &filePath) {
         
         // Fallback to basic canvas rendering when WebGL isn't available
         function initFallback() {
-            console.log("Initializing fallback visualization");
-            
             document.getElementById('fallback-container').style.display = 'block';
             document.getElementById('canvas-container').style.display = 'none';
             
@@ -425,11 +345,9 @@ bool ArenaRenderer::createArenaHtmlFile(const QString &filePath) {
             // Set up Qt web channel
             new QWebChannel(qt.webChannelTransport, function(channel) {
                 arenaRenderer = channel.objects.arenaRenderer;
-                console.log("Web channel initialized");
                 
                 if (!checkWebGL()) {
                     document.getElementById('error-container').style.display = 'block';
-                    console.error("WebGL not available");
                     
                     // Use fallback mode instead
                     initFallback();
@@ -450,14 +368,13 @@ bool ArenaRenderer::createArenaHtmlFile(const QString &filePath) {
                         arenaRenderer.handleJavaScriptMessage("WebGL initialized successfully");
                     }
                 } catch (e) {
-                    console.error("WebGL initialization failed:", e);
                     document.getElementById('error-container').style.display = 'block';
                     
                     // Use fallback mode
                     initFallback();
                     
                     if (arenaRenderer) {
-                        arenaRenderer.handleJavaScriptMessage("WebGL initialization failed: " + e.message + ", using fallback");
+                        arenaRenderer.handleJavaScriptMessage("WebGL initialization failed, using fallback");
                     }
                 }
             });
