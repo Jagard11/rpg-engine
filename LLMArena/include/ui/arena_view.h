@@ -13,9 +13,7 @@
 
 #include "character_persistence.h"
 #include "player_controller.h"
-
-// Forward declarations
-class GLArenaWidget;
+#include "../rendering/gl_arena_widget.h"  // Include the full header instead of forward declaration
 
 // Main widget for the 3D arena view
 class ArenaView : public QWidget {

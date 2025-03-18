@@ -1,5 +1,4 @@
 // src/main.cpp
-// src/main.cpp - Fixed version with safer Arena tab initialization and updated include paths
 #include <QApplication>
 #include <QMainWindow>
 #include <QVBoxLayout>
@@ -175,7 +174,7 @@ int main(int argc, char *argv[])
     // Add home tab
     tabWidget->addTab(homeTab, "Home");
     
-    // Create conversation tab for text-based interaction when 3D is unavailable
+    // Create conversation tab for text-based interaction
     QWidget* conversationTab = new QWidget(tabWidget);
     QVBoxLayout* conversationLayout = new QVBoxLayout(conversationTab);
     
@@ -307,62 +306,84 @@ int main(int argc, char *argv[])
         QMessageBox::critical(&mainWindow, "Error", error);
     });
     
-    // Set the central widget
-    mainWindow.setCentralWidget(centralWidget);
-    
-    // Fix: Use reference capture for mainWindow to prevent copy attempt
+    // Prevent user from clicking the 3D Arena tab until it's ready
     QObject::connect(tabWidget, &QTabWidget::currentChanged, [&mainWindow, tabWidget, arenaTabIndex](int index) {
-        if (index == arenaTabIndex && tabWidget->tabText(index) == "3D Arena (Loading)") {
+        if (index == arenaTabIndex && tabWidget->tabText(index).contains("Loading")) {
             // Switch back to home tab
             tabWidget->setCurrentIndex(0);
-            // Fix: Pass pointer directly without & operator
             QMessageBox::information(&mainWindow, "Loading",
                                    "The 3D Arena is still loading. Please wait a moment.");
         }
     });
     
-    // Show the window immediately with just the basic tabs
+    // Set the central widget
+    mainWindow.setCentralWidget(centralWidget);
+    
+    // Show the window before trying to create the arena view
     mainWindow.show();
     
-    // Create and initialize the ArenaView with a longer delay to ensure proper initialization
-    QTimer::singleShot(2000, [&mainWindow, tabWidget, arenaTabIndex, characterManager]() {
+    // Create ArenaView in a separate thread after a delay
+    QTimer::singleShot(1000, [&]() {
         try {
-            // Keep the first two tabs and replace the arena placeholder
-            while (tabWidget->count() > 2) {
-                tabWidget->removeTab(2);  // Remove arena tab if it exists
-            }
-            
-            // Create the arena view
-            ArenaView* arenaView = new ArenaView(characterManager, &mainWindow);
-            tabWidget->addTab(arenaView, "3D Arena");
-            
-            // Initialize arena after it's been added to the tab widget
-            QTimer::singleShot(500, [arenaView]() {
-                try {
-                    arenaView->initialize();
-                } catch (const std::exception& e) {
-                    qWarning() << "Failed to initialize arena view:" << e.what();
-                }
-            });
-        } catch (const std::exception& e) {
-            qWarning() << "Failed to create 3D Arena view:" << e.what();
-            
-            // Create a placeholder tab with error message
+            // Create an error tab for fallback
             QWidget* errorTab = new QWidget();
             QVBoxLayout* errorLayout = new QVBoxLayout(errorTab);
             
-            QLabel* errorLabel = new QLabel(
-                "<h3>3D Visualization Unavailable</h3>"
-                "<p>Your system does not have the required OpenGL capabilities.</p>"
-                "<p>Please use the Conversation tab instead.</p>"
-            );
-            errorLabel->setAlignment(Qt::AlignCenter);
-            errorLayout->addWidget(errorLabel);
-            
-            // Add the error tab
-            tabWidget->addTab(errorTab, "3D Arena (Unavailable)");
+            try {
+                // Create ArenaView and add to tabWidget
+                ArenaView* arenaView = new ArenaView(characterManager, tabWidget);
+                
+                // Replace placeholder with actual arena view
+                tabWidget->removeTab(arenaTabIndex);  
+                tabWidget->insertTab(arenaTabIndex, arenaView, "3D Arena");
+                
+                // Delay initialization to give OpenGL context time to set up
+                QTimer::singleShot(500, [arenaView]() {
+                    try {
+                        arenaView->initialize();
+                    } catch (const std::exception& e) {
+                        qCritical() << "Failed to initialize Arena View:" << e.what();
+                    }
+                });
+            }
+            catch (const std::exception& e) {
+                qCritical() << "Failed to create 3D Arena view:" << e.what();
+                
+                // Add error message to the error tab
+                QLabel* errorLabel = new QLabel(
+                    "<h3>3D Visualization Unavailable</h3>"
+                    "<p>Error: " + QString(e.what()) + "</p>"
+                    "<p>Please use the Conversation tab instead.</p>"
+                );
+                errorLabel->setAlignment(Qt::AlignCenter);
+                errorLayout->addWidget(errorLabel);
+                
+                // Replace placeholder with error tab
+                tabWidget->removeTab(arenaTabIndex);
+                tabWidget->insertTab(arenaTabIndex, errorTab, "3D Arena (Error)");
+            }
+            catch (...) {
+                qCritical() << "Unknown exception creating 3D Arena view";
+                
+                // Add error message to the error tab
+                QLabel* errorLabel = new QLabel(
+                    "<h3>3D Visualization Unavailable</h3>"
+                    "<p>An unknown error occurred.</p>"
+                    "<p>Please use the Conversation tab instead.</p>"
+                );
+                errorLabel->setAlignment(Qt::AlignCenter);
+                errorLayout->addWidget(errorLabel);
+                
+                // Replace placeholder with error tab
+                tabWidget->removeTab(arenaTabIndex);
+                tabWidget->insertTab(arenaTabIndex, errorTab, "3D Arena (Error)");
+            }
+        }
+        catch (...) {
+            qCritical() << "Critical error in ArenaView creation";
         }
     });
     
+    // Run the application
     return app.exec();
 }

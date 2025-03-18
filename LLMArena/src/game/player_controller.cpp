@@ -87,7 +87,7 @@ void PlayerController::createPlayerEntity() {
         GameEntity playerEntity;
         playerEntity.id = "player";
         playerEntity.type = "player";
-        playerEntity.position = QVector3D(5, 0.9, 5); // Start in the arena, offset from center, and slightly above the floor
+        playerEntity.position = QVector3D(5, 0.9, 5); // Start in the voxel room, offset from center, and slightly above the floor
         playerEntity.dimensions = QVector3D(0.6, 1.8, 0.6); // Typical human dimensions
         playerEntity.isStatic = false;
         
@@ -96,7 +96,7 @@ void PlayerController::createPlayerEntity() {
         // Set initial position
         position = playerEntity.position;
         
-        // Set initial rotation (facing center of arena)
+        // Initial rotation (facing toward center of room)
         rotation = atan2(-position.z(), -position.x());
         
         qDebug() << "Player entity created at position:" << position.x() << position.y() << position.z()
@@ -204,27 +204,6 @@ QVector3D PlayerController::applyConstraints(const QVector3D &newPosition) {
         // Check if new position would cause a collision
         if (gameScene->checkCollision("player", newPosition)) {
             return position; // If collision, keep old position
-        }
-        
-        // Check if new position is within arena bounds
-        QVector3D centerPos(0, 0, 0);
-        float distanceFromCenter = QVector2D(newPosition.x(), newPosition.z()).length();
-        
-        // Keep player within a safe distance from arena radius
-        float arenaRadius = gameScene->getArenaRadius();
-        if (arenaRadius > 0 && distanceFromCenter > arenaRadius - 1.0) {
-            // Calculate direction vector from center to position
-            QVector3D direction = newPosition - centerPos;
-            direction.setY(0); // Keep y-coordinate unchanged
-            
-            // Normalize and scale to safe radius
-            if (direction.length() > 0.001) {
-                direction.normalize();
-                direction *= (arenaRadius - 1.0);
-                
-                // Create new position using direction from center
-                return QVector3D(direction.x(), newPosition.y(), direction.z());
-            }
         }
     }
     catch (const std::exception& e) {

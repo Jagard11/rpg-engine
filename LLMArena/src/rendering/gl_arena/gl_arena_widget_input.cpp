@@ -12,11 +12,10 @@ void GLArenaWidget::keyPressEvent(QKeyEvent* event)
     }
 
     try {
-        qDebug() << "GLArenaWidget handling key press:" << event->key();
         m_playerController->handleKeyPress(event);
     } 
     catch (const std::exception& e) {
-        qWarning() << "Exception in GLArenaWidget::keyPressEvent:" << e.what();
+        qWarning() << "Exception in keyPressEvent:" << e.what();
     }
     
     // Let parent widget handle the event too
@@ -32,13 +31,23 @@ void GLArenaWidget::keyReleaseEvent(QKeyEvent* event)
     }
 
     try {
-        qDebug() << "GLArenaWidget handling key release:" << event->key();
         m_playerController->handleKeyRelease(event);
     }
     catch (const std::exception& e) {
-        qWarning() << "Exception in GLArenaWidget::keyReleaseEvent:" << e.what();
+        qWarning() << "Exception in keyReleaseEvent:" << e.what();
     }
     
     // Let parent widget handle the event too
     QOpenGLWidget::keyReleaseEvent(event);
+}
+
+void GLArenaWidget::onPlayerPositionChanged(const QVector3D& position)
+{
+    emit playerPositionUpdated(position.x(), position.y(), position.z());
+    update(); // Request a redraw
+}
+
+void GLArenaWidget::onPlayerRotationChanged(float rotation)
+{
+    update(); // Request a redraw
 }

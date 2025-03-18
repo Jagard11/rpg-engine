@@ -76,11 +76,9 @@ ArenaView::ArenaView(CharacterManager *charManager, QWidget *parent)
 }
 
 void ArenaView::initialize() {
-    // OpenGL widget is initialized automatically
-    if (glWidget) {
-        qDebug() << "OpenGL widget initialized, setting arena parameters";
-        glWidget->initializeArena(10.0, 2.0);
-    }
+    // Don't immediately initialize the arena - this will happen in onRendererInitialized
+    // after the voxel system is properly set up
+    qDebug() << "ArenaView initialized - waiting for renderer initialization";
 }
 
 void ArenaView::setupUI() {
@@ -224,8 +222,8 @@ void ArenaView::onCharacterSelected(const QString &characterName) {
 void ArenaView::onResetArena() {
     // Reset arena parameters and player position if OpenGL widget is available
     if (glWidget) {
-        qDebug() << "Resetting arena to 10m radius with 2m walls";
-        glWidget->initializeArena(10.0, 2.0);
+        qDebug() << "Resetting arena to 20m width with 2m height";
+        glWidget->initializeArena(20.0, 2.0);
         
         if (glWidget->getPlayerController()) {
             // Reset player by recreating the entity
@@ -245,6 +243,16 @@ void ArenaView::onArenaParametersChanged() {
 
 void ArenaView::onRendererInitialized() {
     qDebug() << "OpenGL rendering initialized";
+    
+    // Now that the renderer is initialized, it's safe to initialize the arena
+    // The voxel system should be created by now
+    if (glWidget) {
+        // Use a short delay to ensure VoxelSystem is fully set up
+        QTimer::singleShot(100, this, [this]() {
+            qDebug() << "Initializing arena with default parameters";
+            glWidget->initializeArena(10.0, 2.0);
+        });
+    }
     
     // Load the first character if any are available
     if (characterSelector && characterSelector->count() > 1) {

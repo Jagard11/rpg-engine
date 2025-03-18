@@ -1,4 +1,3 @@
-// include/rendering/gl_arena_widget.h
 #ifndef GL_ARENA_WIDGET_H
 #define GL_ARENA_WIDGET_H
 
@@ -13,11 +12,12 @@
 #include <QMap>
 #include <QTimer>
 #include <QKeyEvent>
-#include <memory> // For std::unique_ptr
+#include <memory>
 
 #include "character_persistence.h"
 #include "game_scene.h"
 #include "player_controller.h"
+#include "../voxel/voxel_system_integration.h"
 
 // Forward declarations
 class GLArenaWidget;
@@ -37,9 +37,11 @@ public:
     float height() const { return m_height; }
     float depth() const { return m_depth; }
     
-    // Accessor methods for rendering
+    // Safe getters with null checks
+    bool hasValidTexture() const { return m_texture && m_texture->isCreated(); }
+    bool hasValidVAO() const { return m_vao.isCreated(); }
+    QOpenGLTexture* getTexture() const { return m_texture; }
     QOpenGLVertexArrayObject* getVAO() { return &m_vao; }
-    QOpenGLTexture* getTexture() { return m_texture; }
     
 private:
     QOpenGLTexture* m_texture;
@@ -62,7 +64,7 @@ public:
     ~GLArenaWidget();
     
     // Initialize with arena parameters
-    void initializeArena(double radius, double wallHeight);
+    void initializeArena(double width, double height);
     
     // Character management
     void setActiveCharacter(const QString& name);
@@ -75,9 +77,6 @@ public:
     // Handle key events
     void keyPressEvent(QKeyEvent* event) override;
     void keyReleaseEvent(QKeyEvent* event) override;
-    
-    // Get GL context for helper classes
-    QOpenGLContext* getContext() { return context(); }
     
 signals:
     void renderingInitialized();
@@ -99,30 +98,28 @@ private:
     // Initialize shaders
     bool initShaders();
     
-    // Create arena geometry
-    void createArena(double radius, double wallHeight);
-    
-    // Create floor geometry
-    void createFloor(double radius);
-    
-    // Create a grid for visualization
-    void createGrid(double size, int divisions);
-    
-    // Render the arena
-    void renderArena();
-    
     // Render characters
     void renderCharacters();
+    
+    // Simpler character rendering method
+    void renderCharactersSimple();
+    
+    // Absolute fallback rendering method
+    void renderCharactersFallback();
+    
+    // Direct quad drawing without VAOs
+    void drawCharacterQuad(QOpenGLTexture* texture, float x, float y, float z, float width, float height);
     
     // Convert world coords to normalized device coords
     QVector3D worldToNDC(const QVector3D& worldPos);
     
+    // Create geometric objects for rendering
+    void createFloor(double radius);
+    void createArena(double radius, double wallHeight);
+    void createGrid(double size, int divisions);
+    
     // Character manager for loading sprites
     CharacterManager* m_characterManager;
-    
-    // Arena parameters
-    double m_arenaRadius;
-    double m_wallHeight;
     
     // Game scene for entity tracking
     GameScene* m_gameScene;
@@ -133,67 +130,45 @@ private:
     // Active character
     QString m_activeCharacter;
     
-    // Shader programs
-    QOpenGLShaderProgram* m_basicProgram;    // For walls and floor
-    QOpenGLShaderProgram* m_billboardProgram; // For character billboards
-    QOpenGLShaderProgram* m_gridProgram;     // For grid lines
+    // Voxel system integration
+    VoxelSystemIntegration* m_voxelSystem;
+    
+    // Shader program for billboards
+    QOpenGLShaderProgram* m_billboardProgram;
     
     // Camera/view matrices
     QMatrix4x4 m_projectionMatrix;
     QMatrix4x4 m_viewMatrix;
     
-    // Wall geometry struct with unique_ptr to prevent copy issues
-    struct WallGeometry {
-        std::unique_ptr<QOpenGLBuffer> vbo;
-        std::unique_ptr<QOpenGLBuffer> ibo;
-        std::unique_ptr<QOpenGLVertexArrayObject> vao;
-        int indexCount;
-        
-        WallGeometry() : 
-            vbo(new QOpenGLBuffer(QOpenGLBuffer::VertexBuffer)),
-            ibo(new QOpenGLBuffer(QOpenGLBuffer::IndexBuffer)),
-            vao(new QOpenGLVertexArrayObject()),
-            indexCount(0) {}
-            
-        // No copy allowed, but move is ok
-        WallGeometry(const WallGeometry&) = delete;
-        WallGeometry& operator=(const WallGeometry&) = delete;
-        
-        WallGeometry(WallGeometry&& other) noexcept :
-            vbo(std::move(other.vbo)),
-            ibo(std::move(other.ibo)), 
-            vao(std::move(other.vao)),
-            indexCount(other.indexCount) {}
-            
-        WallGeometry& operator=(WallGeometry&& other) noexcept {
-            vbo = std::move(other.vbo);
-            ibo = std::move(other.ibo);
-            vao = std::move(other.vao);
-            indexCount = other.indexCount;
-            return *this;
-        }
-    };
-    
-    // Geometry data
-    QOpenGLBuffer m_floorVBO;
-    QOpenGLBuffer m_floorIBO;
-    QOpenGLVertexArrayObject m_floorVAO;
-    int m_floorIndexCount;
-    
-    QOpenGLBuffer m_gridVBO;
-    QOpenGLVertexArrayObject m_gridVAO;
-    int m_gridVertexCount;
-    
-    std::vector<WallGeometry> m_walls; // Changed from QVector to std::vector
-    
     // Character sprites
     QMap<QString, CharacterSprite*> m_characterSprites;
     
-    // Rendering timer
-    QTimer m_renderTimer;
-    
     // Flag to indicate if OpenGL is properly initialized
     bool m_initialized;
+    
+    // Geometry-related members
+    QOpenGLVertexArrayObject m_floorVAO;
+    QOpenGLBuffer m_floorVBO;
+    QOpenGLBuffer m_floorIBO;
+    int m_floorIndexCount;
+    
+    QOpenGLVertexArrayObject m_gridVAO;
+    QOpenGLBuffer m_gridVBO;
+    int m_gridVertexCount;
+    
+    // Arena parameters
+    double m_arenaRadius;
+    double m_wallHeight;
+    
+    // Wall geometry
+    struct WallGeometry {
+        std::unique_ptr<QOpenGLVertexArrayObject> vao;
+        std::unique_ptr<QOpenGLBuffer> vbo;
+        std::unique_ptr<QOpenGLBuffer> ibo;
+        int indexCount;
+    };
+    
+    std::vector<WallGeometry> m_walls;
 };
 
 #endif // GL_ARENA_WIDGET_H

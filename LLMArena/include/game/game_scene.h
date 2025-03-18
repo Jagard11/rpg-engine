@@ -41,17 +41,17 @@ public:
     // Get all entities of a specific type
     Q_INVOKABLE QVector<GameEntity> getEntitiesByType(const QString &type) const;
     
+    // Get all entities in the scene
+    QVector<GameEntity> getAllEntities() const;
+    
     // Check for collisions and handle them
     Q_INVOKABLE bool checkCollision(const QString &entityId, const QVector3D &newPosition);
     
-    // Create the octagonal arena
-    Q_INVOKABLE void createOctagonalArena(double radius, double wallHeight);
+    // Create octagonal arena with walls
+    void createOctagonalArena(double radius, double wallHeight);
     
-    // Get the arena radius
-    Q_INVOKABLE double getArenaRadius() const { return arenaRadius; }
-    
-    // Get the arena wall height
-    Q_INVOKABLE double getArenaWallHeight() const { return arenaWallHeight; }
+    // Check if position is inside the arena
+    bool isInsideArena(const QVector3D &position) const;
 
 signals:
     // Signal for when an entity is added
@@ -65,14 +65,14 @@ signals:
     
     // Signal for collision events
     void collisionDetected(const QString &entityA, const QString &entityB);
+    
+    // Signal for world changes
+    void worldChanged();
 
 private:
     QMap<QString, GameEntity> entities;
     double arenaRadius;
     double arenaWallHeight;
-    
-    // Calculate if a point is inside the octagonal arena
-    bool isInsideArena(const QVector3D &position) const;
     
     // Check if two entities are colliding
     bool areEntitiesColliding(const GameEntity &entityA, const GameEntity &entityB) const;

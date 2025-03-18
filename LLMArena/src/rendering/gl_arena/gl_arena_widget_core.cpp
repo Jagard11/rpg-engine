@@ -8,198 +8,133 @@
 #include <QFile>
 #include <QDir>
 #include <stdexcept>
+#include <cmath>
+#include <vector>
 
 GLArenaWidget::GLArenaWidget(CharacterManager* charManager, QWidget* parent)
     : QOpenGLWidget(parent), m_characterManager(charManager), 
-      m_arenaRadius(10.0), m_wallHeight(2.0), m_initialized(false),
-      m_floorVBO(QOpenGLBuffer::VertexBuffer), m_floorIBO(QOpenGLBuffer::IndexBuffer),
-      m_gridVBO(QOpenGLBuffer::VertexBuffer),
-      m_basicProgram(nullptr), m_billboardProgram(nullptr), m_gridProgram(nullptr),
-      m_floorIndexCount(0), m_gridVertexCount(0)
+      m_initialized(false),
+      m_billboardProgram(nullptr),
+      m_voxelSystem(nullptr)  // Initialize to nullptr
 {
-    // Set focus policy to receive keyboard events
     setFocusPolicy(Qt::StrongFocus);
-    
-    // Create game scene
     m_gameScene = new GameScene(this);
-    
-    // Create player controller
     m_playerController = new PlayerController(m_gameScene, this);
     
-    // Connect player signals
     connect(m_playerController, &PlayerController::positionChanged, 
             this, &GLArenaWidget::onPlayerPositionChanged);
     connect(m_playerController, &PlayerController::rotationChanged, 
             this, &GLArenaWidget::onPlayerRotationChanged);
     
-    // Use a safer update approach with lower frequency
-    QTimer *safeTimer = new QTimer(this);
-    connect(safeTimer, &QTimer::timeout, this, [this]() {
-        if (isVisible() && isValid()) {
-            update(); // Request repaint only if widget is visible and valid
-        }
-    });
-    safeTimer->start(33); // ~30 FPS - balanced for performance
+    // Don't create voxel system yet - we'll do it in initializeGL
+    
+    QTimer* updateTimer = new QTimer(this);
+    connect(updateTimer, &QTimer::timeout, this, QOverload<>::of(&QWidget::update));
+    updateTimer->start(50);
 }
 
 GLArenaWidget::~GLArenaWidget()
 {
-    // Make sure we handle OpenGL resource cleanup safely
-    try {
-        // Only try to make current if the context is valid
-        if (context() && context()->isValid()) {
-            // makeCurrent() returns void, not bool, so we can't check its return value
-            makeCurrent();
-            
-            // Clean up OpenGL resources
-            if (m_floorVBO.isCreated()) m_floorVBO.destroy();
-            if (m_floorIBO.isCreated()) m_floorIBO.destroy();
-            if (m_floorVAO.isCreated()) m_floorVAO.destroy();
-            if (m_gridVBO.isCreated()) m_gridVBO.destroy();
-            if (m_gridVAO.isCreated()) m_gridVAO.destroy();
-            
-            // Walls are auto-cleaned by the std::unique_ptr
-            m_walls.clear();
-            
-            // Clean up character sprites - POTENTIAL BUG AREA
-            // Safer deletion with checks
-            for (auto it = m_characterSprites.begin(); it != m_characterSprites.end(); ++it) {
-                if (it.value()) {
-                    delete it.value();
-                    it.value() = nullptr;
-                }
-            }
-            m_characterSprites.clear();
-            
-            // Clean up shader programs
-            delete m_basicProgram;
-            m_basicProgram = nullptr;
-            
-            delete m_billboardProgram;
-            m_billboardProgram = nullptr;
-            
-            delete m_gridProgram;
-            m_gridProgram = nullptr;
-            
-            doneCurrent();
-        } else {
-            qWarning() << "Invalid OpenGL context during destructor cleanup";
-        }
-    } catch (const std::exception& e) {
-        qWarning() << "Exception during OpenGL cleanup:" << e.what();
+    makeCurrent();
+    
+    // Clean up character sprites
+    for (auto it = m_characterSprites.begin(); it != m_characterSprites.end(); ++it) {
+        if (it.value()) delete it.value();
     }
+    m_characterSprites.clear();
+    
+    // Clean up shader programs
+    delete m_billboardProgram;
+    
+    // Delete voxel system
+    delete m_voxelSystem;
+    
+    doneCurrent();
 }
 
 void GLArenaWidget::initializeGL()
 {
-    // Initialize OpenGL functions
     initializeOpenGLFunctions();
     
-    // Set up OpenGL state
+    // Initialize basic OpenGL settings
     glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     
-    // Initialize shaders
-    if (!initShaders()) {
-        qWarning() << "Failed to initialize shaders";
-        return;
+    // Initialize shaders for character billboards
+    initShaders();
+    
+    try {
+        // Create and initialize voxel system
+        m_voxelSystem = new VoxelSystemIntegration(m_gameScene, this);
+        
+        // Initialize the voxel system with a try-catch to handle any errors
+        try {
+            m_voxelSystem->initialize();
+            qDebug() << "Voxel system successfully initialized";
+        } catch (const std::exception& e) {
+            qCritical() << "Failed to initialize voxel system:" << e.what();
+            // Keep the voxel system object but mark it as not initialized
+        }
+    } catch (const std::exception& e) {
+        qCritical() << "Failed to create voxel system:" << e.what();
+        // Don't throw here, just continue without the voxel system
     }
     
-    // Create arena geometry
-    createArena(m_arenaRadius, m_wallHeight);
-    
-    // Create floor
-    createFloor(m_arenaRadius);
-    
-    // Create grid
-    createGrid(m_arenaRadius * 2, 20);
-    
-    // Create player entity
+    // Create player entity at default position
     m_playerController->createPlayerEntity();
     m_playerController->startUpdates();
     
+    // Mark initialization as complete
     m_initialized = true;
     
-    // Emit signal properly
+    // Signal that rendering is initialized
     emit renderingInitialized();
 }
 
 void GLArenaWidget::resizeGL(int w, int h)
 {
-    // Update projection matrix when widget resizes
     float aspectRatio = float(w) / float(h ? h : 1);
     const float zNear = 0.1f, zFar = 100.0f, fov = 60.0f;
-    
     m_projectionMatrix.setToIdentity();
     m_projectionMatrix.perspective(fov, aspectRatio, zNear, zFar);
 }
 
-void GLArenaWidget::initializeArena(double radius, double wallHeight)
+// Initialize arena with dimensions
+void GLArenaWidget::initializeArena(double width, double height)
 {
-    // Store parameters to be applied during OpenGL initialization
-    m_arenaRadius = radius;
-    m_wallHeight = wallHeight;
+    // Check if we're properly initialized
+    if (!m_initialized) {
+        qWarning() << "Cannot initialize arena: OpenGL not initialized";
+        return;
+    }
     
-    // If already initialized, recreate the arena
-    if (m_initialized && isValid()) {
-        makeCurrent();
+    // Check if voxel system is initialized with more details
+    if (!m_voxelSystem) {
+        qWarning() << "Cannot initialize arena: voxel system not initialized";
+        return;
+    }
+    
+    try {
+        // Store dimensions
+        m_arenaRadius = width / 2.0;
+        m_wallHeight = height;
         
-        // Remove existing entities from game scene
-        for (int i = 0; i < 8; i++) {
-            m_gameScene->removeEntity(QString("arena_wall_%1").arg(i));
-        }
-        m_gameScene->removeEntity("arena_floor");
+        // Create a default room with the voxel system
+        qDebug() << "Creating default world in voxel system";
+        m_voxelSystem->createDefaultWorld();
         
-        // Clear existing walls vector
-        m_walls.clear();
-        
-        // Remove floor geometry
-        if (m_floorVBO.isCreated()) m_floorVBO.destroy();
-        if (m_floorIBO.isCreated()) m_floorIBO.destroy();
-        if (m_floorVAO.isCreated()) m_floorVAO.destroy();
-        
-        // Create new geometries
-        createArena(radius, wallHeight);
-        createFloor(radius);
-        
-        doneCurrent();
-        update();
+        qDebug() << "Arena initialized with radius" << m_arenaRadius << "and height" << m_wallHeight;
+    } catch (const std::exception& e) {
+        qCritical() << "Exception in initializeArena:" << e.what();
     }
 }
 
-void GLArenaWidget::setActiveCharacter(const QString& name)
-{
-    m_activeCharacter = name;
-}
-
-QVector3D GLArenaWidget::worldToNDC(const QVector3D& worldPos)
-{
-    // Convert world coordinates to normalized device coordinates (for debugging)
-    QVector4D clipSpace = m_projectionMatrix * m_viewMatrix * QVector4D(worldPos, 1.0f);
-    QVector3D ndcSpace;
-    
-    if (clipSpace.w() != 0.0f) {
-        ndcSpace = QVector3D(clipSpace.x() / clipSpace.w(), 
-                            clipSpace.y() / clipSpace.w(),
-                            clipSpace.z() / clipSpace.w());
+// Helper function to check OpenGL errors
+static void checkGLError(const char* step) {
+    GLenum err = glGetError();
+    if (err != GL_NO_ERROR) {
+        qCritical() << "OpenGL error at" << step << ":" << err;
     }
-    
-    return ndcSpace;
-}
-
-void GLArenaWidget::onPlayerPositionChanged(const QVector3D& position)
-{
-    // Trigger redraw when player position changes
-    emit playerPositionUpdated(position.x(), position.y(), position.z());
-    update();
-}
-
-void GLArenaWidget::onPlayerRotationChanged(float rotation)
-{
-    // Trigger redraw when player rotation changes
-    QVector3D pos = m_playerController->getPosition();
-    emit playerPositionUpdated(pos.x(), pos.y(), pos.z());
-    update();
 }

@@ -35,6 +35,7 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include/game
     ${CMAKE_CURRENT_SOURCE_DIR}/include/rendering
     ${CMAKE_CURRENT_SOURCE_DIR}/include/memory
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/voxel
 )
 
 # Explicitly list all header files that contain Q_OBJECT macro
@@ -47,6 +48,10 @@ set(HEADERS
     include/game/player_controller.h
     include/rendering/arena_renderer.h
     include/rendering/gl_arena_widget.h
+    include/voxel/voxel_world.h
+    include/voxel/voxel_renderer.h
+    include/voxel/sky_system.h
+    include/voxel/voxel_system_integration.h
 )
 
 # Main source file
@@ -68,7 +73,7 @@ set(CHARACTER_SOURCES
     src/character/ui/character_manager_dialog.cpp
 )
 
-# Memory module
+# Memory module - using only helpers file to avoid duplicates
 set(MEMORY_SOURCES
     src/memory/memory_system_helpers.cpp
 )
@@ -83,7 +88,7 @@ set(LLM_SOURCES
     src/llm/oobabooga_bridge.cpp
 )
 
-# Rendering module - UPDATED: Modular structure
+# Rendering module - UPDATED: Remove stubs and use main implementations
 set(RENDERING_SOURCES
     # Modular GL Arena Widget
     src/rendering/gl_arena/gl_arena_widget_core.cpp
@@ -92,8 +97,10 @@ set(RENDERING_SOURCES
     src/rendering/gl_arena/gl_arena_widget_shaders.cpp
     src/rendering/gl_arena/gl_arena_widget_geometry.cpp
     src/rendering/gl_arena/gl_arena_widget_input.cpp
+    src/rendering/gl_arena/gl_arena_widget_stub.cpp
+    src/rendering/gl_arena/gl_arena_direct_rendering.cpp # Add this line
     
-    # Modular Arena Renderer
+    # Modular Arena Renderer - without stubs
     src/rendering/arena_renderer/arena_renderer_core.cpp
     src/rendering/arena_renderer/arena_renderer_webgl.cpp
     src/rendering/arena_renderer/arena_renderer_scene.cpp
@@ -106,6 +113,19 @@ set(GAME_SOURCES
     src/game/player_controller.cpp
 )
 
+# Voxel module
+set(VOXEL_SOURCES
+    src/voxel/voxel_world.cpp
+    src/voxel/voxel_renderer.cpp
+    src/voxel/sky_system.cpp
+    src/voxel/voxel_system_integration.cpp
+)
+
+# Debug module
+set(DEBUG_SOURCES
+    src/debug/opengl_debug.cpp
+)
+
 # Combine all sources
 list(APPEND SOURCES 
     ${CHARACTER_SOURCES}
@@ -114,6 +134,8 @@ list(APPEND SOURCES
     ${LLM_SOURCES}
     ${RENDERING_SOURCES}
     ${GAME_SOURCES}
+    ${VOXEL_SOURCES}
+    ${DEBUG_SOURCES}
 )
 
 # Check for resources directory
