@@ -1,120 +1,194 @@
 // src/rendering/gl_arena/gl_arena_direct_rendering.cpp
 #include "../../include/rendering/gl_arena_widget.h"
 #include <QDebug>
+#include <QOpenGLFramebufferObject>
 
-// Draw a quad directly without using VAOs or IBOs
+// Global static buffers to prevent recreation
+static QOpenGLBuffer s_vbo(QOpenGLBuffer::VertexBuffer);
+static QOpenGLVertexArrayObject s_vao;
+static bool s_buffersInitialized = false;
+
+// Simplest possible quad drawing
 void GLArenaWidget::drawCharacterQuad(QOpenGLTexture* texture, float x, float y, float z, float width, float height)
 {
-    if (!m_billboardProgram || !texture) {
+    if (!m_billboardProgram) {
+        qWarning() << "Billboard program is null in drawCharacterQuad";
         return;
     }
     
-    qDebug() << "Drawing character quad at" << x << y << z << "with size" << width << height;
+    // Skip if no texture
+    bool hasTexture = texture && texture->isCreated();
+    if (!hasTexture) {
+        return;
+    }
     
-    // Set shader uniforms
-    m_billboardProgram->setUniformValue("position", QVector3D(x, y, z));
-    m_billboardProgram->setUniformValue("size", QVector2D(width, height));
+    // Initialize static buffers if needed (only once)
+    if (!s_buffersInitialized) {
+        // Define the quad vertices - only position and texture coords
+        float vertices[] = {
+            -0.5f, -0.5f,  0.0f, 1.0f,  // Bottom left
+             0.5f, -0.5f,  1.0f, 1.0f,  // Bottom right
+             0.5f,  0.5f,  1.0f, 0.0f,  // Top right
+            -0.5f,  0.5f,  0.0f, 0.0f   // Top left
+        };
+        
+        // Create the VAO
+        if (!s_vao.create()) {
+            qWarning() << "Failed to create static VAO";
+            return;
+        }
+        s_vao.bind();
+        
+        // Create and populate the VBO
+        if (!s_vbo.create()) {
+            qWarning() << "Failed to create static VBO";
+            s_vao.release();
+            return;
+        }
+        s_vbo.bind();
+        s_vbo.allocate(vertices, sizeof(vertices));
+        
+        // Set up vertex attributes
+        glEnableVertexAttribArray(0); // positions
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), 0);
+        
+        glEnableVertexAttribArray(1); // texture coordinates
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+        
+        // Release bindings
+        s_vbo.release();
+        s_vao.release();
+        
+        // Mark as initialized
+        s_buffersInitialized = true;
+    }
+    
+    // Set uniforms (position, size)
+    int posLoc = m_billboardProgram->uniformLocation("position");
+    int sizeLoc = m_billboardProgram->uniformLocation("size");
+    int texLoc = m_billboardProgram->uniformLocation("textureSampler");
+    
+    if (posLoc != -1)
+        m_billboardProgram->setUniformValue(posLoc, QVector3D(x, y + height/2, z));
+    if (sizeLoc != -1)
+        m_billboardProgram->setUniformValue(sizeLoc, QVector2D(width, height));
+    if (texLoc != -1)
+        m_billboardProgram->setUniformValue(texLoc, 0);
     
     // Bind texture
     glActiveTexture(GL_TEXTURE0);
     texture->bind();
     
-    // Draw a simple quad (two triangles) using glDrawArrays
-    float vertices[] = {
-        // Position (2D) + TexCoord
-        -0.5f, -0.5f,  0.0f, 1.0f,  // Bottom left
-         0.5f, -0.5f,  1.0f, 1.0f,  // Bottom right
-         0.5f,  0.5f,  1.0f, 0.0f,  // Top right
-        -0.5f,  0.5f,  0.0f, 0.0f   // Top left
-    };
-    
-    // Simple direct rendering without VAO
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), vertices);
-    
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), vertices + 2);
-    
-    // Draw as triangle fan
+    // Bind VAO and draw
+    s_vao.bind();
     glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+    s_vao.release();
     
-    // Cleanup
-    glDisableVertexAttribArray(0);
-    glDisableVertexAttribArray(1);
-    
-    // Unbind texture
+    // Release texture
     texture->release();
 }
 
 void GLArenaWidget::renderCharactersFallback() 
 {
-    qDebug() << "Using ABSOLUTE FALLBACK character rendering method";
+    // Extra guard against null objects
+    if (!isValid() || !context() || !context()->isValid()) {
+        return;
+    }
     
-    // Check for shader program
+    // Skip if shaders aren't available
     if (!m_billboardProgram || !m_billboardProgram->isLinked()) {
-        qWarning() << "No valid shader for fallback rendering";
         return;
     }
     
-    // Bind shader program
-    if (!m_billboardProgram->bind()) {
-        qWarning() << "Failed to bind shader for fallback rendering";
-        return;
-    }
-    
-    // Set common uniforms
-    m_billboardProgram->setUniformValue("view", m_viewMatrix);
-    m_billboardProgram->setUniformValue("projection", m_projectionMatrix);
-    m_billboardProgram->setUniformValue("textureSampler", 0);
-    
-    // Enable blending
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    
-    // Iterate through characters
-    for (auto it = m_characterSprites.begin(); it != m_characterSprites.end(); ++it) {
-        QString name = it.key();
-        CharacterSprite* sprite = it.value();
+    try {
+        // Save current OpenGL state
+        GLboolean depthTestEnabled;
+        glGetBooleanv(GL_DEPTH_TEST, &depthTestEnabled);
         
-        if (!sprite) {
-            continue;
-        }
+        GLboolean blendEnabled;
+        glGetBooleanv(GL_BLEND, &blendEnabled);
         
-        // Get texture directly and safely
-        QOpenGLTexture* texture = sprite->getTexture();
-        if (!texture || !texture->isCreated()) {
-            qWarning() << "No valid texture for" << name;
-            continue;
-        }
+        GLint blendSrcRGB, blendDstRGB;
+        glGetIntegerv(GL_BLEND_SRC_RGB, &blendSrcRGB);
+        glGetIntegerv(GL_BLEND_DST_RGB, &blendDstRGB);
         
-        // Get position
-        float x = 0.0f, y = 0.0f, z = 0.0f;
-        try {
+        // Set rendering state
+        glDisable(GL_DEPTH_TEST);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        
+        // Bind shader
+        m_billboardProgram->bind();
+        
+        // Set common uniforms
+        m_billboardProgram->setUniformValue("view", m_viewMatrix);
+        m_billboardProgram->setUniformValue("projection", m_projectionMatrix);
+        
+        // Make a safe copy of the character map
+        QMap<QString, CharacterSprite*> characterCopy = m_characterSprites;
+        
+        // Render each character
+        for (auto it = characterCopy.constBegin(); it != characterCopy.constEnd(); ++it) {
+            QString name = it.key();
+            CharacterSprite* sprite = it.value();
+            
+            // Skip null sprites
+            if (!sprite) {
+                continue;
+            }
+            
+            // Get texture safely
+            QOpenGLTexture* texture = sprite->getTexture();
+            if (!texture || !texture->isCreated()) {
+                continue;
+            }
+            
+            // Get position safely
+            QVector3D position(0.0f, 0.0f, 0.0f);
             if (m_gameScene) {
                 GameEntity entity = m_gameScene->getEntity(name);
                 if (!entity.id.isEmpty()) {
-                    x = entity.position.x();
-                    y = entity.position.y();
-                    z = entity.position.z();
+                    position = entity.position;
                 }
             }
-        } catch (...) {
-            qWarning() << "Failed to get position for" << name;
+            
+            // Draw character
+            drawCharacterQuad(texture, position.x(), position.y(), position.z(), 
+                              sprite->width(), sprite->height());
         }
         
-        // Draw quad directly
-        try {
-            drawCharacterQuad(texture, x, y, z, sprite->width(), sprite->height());
-        } catch (const std::exception& e) {
-            qWarning() << "Exception drawing quad for" << name << ":" << e.what();
-        } catch (...) {
-            qWarning() << "Unknown exception drawing quad for" << name;
-        }
+        // Cleanup
+        m_billboardProgram->release();
+        
+        // Restore OpenGL state
+        if (depthTestEnabled)
+            glEnable(GL_DEPTH_TEST);
+        else
+            glDisable(GL_DEPTH_TEST);
+            
+        if (blendEnabled)
+            glEnable(GL_BLEND);
+        else
+            glDisable(GL_BLEND);
+            
+        glBlendFunc(blendSrcRGB, blendDstRGB);
     }
-    
-    // Unbind shader
-    m_billboardProgram->release();
-    
-    // Disable blending
-    glDisable(GL_BLEND);
+    catch (const std::exception& e) {
+        qCritical() << "Exception in renderCharactersFallback:" << e.what();
+        
+        // Emergency cleanup
+        if (m_billboardProgram && m_billboardProgram->isLinked()) {
+            m_billboardProgram->release();
+        }
+        glEnable(GL_DEPTH_TEST);
+    }
+    catch (...) {
+        qCritical() << "Unknown exception in renderCharactersFallback";
+        
+        // Emergency cleanup
+        if (m_billboardProgram && m_billboardProgram->isLinked()) {
+            m_billboardProgram->release();
+        }
+        glEnable(GL_DEPTH_TEST);
+    }
 }

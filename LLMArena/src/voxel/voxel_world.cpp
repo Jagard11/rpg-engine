@@ -1,6 +1,7 @@
 // src/voxel/voxel_world.cpp
 #include "../../include/voxel/voxel_world.h"
 #include <QDebug>
+#include <QDateTime>
 
 VoxelWorld::VoxelWorld(QObject* parent) : QObject(parent) {
     // Initialize with an empty world
@@ -19,14 +20,25 @@ void VoxelWorld::setVoxel(int x, int y, int z, const Voxel& voxel) {
 }
 
 void VoxelWorld::setVoxel(const VoxelPos& pos, const Voxel& voxel) {
+    // Check if voxel actually changed to prevent unnecessary updates
+    bool changed = false;
+    
     if (voxel.type == VoxelType::Air) {
-        m_voxels.remove(pos); // Don't store air blocks
+        if (m_voxels.contains(pos)) {
+            m_voxels.remove(pos); // Don't store air blocks
+            changed = true;
+        }
     } else {
-        m_voxels[pos] = voxel;
+        if (!m_voxels.contains(pos) || m_voxels[pos].type != voxel.type || m_voxels[pos].color != voxel.color) {
+            m_voxels[pos] = voxel;
+            changed = true;
+        }
     }
     
-    // Signal that the world has changed
-    emit worldChanged();
+    // Signal that the world has changed only if there was an actual change
+    if (changed) {
+        emit worldChanged();
+    }
 }
 
 void VoxelWorld::createFlatWorld() {

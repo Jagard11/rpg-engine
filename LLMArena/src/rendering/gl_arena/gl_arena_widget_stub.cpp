@@ -14,10 +14,22 @@ void GLArenaWidget::loadCharacterSprite(const QString& characterName, const QStr
     
     // Check if the character sprite already exists
     if (m_characterSprites.contains(characterName)) {
-        qDebug() << "Removing existing sprite for:" << characterName;
+        qDebug() << "SEGFAULT-CHECK: Removing existing sprite for:" << characterName;
         CharacterSprite* oldSprite = m_characterSprites[characterName];
         if (oldSprite) {
-            delete oldSprite;
+            // Check if context is valid before deleting
+            QOpenGLContext* ctx = QOpenGLContext::currentContext();
+            if (!ctx || !ctx->isValid()) {
+                qCritical() << "SEGFAULT-CHECK: No valid context when deleting sprite:" << characterName;
+            }
+            try {
+                delete oldSprite;
+                qDebug() << "SEGFAULT-CHECK: Successfully deleted old sprite for:" << characterName;
+            } catch (const std::exception& e) {
+                qCritical() << "SEGFAULT-CHECK: Exception deleting old sprite:" << e.what();
+            } catch (...) {
+                qCritical() << "SEGFAULT-CHECK: Unknown exception deleting old sprite";
+            }
         }
         m_characterSprites.remove(characterName);
     }

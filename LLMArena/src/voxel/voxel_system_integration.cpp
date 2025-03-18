@@ -1,6 +1,9 @@
 // src/voxel/voxel_system_integration.cpp
 #include "../../include/voxel/voxel_system_integration.h"
 #include <QDebug>
+#include <QDateTime>
+#include <QTimer>
+#include <QSet>
 #include <stdexcept>
 
 VoxelSystemIntegration::VoxelSystemIntegration(GameScene* gameScene, QObject* parent)
@@ -23,7 +26,7 @@ VoxelSystemIntegration::VoxelSystemIntegration(GameScene* gameScene, QObject* pa
         
         qDebug() << "VoxelSystemIntegration created successfully";
     } catch (const std::exception& e) {
-        qCritical() << "Failed to create voxel system components:" << e.what();
+        qCritical() << "SEGFAULT-CHECK: Failed to create voxel system components:" << e.what();
         // Clean up partially initialized components
         delete m_renderer;
         m_renderer = nullptr;
@@ -32,13 +35,14 @@ VoxelSystemIntegration::VoxelSystemIntegration(GameScene* gameScene, QObject* pa
 }
 
 VoxelSystemIntegration::~VoxelSystemIntegration() {
+    qDebug() << "SEGFAULT-CHECK: VoxelSystemIntegration destructor called";
     delete m_renderer; // m_renderer doesn't have a parent, so delete it explicitly
 }
 
 void VoxelSystemIntegration::initialize() {
     // Check if components exist
     if (!m_world || !m_renderer) {
-        qCritical() << "Cannot initialize voxel system: components not created";
+        qCritical() << "SEGFAULT-CHECK: Cannot initialize voxel system: components not created";
         throw std::runtime_error("Voxel system components not created");
     }
     
@@ -53,17 +57,30 @@ void VoxelSystemIntegration::initialize() {
         // Initialize sky system if it exists
         if (m_sky) {
             m_sky->initialize();
+        } else {
+            qWarning() << "SEGFAULT-CHECK: Sky system is null during initialization";
         }
         
         qDebug() << "Voxel system initialized successfully";
     } catch (const std::exception& e) {
-        qCritical() << "Failed to initialize voxel system:" << e.what();
+        qCritical() << "SEGFAULT-CHECK: Failed to initialize voxel system:" << e.what();
         throw; // Rethrow to notify caller
     }
 }
 
 void VoxelSystemIntegration::render(const QMatrix4x4& viewMatrix, const QMatrix4x4& projectionMatrix) {
     try {
+        // Check component validity
+        if (!m_renderer) {
+            qCritical() << "SEGFAULT-CHECK: Renderer is null in VoxelSystemIntegration::render";
+            return;
+        }
+        
+        if (!m_world) {
+            qCritical() << "SEGFAULT-CHECK: World is null in VoxelSystemIntegration::render";
+            return;
+        }
+
         // Clear color and depth buffer
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
@@ -79,26 +96,30 @@ void VoxelSystemIntegration::render(const QMatrix4x4& viewMatrix, const QMatrix4
             try {
                 m_sky->render(viewMatrix, projectionMatrix);
             } catch (const std::exception& e) {
-                qWarning() << "Error rendering sky:" << e.what();
+                qWarning() << "SEGFAULT-CHECK: Error rendering sky:" << e.what();
+            } catch (...) {
+                qWarning() << "SEGFAULT-CHECK: Unknown error rendering sky";
             }
         }
         
-        // Render voxel world if it exists
-        if (m_renderer && m_world) {
-            try {
-                m_renderer->render(viewMatrix, projectionMatrix);
-            } catch (const std::exception& e) {
-                qWarning() << "Error rendering voxels:" << e.what();
-            }
+        // Render voxel world
+        try {
+            m_renderer->render(viewMatrix, projectionMatrix);
+        } catch (const std::exception& e) {
+            qWarning() << "SEGFAULT-CHECK: Error rendering voxels:" << e.what();
+        } catch (...) {
+            qWarning() << "SEGFAULT-CHECK: Unknown error rendering voxels";
         }
     } catch (const std::exception& e) {
-        qCritical() << "Exception during voxel system rendering:" << e.what();
+        qCritical() << "SEGFAULT-CHECK: Exception during voxel system rendering:" << e.what();
+    } catch (...) {
+        qCritical() << "SEGFAULT-CHECK: Unknown exception during voxel system rendering";
     }
 }
 
 void VoxelSystemIntegration::createDefaultWorld() {
     if (!m_world) {
-        qCritical() << "Cannot create default world: world component not initialized";
+        qCritical() << "SEGFAULT-CHECK: Cannot create default world: world component not initialized";
         return;
     }
     
@@ -113,15 +134,20 @@ void VoxelSystemIntegration::createDefaultWorld() {
         
         qDebug() << "Default world created successfully";
     } catch (const std::exception& e) {
-        qCritical() << "Failed to create default world:" << e.what();
+        qCritical() << "SEGFAULT-CHECK: Failed to create default world:" << e.what();
     }
 }
 
+// Connect signals
 void VoxelSystemIntegration::connectSignals() {
     // Connect world changes to renderer if both exist
     if (m_world && m_renderer) {
+        // Only update renderdata when world changes
         connect(m_world, &VoxelWorld::worldChanged, m_renderer, &VoxelRenderer::updateRenderData);
-        connect(m_world, &VoxelWorld::worldChanged, this, &VoxelSystemIntegration::updateGameScene);
+        
+        // Only update game scene once on initial world creation
+        // We don't need constant updates as voxels are static once created
+        QTimer::singleShot(500, this, &VoxelSystemIntegration::updateGameScene);
     }
     
     // Disconnect any existing sky signal connections
@@ -137,55 +163,72 @@ void VoxelSystemIntegration::connectSignals() {
 }
 
 void VoxelSystemIntegration::updateGameScene() {
+    // Prevent frequent updates using static timestamp
+    static qint64 lastUpdateTime = 0;
+    qint64 currentTime = QDateTime::currentMSecsSinceEpoch();
+    
+    // Only update every 5 seconds maximum
+    if (currentTime - lastUpdateTime < 5000) {
+        return;
+    }
+    lastUpdateTime = currentTime;
+
     if (!m_gameScene || !m_world) {
-        qWarning() << "Cannot update game scene: missing components";
+        qWarning() << "SEGFAULT-CHECK: Cannot update game scene: missing components";
         return;
     }
     
+    // Static flag to prevent recursive updates
+    static bool isUpdating = false;
+    if (isUpdating) {
+        qDebug() << "Already updating game scene, skipping recursive call";
+        return;
+    }
+    
+    isUpdating = true;
+    qDebug() << "---Beginning voxel world sync (happens only occasionally)---";
+    
     try {
-        // Store player entity if it exists
-        GameEntity player;
-        bool hasPlayer = false;
+        // Get all visible voxels
+        QVector<VoxelPos> visibleVoxels = m_world->getVisibleVoxels();
         
-        if (m_gameScene->getEntity("player").id == "player") {
-            player = m_gameScene->getEntity("player");
-            hasPlayer = true;
-        }
+        // Limit to a reasonable number to avoid overload
+        const int MAX_VOXELS = 100;
+        int voxelCount = qMin(MAX_VOXELS, visibleVoxels.size());
         
-        // Remove all entities except player
-        QVector<QString> entitiesToRemove;
+        // Keep track of current entities
+        QSet<QString> existingVoxelEntities;
+        QSet<QString> voxelsToKeep;
         
-        for (const GameEntity& entity : m_gameScene->getAllEntities()) {
-            if (entity.id != "player") {
-                entitiesToRemove.append(entity.id);
+        // Get existing voxel entities
+        QVector<GameEntity> allEntities = m_gameScene->getAllEntities();
+        for (const GameEntity& entity : allEntities) {
+            if (entity.type == "voxel") {
+                existingVoxelEntities.insert(entity.id);
             }
         }
         
-        for (const QString& id : entitiesToRemove) {
-            m_gameScene->removeEntity(id);
-        }
-        
-        // Re-add player if it existed
-        if (hasPlayer) {
-            m_gameScene->addEntity(player);
-        }
-        
-        // Add voxel entities, limit to a reasonable number to avoid overload
-        const int MAX_ENTITIES = 100;
-        QVector<VoxelPos> visibleVoxels = m_world->getVisibleVoxels();
-        
-        // Create entities for visible voxels up to limit
-        int entityCount = 0;
-        for (int i = 0; i < qMin(MAX_ENTITIES, visibleVoxels.size()); i++) {
+        // Process visible voxels
+        for (int i = 0; i < voxelCount; i++) {
             const VoxelPos& pos = visibleVoxels[i];
             Voxel voxel = m_world->getVoxel(pos);
             
             // Skip air voxels
             if (voxel.type == VoxelType::Air) continue;
             
-            // Create a game entity for the voxel
+            // Create ID for this voxel
+            QString voxelId = QString("voxel_%1_%2_%3").arg(pos.x).arg(pos.y).arg(pos.z);
+            voxelsToKeep.insert(voxelId);
+            
+            // Check if this voxel entity already exists
+            if (existingVoxelEntities.contains(voxelId)) {
+                // Entity exists, no need to re-add it
+                continue;
+            }
+            
+            // Create a new entity for this voxel
             GameEntity voxelEntity;
-            voxelEntity.id = QString("voxel_%1_%2_%3").arg(pos.x).arg(pos.y).arg(pos.z);
+            voxelEntity.id = voxelId;
             voxelEntity.type = "voxel";
             voxelEntity.position = QVector3D(pos.x, pos.y, pos.z);
             voxelEntity.dimensions = QVector3D(1.0f, 1.0f, 1.0f);
@@ -193,32 +236,61 @@ void VoxelSystemIntegration::updateGameScene() {
             
             // Add to game scene
             m_gameScene->addEntity(voxelEntity);
-            entityCount++;
         }
         
-        qDebug() << "Updated game scene with" << entityCount << "voxel entities";
+        // Remove voxel entities that are no longer visible
+        QSet<QString> voxelsToRemove = existingVoxelEntities - voxelsToKeep;
+        for (const QString& voxelId : voxelsToRemove) {
+            m_gameScene->removeEntity(voxelId);
+        }
         
-        // Add simplified celestial entities
+        // Update celestial entities (sun and moon)
+        // For these, use direct position updates instead of removing/re-adding
         if (m_sky) {
-            // Add sun
-            GameEntity sunEntity;
-            sunEntity.id = "sun";
-            sunEntity.type = "celestial";
-            sunEntity.position = m_sky->getSunPosition();
-            sunEntity.dimensions = QVector3D(5.0f, 5.0f, 5.0f);
-            sunEntity.isStatic = false;
-            m_gameScene->addEntity(sunEntity);
+            // Update sun position
+            GameEntity sunEntity = m_gameScene->getEntity("sun");
+            QVector3D sunPos = m_sky->getSunPosition();
             
-            // Add moon
-            GameEntity moonEntity;
-            moonEntity.id = "moon";
-            moonEntity.type = "celestial";
-            moonEntity.position = m_sky->getMoonPosition();
-            moonEntity.dimensions = QVector3D(3.0f, 3.0f, 3.0f);
-            moonEntity.isStatic = false;
-            m_gameScene->addEntity(moonEntity);
+            if (sunEntity.id.isEmpty()) {
+                // Create new sun entity if it doesn't exist
+                sunEntity.id = "sun";
+                sunEntity.type = "celestial";
+                sunEntity.dimensions = QVector3D(5.0f, 5.0f, 5.0f);
+                sunEntity.isStatic = false;
+                sunEntity.position = sunPos;
+                m_gameScene->addEntity(sunEntity);
+            } else if ((sunEntity.position - sunPos).length() > 0.1f) {
+                // Only update position if it changed significantly
+                // Use updateEntityPosition method directly to avoid remove/add cycle
+                m_gameScene->updateEntityPosition("sun", sunPos);
+            }
+            
+            // Update moon position
+            GameEntity moonEntity = m_gameScene->getEntity("moon");
+            QVector3D moonPos = m_sky->getMoonPosition();
+            
+            if (moonEntity.id.isEmpty()) {
+                // Create new moon entity if it doesn't exist
+                moonEntity.id = "moon";
+                moonEntity.type = "celestial";
+                moonEntity.dimensions = QVector3D(3.0f, 3.0f, 3.0f);
+                moonEntity.isStatic = false;
+                moonEntity.position = moonPos;
+                m_gameScene->addEntity(moonEntity);
+            } else if ((moonEntity.position - moonPos).length() > 0.1f) {
+                // Only update position if it changed significantly
+                // Use updateEntityPosition method directly to avoid remove/add cycle
+                m_gameScene->updateEntityPosition("moon", moonPos);
+            }
+        } else {
+            qWarning() << "SEGFAULT-CHECK: Sky system is null during updateGameScene";
         }
+        
+        qDebug() << "Updated game scene with" << voxelCount << "voxel entities";
     } catch (const std::exception& e) {
-        qCritical() << "Exception in updateGameScene:" << e.what();
+        qCritical() << "SEGFAULT-CHECK: Exception in updateGameScene:" << e.what();
     }
+    
+    qDebug() << "---Voxel world sync completed---";
+    isUpdating = false;
 }

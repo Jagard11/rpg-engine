@@ -52,6 +52,7 @@ set(HEADERS
     include/voxel/voxel_renderer.h
     include/voxel/sky_system.h
     include/voxel/voxel_system_integration.h
+    include/utils/crash_handler.h
 )
 
 # Main source file

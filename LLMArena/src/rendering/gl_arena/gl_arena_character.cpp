@@ -11,33 +11,36 @@ CharacterSprite::CharacterSprite()
     : m_texture(nullptr), m_width(1.0f), m_height(2.0f), m_depth(1.0f),
       m_vertexBuffer(QOpenGLBuffer::VertexBuffer), m_indexBuffer(QOpenGLBuffer::IndexBuffer)
 {
-    qDebug() << "CharacterSprite constructor called";
+    // Log constructor for tracking object lifecycle
+    static int spriteCounter = 0;
+    qDebug() << "SEGFAULT-CHECK: CharacterSprite constructor #" << ++spriteCounter;
 }
 
 CharacterSprite::~CharacterSprite()
 {
+    // Log destructor for tracking object lifecycle
+    static int destructorCounter = 0;
+    qDebug() << "SEGFAULT-CHECK: CharacterSprite destructor #" << ++destructorCounter;
+    
     // Safe cleanup with explicit error handling
     try {
         // Only operate on OpenGL objects if we have a valid context
         QOpenGLContext* ctx = QOpenGLContext::currentContext();
         if (!ctx || !ctx->isValid()) {
-            qWarning() << "No valid OpenGL context in CharacterSprite destructor";
+            qWarning() << "SEGFAULT-CHECK: No valid OpenGL context in CharacterSprite destructor";
             return;
         }
         
         // Release OpenGL resources in a safe way
         if (m_vertexBuffer.isCreated()) {
-            qDebug() << "Destroying vertex buffer";
             m_vertexBuffer.destroy();
         }
         
         if (m_indexBuffer.isCreated()) {
-            qDebug() << "Destroying index buffer";
             m_indexBuffer.destroy();
         }
         
         if (m_vao.isCreated()) {
-            qDebug() << "Destroying VAO";
             m_vao.destroy();
         }
         
@@ -45,7 +48,6 @@ CharacterSprite::~CharacterSprite()
         if (m_texture) {
             // Only destroy if it's created to avoid crash
             if (m_texture->isCreated()) {
-                qDebug() << "Destroying texture";
                 // Ensure we're not bound to any texture unit
                 QOpenGLFunctions* f = ctx->functions();
                 if (f) {
@@ -58,25 +60,24 @@ CharacterSprite::~CharacterSprite()
             }
             
             // Delete the texture object itself
-            qDebug() << "Deleting texture object";
             delete m_texture;
             m_texture = nullptr;
         }
     } catch (const std::exception& e) {
-        qWarning() << "Exception in CharacterSprite destructor:" << e.what();
+        qCritical() << "SEGFAULT-CHECK: Exception in CharacterSprite destructor:" << e.what();
     } catch (...) {
-        qWarning() << "Unknown exception in CharacterSprite destructor";
+        qCritical() << "SEGFAULT-CHECK: Unknown exception in CharacterSprite destructor";
     }
 }
 
 void CharacterSprite::init(QOpenGLContext* context, const QString& texturePath, 
                           double width, double height, double depth)
 {
-    qDebug() << "Initializing CharacterSprite with texture:" << texturePath;
+    qDebug() << "SEGFAULT-CHECK: CharacterSprite::init start with texture:" << texturePath;
     
     // Bail out if no context
     if (!context || !context->isValid()) {
-        qWarning() << "CharacterSprite init: Invalid OpenGL context";
+        qCritical() << "SEGFAULT-CHECK: Invalid OpenGL context in CharacterSprite::init";
         return;
     }
     
@@ -89,13 +90,18 @@ void CharacterSprite::init(QOpenGLContext* context, const QString& texturePath,
     
     // Clean up any existing texture first
     if (m_texture) {
-        if (m_texture->isCreated()) {
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, 0);
-            m_texture->destroy();
+        try {
+            if (m_texture->isCreated()) {
+                glActiveTexture(GL_TEXTURE0);
+                glBindTexture(GL_TEXTURE_2D, 0);
+                m_texture->destroy();
+            }
+            delete m_texture;
+            m_texture = nullptr;
+            qDebug() << "SEGFAULT-CHECK: Previous texture cleaned up successfully";
+        } catch (const std::exception& e) {
+            qCritical() << "SEGFAULT-CHECK: Exception cleaning up texture:" << e.what();
         }
-        delete m_texture;
-        m_texture = nullptr;
     }
     
     try {
@@ -115,7 +121,7 @@ void CharacterSprite::init(QOpenGLContext* context, const QString& texturePath,
             if (fileInfo.exists() && fileInfo.isFile()) {
                 QImage loadedImage;
                 if (loadedImage.load(texturePath)) {
-                    qDebug() << "Successfully loaded image from" << texturePath;
+                    qDebug() << "SEGFAULT-CHECK: Successfully loaded image from" << texturePath;
                     // Convert to RGBA format if needed
                     if (loadedImage.format() != QImage::Format_RGBA8888) {
                         textureImage = loadedImage.convertToFormat(QImage::Format_RGBA8888);
@@ -123,15 +129,19 @@ void CharacterSprite::init(QOpenGLContext* context, const QString& texturePath,
                         textureImage = loadedImage;
                     }
                 } else {
-                    qWarning() << "Failed to load texture from" << texturePath;
+                    qWarning() << "SEGFAULT-CHECK: Failed to load texture from" << texturePath;
                 }
             } else {
-                qWarning() << "Texture file does not exist:" << texturePath;
+                qWarning() << "SEGFAULT-CHECK: Texture file does not exist:" << texturePath;
             }
         }
         
         // Create texture object
         m_texture = new QOpenGLTexture(QOpenGLTexture::Target2D);
+        if (!m_texture) {
+            qCritical() << "SEGFAULT-CHECK: Failed to allocate texture object";
+            return;
+        }
         
         // Set up texture parameters
         m_texture->setFormat(QOpenGLTexture::RGBA8_UNorm);
@@ -141,15 +151,14 @@ void CharacterSprite::init(QOpenGLContext* context, const QString& texturePath,
         
         // Create and upload the texture
         if (!m_texture->create()) {
-            qWarning() << "Failed to create OpenGL texture";
+            qCritical() << "SEGFAULT-CHECK: Failed to create OpenGL texture";
             delete m_texture;
             m_texture = nullptr;
             return;
         }
         
         m_texture->setData(textureImage);
-        
-        qDebug() << "Successfully created texture" << textureImage.width() << "x" << textureImage.height();
+        qDebug() << "SEGFAULT-CHECK: Successfully created texture" << textureImage.width() << "x" << textureImage.height();
         
         // Now set up the vertex/index data for billboard quad
         // Create quad buffer data - simplified with minimal data
@@ -178,14 +187,14 @@ void CharacterSprite::init(QOpenGLContext* context, const QString& texturePath,
         
         // Create VAO
         if (!m_vao.create()) {
-            qWarning() << "Failed to create VAO";
+            qCritical() << "SEGFAULT-CHECK: Failed to create VAO";
             return;
         }
         m_vao.bind();
         
         // Create VBO
         if (!m_vertexBuffer.create()) {
-            qWarning() << "Failed to create VBO";
+            qCritical() << "SEGFAULT-CHECK: Failed to create VBO";
             m_vao.release();
             return;
         }
@@ -194,7 +203,7 @@ void CharacterSprite::init(QOpenGLContext* context, const QString& texturePath,
         
         // Create IBO
         if (!m_indexBuffer.create()) {
-            qWarning() << "Failed to create IBO";
+            qCritical() << "SEGFAULT-CHECK: Failed to create IBO";
             m_vertexBuffer.release();
             m_vao.release();
             return;
@@ -215,11 +224,11 @@ void CharacterSprite::init(QOpenGLContext* context, const QString& texturePath,
         m_vertexBuffer.release();
         m_vao.release();
         
-        qDebug() << "Successfully initialized billboard geometry";
+        qDebug() << "SEGFAULT-CHECK: Successfully initialized billboard geometry";
     } catch (const std::exception& e) {
-        qWarning() << "Exception in CharacterSprite::init:" << e.what();
+        qCritical() << "SEGFAULT-CHECK: Exception in CharacterSprite::init:" << e.what();
     } catch (...) {
-        qWarning() << "Unknown exception in CharacterSprite::init";
+        qCritical() << "SEGFAULT-CHECK: Unknown exception in CharacterSprite::init";
     }
 }
 
@@ -231,24 +240,21 @@ void CharacterSprite::updatePosition(float x, float y, float z)
 void CharacterSprite::render(QOpenGLShaderProgram* program, QMatrix4x4& viewMatrix, QMatrix4x4& projectionMatrix)
 {
     // This method is no longer used, as rendering is handled directly in GLArenaWidget::renderCharacters
-    // Kept for API compatibility
-    qDebug() << "CharacterSprite::render called but is deprecated";
+    qDebug() << "SEGFAULT-CHECK: CharacterSprite::render called but is deprecated";
     
     // Skip render if shader, texture or VAO are invalid
     if (!program || !program->isLinked()) {
-        qWarning() << "Invalid shader program in CharacterSprite::render";
+        qWarning() << "SEGFAULT-CHECK: Invalid shader program in CharacterSprite::render";
         return;
     }
     
     if (!m_texture || !m_texture->isCreated()) {
-        qWarning() << "Invalid texture in CharacterSprite::render";
+        qWarning() << "SEGFAULT-CHECK: Invalid texture in CharacterSprite::render";
         return;
     }
     
     if (!m_vao.isCreated()) {
-        qWarning() << "Invalid VAO in CharacterSprite::render";
+        qWarning() << "SEGFAULT-CHECK: Invalid VAO in CharacterSprite::render";
         return;
     }
-    
-    qDebug() << "CharacterSprite::render - this method is no longer used";
 }

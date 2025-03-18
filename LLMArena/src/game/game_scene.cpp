@@ -15,8 +15,8 @@ void GameScene::addEntity(const GameEntity &entity) {
     }
     
     entities[entity.id] = entity;
-    qDebug() << "Added entity:" << entity.id << "at position" 
-             << entity.position.x() << entity.position.y() << entity.position.z();
+    // qDebug() << "Added entity:" << entity.id << "at position" 
+    //          << entity.position.x() << entity.position.y() << entity.position.z();
     emit entityAdded(entity);
 }
 

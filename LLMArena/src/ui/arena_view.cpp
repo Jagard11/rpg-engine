@@ -148,16 +148,27 @@ void ArenaView::loadCharacters() {
     characterSelector->blockSignals(false);
 }
 
+// Fix for the infinite recursion bug:
+// Added a static flag to prevent recursive event forwarding
 void ArenaView::keyPressEvent(QKeyEvent *event) {
+    // Use a static flag to prevent infinite recursion
+    static bool handlingKeyEvent = false;
+    
+    if (handlingKeyEvent) {
+        // We're already handling a key event, just accept it and return
+        event->accept();
+        return;
+    }
+    
+    // Set the flag before handling
+    handlingKeyEvent = true;
+    
     // Forward key events to OpenGL widget with safety checks
     if (glWidget && event) {
-        // Set focus to OpenGL widget if it doesn't have it
-        if (!glWidget->hasFocus()) {
-            glWidget->setFocus();
-        }
+        // Don't call setFocus() inside the event handler - that can trigger another event
         
-        // Use sendEvent instead of passing directly to ensure proper event delivery
-        QCoreApplication::sendEvent(glWidget, event);
+        // Call the key handler directly instead of using sendEvent
+        glWidget->keyPressEvent(event);
         
         // Mark event as accepted to prevent it from being processed further
         event->accept();
@@ -165,13 +176,29 @@ void ArenaView::keyPressEvent(QKeyEvent *event) {
         // Fall back to default handling if no OpenGL widget
         QWidget::keyPressEvent(event);
     }
+    
+    // Reset the flag when done
+    handlingKeyEvent = false;
 }
 
+// Fix the key release event handler in the same way
 void ArenaView::keyReleaseEvent(QKeyEvent *event) {
+    // Use a static flag to prevent infinite recursion
+    static bool handlingKeyEvent = false;
+    
+    if (handlingKeyEvent) {
+        // We're already handling a key event, just accept it and return
+        event->accept();
+        return;
+    }
+    
+    // Set the flag before handling
+    handlingKeyEvent = true;
+    
     // Forward key events to OpenGL widget with safety checks
     if (glWidget && event) {
-        // Use sendEvent instead of passing directly to ensure proper event delivery
-        QCoreApplication::sendEvent(glWidget, event);
+        // Call the key handler directly instead of using sendEvent
+        glWidget->keyReleaseEvent(event);
         
         // Mark event as accepted to prevent it from being processed further
         event->accept();
@@ -179,6 +206,9 @@ void ArenaView::keyReleaseEvent(QKeyEvent *event) {
         // Fall back to default handling if no OpenGL widget
         QWidget::keyReleaseEvent(event);
     }
+    
+    // Reset the flag when done
+    handlingKeyEvent = false;
 }
 
 void ArenaView::showEvent(QShowEvent *event) {

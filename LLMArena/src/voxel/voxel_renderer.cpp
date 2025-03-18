@@ -84,7 +84,6 @@ void VoxelRenderer::updateRenderData() {
     }
     
     m_voxelCount = m_visibleVoxels.size();
-    qDebug() << "Updated render data with" << m_voxelCount << "visible voxels";
 }
 
 void VoxelRenderer::createCubeGeometry(float size) {

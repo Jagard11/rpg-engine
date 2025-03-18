@@ -332,8 +332,19 @@ void SkySystem::updateTime() {
         
         // Update sky color
         calculateSkyColor();
+        
+        // Check OpenGL errors after sky update
+        QOpenGLContext* ctx = QOpenGLContext::currentContext();
+        if (ctx && ctx->isValid()) {
+            GLenum err;
+            while ((err = glGetError()) != GL_NO_ERROR) {
+                qCritical() << "SEGFAULT-CHECK: OpenGL error in SkySystem::updateTime:" << err;
+            }
+        }
     } catch (const std::exception& e) {
-        qWarning() << "Exception in SkySystem::updateTime:" << e.what();
+        qCritical() << "SEGFAULT-CHECK: Exception in SkySystem::updateTime:" << e.what();
+    } catch (...) {
+        qCritical() << "SEGFAULT-CHECK: Unknown exception in SkySystem::updateTime";
     }
 }
 

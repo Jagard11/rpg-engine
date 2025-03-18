@@ -20,13 +20,18 @@
 #include "character/character_persistence.h"
 #include "llm/oobabooga_bridge.h"
 #include "ui/arena_view.h"
+#include "utils/crash_handler.h"
 
 // Global crash handler to display errors and prevent immediate exit
 void globalCrashHandler() {
     try {
+        // Generate detailed crash log
+        CrashHandler::dumpCrashInfo("Unhandled C++ exception");
+        
         QMessageBox::critical(nullptr, "Application Error",
                              "An unhandled exception occurred. The application will now close.\n\n"
-                             "Please report this issue with detailed steps to reproduce.");
+                             "A crash log has been saved to the crash_logs directory.\n"
+                             "Please report this issue with the log file attached.");
     } catch (...) {
         // If even showing a message box fails, at least print to console
         qCritical() << "CRITICAL ERROR: Unhandled exception in application.";
@@ -124,6 +129,9 @@ int main(int argc, char *argv[])
     
     // Initialize Qt application
     QApplication app(argc, argv);
+    
+    // IMPORTANT: Install signal handlers AFTER QApplication is initialized
+    CrashHandler::installHandlers();
     
     // Check if OpenGL is available before trying to use it
     bool openglAvailable = isOpenGLAvailable();

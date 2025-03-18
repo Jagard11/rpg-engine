@@ -35,21 +35,44 @@ GLArenaWidget::GLArenaWidget(CharacterManager* charManager, QWidget* parent)
 
 GLArenaWidget::~GLArenaWidget()
 {
-    makeCurrent();
+    qDebug() << "SEGFAULT-CHECK: GLArenaWidget destructor called";
     
-    // Clean up character sprites
-    for (auto it = m_characterSprites.begin(); it != m_characterSprites.end(); ++it) {
-        if (it.value()) delete it.value();
+    try {
+        makeCurrent();
+        
+        // Clean up character sprites
+        qDebug() << "SEGFAULT-CHECK: Deleting" << m_characterSprites.size() << "character sprites";
+        for (auto it = m_characterSprites.begin(); it != m_characterSprites.end(); ++it) {
+            if (it.value()) {
+                try {
+                    qDebug() << "SEGFAULT-CHECK: Deleting sprite for" << it.key();
+                    delete it.value();
+                } catch (const std::exception& e) {
+                    qCritical() << "SEGFAULT-CHECK: Exception deleting sprite:" << e.what();
+                } catch (...) {
+                    qCritical() << "SEGFAULT-CHECK: Unknown exception deleting sprite";
+                }
+            }
+        }
+        m_characterSprites.clear();
+        
+        // Clean up shader programs
+        qDebug() << "SEGFAULT-CHECK: Deleting shader programs";
+        delete m_billboardProgram;
+        m_billboardProgram = nullptr;
+        
+        // Delete voxel system
+        qDebug() << "SEGFAULT-CHECK: Deleting voxel system";
+        delete m_voxelSystem;
+        m_voxelSystem = nullptr;
+        
+        qDebug() << "SEGFAULT-CHECK: Resources deleted successfully";
+        doneCurrent();
+    } catch (const std::exception& e) {
+        qCritical() << "SEGFAULT-CHECK: Exception in GLArenaWidget destructor:" << e.what();
+    } catch (...) {
+        qCritical() << "SEGFAULT-CHECK: Unknown exception in GLArenaWidget destructor";
     }
-    m_characterSprites.clear();
-    
-    // Clean up shader programs
-    delete m_billboardProgram;
-    
-    // Delete voxel system
-    delete m_voxelSystem;
-    
-    doneCurrent();
 }
 
 void GLArenaWidget::initializeGL()
