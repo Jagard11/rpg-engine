@@ -68,31 +68,35 @@ void VoxelRenderer::initialize() {
 
 void VoxelRenderer::loadTextures() {
     QString resourcePath = QDir::currentPath() + "/resources/";
+    qDebug() << "Looking for textures in:" << resourcePath;
     
     // Load cobblestone texture
     QImage cobblestoneImg(resourcePath + "cobblestone.png");
     if (cobblestoneImg.isNull()) {
-        qWarning() << "Failed to load cobblestone texture";
+        qWarning() << "Failed to load cobblestone texture from" << resourcePath + "cobblestone.png";
         createDefaultTexture("cobblestone");
     } else {
+        qDebug() << "Successfully loaded cobblestone texture";
         createTexture("cobblestone", cobblestoneImg);
     }
     
     // Load grass texture
     QImage grassImg(resourcePath + "grass.png");
     if (grassImg.isNull()) {
-        qWarning() << "Failed to load grass texture";
+        qWarning() << "Failed to load grass texture from" << resourcePath + "grass.png";
         createDefaultTexture("grass");
     } else {
+        qDebug() << "Successfully loaded grass texture";
         createTexture("grass", grassImg);
     }
     
     // Load dirt texture
     QImage dirtImg(resourcePath + "dirt.png");
     if (dirtImg.isNull()) {
-        qWarning() << "Failed to load dirt texture";
+        qWarning() << "Failed to load dirt texture from" << resourcePath + "dirt.png";
         createDefaultTexture("dirt");
     } else {
+        qDebug() << "Successfully loaded dirt texture";
         createTexture("dirt", dirtImg);
     }
     
@@ -108,48 +112,99 @@ void VoxelRenderer::createTexture(const QString& name, const QImage& image) {
     }
     
     // Create new texture
-    m_textures[name] = new QOpenGLTexture(image);
+    m_textures[name] = new QOpenGLTexture(QOpenGLTexture::Target2D);
     m_textures[name]->setMinificationFilter(QOpenGLTexture::LinearMipMapLinear);
     m_textures[name]->setMagnificationFilter(QOpenGLTexture::Linear);
-    m_textures[name]->setWrapMode(QOpenGLTexture::Repeat);
+    m_textures[name]->setWrapMode(QOpenGLTexture::ClampToEdge);
+    
+    // Ensure proper format
+    QImage textureImage;
+    if (image.format() != QImage::Format_RGBA8888) {
+        textureImage = image.convertToFormat(QImage::Format_RGBA8888);
+    } else {
+        textureImage = image;
+    }
+    
+    // Fix image orientation for OpenGL
+    textureImage = textureImage.mirrored();
+    
+    // Create and allocate texture
+    if (!m_textures[name]->create()) {
+        qWarning() << "Failed to create texture" << name;
+        return;
+    }
+    
+    m_textures[name]->setSize(textureImage.width(), textureImage.height());
+    m_textures[name]->setFormat(QOpenGLTexture::RGBA8_UNorm);
+    m_textures[name]->allocateStorage();
+    
+    // Upload the texture data
+    m_textures[name]->setData(QOpenGLTexture::RGBA, QOpenGLTexture::UInt8, textureImage.constBits());
+    
+    // Generate mipmaps
+    m_textures[name]->generateMipMaps();
+    
+    qDebug() << "Created texture" << name << "with size" << textureImage.width() << "x" << textureImage.height();
 }
 
 void VoxelRenderer::createDefaultTexture(const QString& name) {
-    // Create a simple checkered pattern texture
+    // Create a simple texture for fallback
     QImage defaultImg(16, 16, QImage::Format_RGBA8888);
     defaultImg.fill(Qt::transparent);
     
     QPainter painter(&defaultImg);
     painter.setPen(Qt::NoPen);
     
-    // Draw checkerboard pattern
+    // Fill with appropriate color based on material type
+    QColor baseColor;
     if (name == "cobblestone") {
-        painter.setBrush(QColor(128, 128, 128));
+        baseColor = QColor(128, 128, 128);
     } else if (name == "grass") {
-        painter.setBrush(QColor(0, 128, 0));
+        baseColor = QColor(0, 128, 0);
     } else if (name == "dirt") {
-        painter.setBrush(QColor(139, 69, 19));
+        baseColor = QColor(139, 69, 19);
     } else {
-        painter.setBrush(QColor(255, 0, 255)); // Pink for default unknown
+        baseColor = QColor(255, 0, 255); // Pink for default unknown
     }
     
-    painter.drawRect(0, 0, 8, 8);
-    painter.drawRect(8, 8, 8, 8);
+    // Fill the entire image with the base color
+    painter.fillRect(0, 0, 16, 16, baseColor);
     
-    if (name == "cobblestone") {
-        painter.setBrush(QColor(100, 100, 100));
-    } else if (name == "grass") {
-        painter.setBrush(QColor(0, 100, 0));
-    } else if (name == "dirt") {
-        painter.setBrush(QColor(101, 67, 33));
-    } else {
-        painter.setBrush(QColor(200, 0, 200));
+    // Add some texture details
+    QColor detailColor = baseColor.darker(120);
+    
+    // Draw some noise/pattern
+    for (int y = 0; y < 16; y++) {
+        for (int x = 0; x < 16; x++) {
+            // Add some random dots/details
+            if ((x + y) % 3 == 0) {
+                painter.fillRect(x, y, 1, 1, detailColor);
+            }
+        }
     }
     
-    painter.drawRect(0, 8, 8, 8);
-    painter.drawRect(8, 0, 8, 8);
+    // If it's cobblestone, draw a grid pattern
+    if (name == "cobblestone") {
+        painter.setPen(QPen(QColor(100, 100, 100), 1));
+        painter.drawLine(0, 4, 16, 4);
+        painter.drawLine(0, 11, 16, 11);
+        painter.drawLine(4, 0, 4, 16);
+        painter.drawLine(11, 0, 11, 16);
+    }
+    
+    // If it's grass, add some blades
+    if (name == "grass") {
+        painter.setPen(QPen(QColor(0, 180, 0), 1));
+        painter.drawLine(2, 0, 2, 5);
+        painter.drawLine(7, 0, 7, 7);
+        painter.drawLine(12, 0, 12, 6);
+    }
+    
+    painter.end();
     
     createTexture(name, defaultImg);
+    
+    qDebug() << "Created default texture for" << name;
 }
 
 void VoxelRenderer::setWorld(VoxelWorld* world) {
@@ -396,6 +451,13 @@ void VoxelRenderer::render(const QMatrix4x4& viewMatrix, const QMatrix4x4& proje
     // Bind VAO
     m_vao.bind();
     
+    // Enable texture unit 0
+    glActiveTexture(GL_TEXTURE0);
+    m_shaderProgram->setUniformValue("textureSampler", 0);
+    
+    // Track current bound texture to avoid redundant binds
+    GLuint currentTexture = 0;
+    
     // Draw each visible voxel
     for (const RenderVoxel& voxel : m_visibleVoxels) {
         // Set voxel-specific uniforms
@@ -403,7 +465,7 @@ void VoxelRenderer::render(const QMatrix4x4& viewMatrix, const QMatrix4x4& proje
         m_shaderProgram->setUniformValue("voxelColor", QVector4D(
             voxel.color.redF(), voxel.color.greenF(), voxel.color.blueF(), voxel.color.alphaF()));
         
-        // Select and bind texture based on voxel type
+        // Select texture based on voxel type
         QOpenGLTexture* texture = nullptr;
         bool useTexture = true;
         
@@ -424,24 +486,29 @@ void VoxelRenderer::render(const QMatrix4x4& viewMatrix, const QMatrix4x4& proje
                 break;
         }
         
-        // Bind texture if available
+        // Bind texture if available and different from current
         if (texture && texture->isCreated()) {
-            texture->bind();
+            // Only rebind if it's a different texture
+            if (texture->textureId() != currentTexture) {
+                texture->bind();
+                currentTexture = texture->textureId();
+            }
             m_shaderProgram->setUniformValue("useTexture", useTexture);
         } else {
+            // If no valid texture, use default color
             m_shaderProgram->setUniformValue("useTexture", false);
         }
         
         // Draw cube
         glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, nullptr);
-        
-        // Unbind texture
-        if (texture && texture->isCreated()) {
-            texture->release();
-        }
     }
     
-    // Unbind
+    // Unbind any bound texture
+    if (currentTexture != 0) {
+        glBindTexture(GL_TEXTURE_2D, 0);
+    }
+    
+    // Unbind VAO and shader
     m_vao.release();
     m_shaderProgram->release();
 }

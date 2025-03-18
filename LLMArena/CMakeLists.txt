@@ -139,6 +139,32 @@ list(APPEND SOURCES
     ${DEBUG_SOURCES}
 )
 
+# Ensure resources directory exists
+if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/resources")
+    file(MAKE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/resources")
+endif()
+
+# Copy texture files to build directory resources
+set(TEXTURE_FILES
+    "cobblestone.png"
+    "grass.png"
+    "dirt.png"
+)
+
+# Create textures directory if it doesn't exist
+file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/resources")
+
+# Copy each texture file to the build directory
+foreach(TEXTURE_FILE ${TEXTURE_FILES})
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/resources/${TEXTURE_FILE}")
+        message(STATUS "Copying texture: ${TEXTURE_FILE}")
+        file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/resources/${TEXTURE_FILE}" 
+             DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/resources")
+    else()
+        message(WARNING "Texture file not found: ${TEXTURE_FILE}")
+    endif()
+endforeach()
+
 # Check for resources directory
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/resources")
     # Create resources
@@ -150,6 +176,9 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/resources")
             <file>shaders/basic.frag</file>
             <file>shaders/billboard.vert</file>
             <file>shaders/billboard.frag</file>
+            <file>resources/cobblestone.png</file>
+            <file>resources/grass.png</file>
+            <file>resources/dirt.png</file>
         </qresource>
     </RCC>
     ")
