@@ -102,7 +102,7 @@ void ArenaView::setupUI() {
     
     // Controls label - Make more prominent
     controlsLabel = new QLabel(
-        "<strong>Controls:</strong> W/S - Move forward/backward, A/D - Rotate left/right, Q/E - Strafe left/right",
+        "<strong>Controls:</strong> W/S - Move forward/backward, A/D - Rotate left/right, Q/E - Strafe left/right, Mouse - Look",
         this
     );
     controlsLabel->setStyleSheet("background-color: rgba(0,0,0,0.1); padding: 5px; border-radius: 3px;");

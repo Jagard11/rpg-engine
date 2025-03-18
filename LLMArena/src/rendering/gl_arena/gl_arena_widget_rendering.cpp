@@ -85,8 +85,15 @@ void GLArenaWidget::paintGL()
         // Update view matrix based on player position and rotation
         m_viewMatrix.setToIdentity();
         
-        // Position camera at player's eye level (1.6m above position)
-        QVector3D eyePos = playerPos + QVector3D(0.0f, 1.6f, 0.0f);
+        // Position camera at player's eye level based on stance
+        float eyeHeight = playerPos.y() + 1.6f; // Default eye height
+        
+        // If player controller exists, get actual eye height
+        if (m_playerController) {
+            eyeHeight = playerPos.y() + m_playerController->getEyeHeight();
+        }
+        
+        QVector3D eyePos = QVector3D(playerPos.x(), eyeHeight, playerPos.z());
         
         // Calculate look direction based on player rotation
         QVector3D lookDir(cos(playerRot), 0.0f, sin(playerRot));
