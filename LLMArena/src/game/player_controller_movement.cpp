@@ -69,8 +69,8 @@ void PlayerController::updatePosition() {
             newPosition.setY(newPosition.y() + jumpVelocity);
             
             // Check if we've landed
-            if (newPosition.y() <= 0.9f) {
-                newPosition.setY(0.9f);
+            if (newPosition.y() <= 1.0f) { // Adjusted to match new floor level of 1.0
+                newPosition.setY(1.0f); 
                 jumping = false;
                 jumpVelocity = 0.0f;
             }
@@ -126,38 +126,47 @@ void PlayerController::updatePosition() {
         if (velocity.length() > 0.001f) {
             QVector3D newPositionBeforeConstraints = newPosition + velocity;
             
-            // Check for collisions with voxel walls using the game scene's collision detection
-            if (gameScene && gameScene->checkCollision("player", newPositionBeforeConstraints)) {
-                // Try X movement only
+            // Check for collisions with all entities
+            bool hasCollision = false;
+            if (gameScene) {
+                hasCollision = gameScene->checkCollision("player", newPositionBeforeConstraints);
+            }
+            
+            if (!hasCollision) {
+                // No collision - free movement
+                newPosition = newPositionBeforeConstraints;
+            } else {
+                // Try X and Z movements separately
                 QVector3D xOnlyPosition = QVector3D(newPositionBeforeConstraints.x(), newPosition.y(), newPosition.z());
-                
-                // Try Z movement only
                 QVector3D zOnlyPosition = QVector3D(newPosition.x(), newPosition.y(), newPositionBeforeConstraints.z());
                 
-                // Check if we can move along either axis
-                bool canMoveX = !gameScene->checkCollision("player", xOnlyPosition);
-                bool canMoveZ = !gameScene->checkCollision("player", zOnlyPosition);
+                bool xCollision = false, zCollision = false;
                 
-                // Choose the valid axis to slide along, or none if both are invalid
-                if (canMoveX) {
+                if (gameScene) {
+                    xCollision = gameScene->checkCollision("player", xOnlyPosition);
+                    zCollision = gameScene->checkCollision("player", zOnlyPosition);
+                }
+                
+                // Check which direction we can move in
+                if (!xCollision) {
                     newPosition = xOnlyPosition;
-                } else if (canMoveZ) {
+                    velocity.setZ(0); // Stop Z movement to prevent sliding
+                } else if (!zCollision) {
                     newPosition = zOnlyPosition;
+                    velocity.setX(0); // Stop X movement to prevent sliding
                 } else {
-                    // Can't move along either axis, just stop movement in this direction
-                    // Reduce velocity to create a sliding effect
+                    // Can't move along either axis, slow down
                     velocity *= 0.5f;
                 }
-            } else {
-                // No collision, move normally
-                newPosition = newPositionBeforeConstraints;
             }
             
             positionHasChanged = true;
         }
         
-        // Apply vertical boundary limit only
-        if (newPosition.y() < 0.9f && !jumping) newPosition.setY(0.9f);
+        // Apply vertical boundary limit only - prevent falling through floor
+        if (newPosition.y() < 1.0f && !jumping) {
+            newPosition.setY(1.0f); // Adjusted to match new floor level of 1.0
+        }
         
         // Update position if changed
         if (positionHasChanged || jumping) {

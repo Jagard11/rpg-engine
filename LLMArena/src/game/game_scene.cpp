@@ -64,15 +64,6 @@ QVector<GameEntity> GameScene::getAllEntities() const {
 }
 
 bool GameScene::checkCollision(const QString &entityId, const QVector3D &newPosition) {
-    // Added safety to prevent excessive checks
-    static qint64 lastCollisionCheck = 0;
-    qint64 currentTime = QDateTime::currentMSecsSinceEpoch();
-    
-    if (currentTime - lastCollisionCheck < 10) { // Avoid too many checks in quick succession
-        return false; // Assume no collision to avoid processing overhead
-    }
-    lastCollisionCheck = currentTime;
-
     // First check that our entity exists
     if (!entities.contains(entityId)) {
         return false;
@@ -80,32 +71,49 @@ bool GameScene::checkCollision(const QString &entityId, const QVector3D &newPosi
     
     GameEntity &entity = entities[entityId];
     
-    // First check if new position is inside the arena
-    if (!isInsideArena(newPosition)) {
+    // Check if any part of the entity would be outside the arena bounds
+    float halfWidth = entity.dimensions.x() / 2.0f;
+    float halfDepth = entity.dimensions.z() / 2.0f;
+    
+    // For a rectangular arena, check simple boundaries
+    if (newPosition.x() - halfWidth < -arenaRadius || 
+        newPosition.x() + halfWidth > arenaRadius ||
+        newPosition.z() - halfDepth < -arenaRadius || 
+        newPosition.z() + halfDepth > arenaRadius) {
+        qDebug() << "Arena boundary collision at" << newPosition.x() << newPosition.y() << newPosition.z();
         return true; // Collision with arena boundary
     }
     
-    // Start with checking only a limited number of entities
-    // This prevents excessive checking that might overload OpenGL
-    const int MAX_CHECKS = 20;
-    int checkCount = 0;
+    // For debugging - count collisions
+    int collisionCount = 0;
     
     // Check collisions with other entities
     for (auto it = entities.constBegin(); it != entities.constEnd(); ++it) {
-        // Skip self, floor entity, non-collidable entities, and static-static collisions
-        if (it.key() == entityId || it.key() == "arena_floor" || 
-            (entity.isStatic && it.value().isStatic)) {
+        // Skip self and floor
+        if (it.key() == entityId || it.key() == "arena_floor") {
             continue;
         }
         
-        // Skip voxel and celestial entities after a certain count
-        // to prevent excessive checking
-        if ((it.key().startsWith("voxel_") || it.key() == "sun" || it.key() == "moon") && 
-            checkCount > MAX_CHECKS) {
+        // Skip static-static collisions
+        if (entity.isStatic && it.value().isStatic) {
             continue;
         }
         
-        checkCount++;
+        // Skip player-player collision
+        if (entityId == "player" && it.value().type == "player") {
+            continue;
+        }
+        
+        // Skip non-solid entities and celestial objects
+        if (it.value().type != "voxel" && it.value().type != "character" && 
+            it.value().type != "arena_wall" && it.value().type != "object") {
+            continue;
+        }
+        
+        // Skip sun and moon
+        if (it.key() == "sun" || it.key() == "moon") {
+            continue;
+        }
         
         // Create a temporary entity with the new position
         GameEntity tempEntity = entity;
@@ -113,11 +121,17 @@ bool GameScene::checkCollision(const QString &entityId, const QVector3D &newPosi
         
         if (areEntitiesColliding(tempEntity, it.value())) {
             emit collisionDetected(entityId, it.key());
-            return true;
+            collisionCount++;
+            
+            // Only log first few collisions to avoid spamming
+            if (collisionCount <= 3) {
+                qDebug() << "Collision between" << entityId << "and" << it.key() << "at" 
+                         << it.value().position.x() << it.value().position.y() << it.value().position.z();
+            }
         }
     }
     
-    return false;
+    return collisionCount > 0;
 }
 
 void GameScene::createOctagonalArena(double radius, double wallHeight) {
@@ -146,67 +160,48 @@ void GameScene::createOctagonalArena(double radius, double wallHeight) {
     floor.isStatic = true;
     addEntity(floor);
     
-    // Create eight wall segments for the octagon
-    for (int i = 0; i < 8; i++) {
-        const double angle1 = M_PI * 2 * i / 8;
-        const double angle2 = M_PI * 2 * (i + 1) / 8;
-        
-        const double x1 = radius * cos(angle1);
-        const double z1 = radius * sin(angle1);
-        const double x2 = radius * cos(angle2);
-        const double z2 = radius * sin(angle2);
-        
-        // Create wall entity
-        GameEntity wall;
-        wall.id = QString("arena_wall_%1").arg(i);
-        wall.type = "arena_wall";
-        
-        // Position at midpoint of the wall segment
-        double midX = (x1 + x2) / 2;
-        double midZ = (z1 + z2) / 2;
-        wall.position = QVector3D(midX, wallHeight / 2, midZ);
-        
-        // Calculate wall dimensions
-        double wallLength = sqrt(pow(x2 - x1, 2) + pow(z2 - z1, 2));
-        wall.dimensions = QVector3D(wallLength, wallHeight, 0.2); // Slightly thicker walls for better collisions
-        wall.isStatic = true;
-        
-        addEntity(wall);
-    }
+    // Create rectangular arena walls (4 sides)
+    // North wall (positive Z)
+    GameEntity northWall;
+    northWall.id = "arena_wall_north";
+    northWall.type = "arena_wall";
+    northWall.position = QVector3D(0, wallHeight / 2, radius);
+    northWall.dimensions = QVector3D(radius * 2, wallHeight, 0.2);
+    northWall.isStatic = true;
+    addEntity(northWall);
+    
+    // South wall (negative Z)
+    GameEntity southWall;
+    southWall.id = "arena_wall_south";
+    southWall.type = "arena_wall";
+    southWall.position = QVector3D(0, wallHeight / 2, -radius);
+    southWall.dimensions = QVector3D(radius * 2, wallHeight, 0.2);
+    southWall.isStatic = true;
+    addEntity(southWall);
+    
+    // East wall (positive X)
+    GameEntity eastWall;
+    eastWall.id = "arena_wall_east";
+    eastWall.type = "arena_wall";
+    eastWall.position = QVector3D(radius, wallHeight / 2, 0);
+    eastWall.dimensions = QVector3D(0.2, wallHeight, radius * 2);
+    eastWall.isStatic = true;
+    addEntity(eastWall);
+    
+    // West wall (negative X)
+    GameEntity westWall;
+    westWall.id = "arena_wall_west";
+    westWall.type = "arena_wall";
+    westWall.position = QVector3D(-radius, wallHeight / 2, 0);
+    westWall.dimensions = QVector3D(0.2, wallHeight, radius * 2);
+    westWall.isStatic = true;
+    addEntity(westWall);
 }
 
 bool GameScene::isInsideArena(const QVector3D &position) const {
-    // For an octagon, we can use a simplified check
-    // The octagon can be defined as the intersection of 8 half-planes
-    
-    const int numSides = 8;
-    for (int i = 0; i < numSides; i++) {
-        // Calculate the angle of the wall normal
-        double angle = M_PI * 2 * i / numSides + M_PI / numSides;
-        
-        // Normal pointing inward
-        double nx = cos(angle);
-        double nz = sin(angle);
-        
-        // A point on the wall
-        double wx = arenaRadius * cos(angle - M_PI / numSides);
-        double wz = arenaRadius * sin(angle - M_PI / numSides);
-        
-        // Vector from wall to position
-        double dx = position.x() - wx;
-        double dz = position.z() - wz;
-        
-        // Dot product (distance to wall along normal)
-        double dist = dx * nx + dz * nz;
-        
-        // If outside any wall, return false
-        if (dist < 0.5) { // 0.5m buffer
-            return false;
-        }
-    }
-    
-    // Inside all walls
-    return true;
+    // For a rectangular arena, just check if the position is within the bounds
+    return (position.x() >= -arenaRadius && position.x() <= arenaRadius &&
+            position.z() >= -arenaRadius && position.z() <= arenaRadius);
 }
 
 bool GameScene::areEntitiesColliding(const GameEntity &entityA, const GameEntity &entityB) const {
@@ -224,15 +219,30 @@ bool GameScene::areEntitiesColliding(const GameEntity &entityA, const GameEntity
     float bHeight = entityB.dimensions.y() > 0 ? entityB.dimensions.y() : 1.0f;
     float bDepth = entityB.dimensions.z() > 0 ? entityB.dimensions.z() : 1.0f;
     
-    // Simple AABB collision check with relaxed tolerances
-    bool xOverlap = fabs(entityA.position.x() - entityB.position.x()) < 
-        (aWidth / 2 + bWidth / 2) * 0.9;
-        
-    bool yOverlap = fabs(entityA.position.y() - entityB.position.y()) < 
-        (aHeight / 2 + bHeight / 2) * 0.9;
-        
-    bool zOverlap = fabs(entityA.position.z() - entityB.position.z()) < 
-        (aDepth / 2 + bDepth / 2) * 0.9;
+    // Calculate half sizes for collision check
+    float aHalfWidth = aWidth / 2.0f;
+    float aHalfHeight = aHeight / 2.0f;
+    float aHalfDepth = aDepth / 2.0f;
+    
+    float bHalfWidth = bWidth / 2.0f;
+    float bHalfHeight = bHeight / 2.0f;
+    float bHalfDepth = bDepth / 2.0f;
+    
+    // Calculate distance between centers
+    float dx = qAbs(entityA.position.x() - entityB.position.x());
+    float dy = qAbs(entityA.position.y() - entityB.position.y());
+    float dz = qAbs(entityA.position.z() - entityB.position.z());
+    
+    // For voxels, make the collision box slightly smaller to allow movement between voxels
+    if (entityB.type == "voxel") {
+        bHalfWidth *= 0.9f;
+        bHalfDepth *= 0.9f;
+    }
+    
+    // Check if entities overlap on all three axes
+    bool xOverlap = dx < (aHalfWidth + bHalfWidth);
+    bool yOverlap = dy < (aHalfHeight + bHalfHeight);
+    bool zOverlap = dz < (aHalfDepth + bHalfDepth);
     
     return xOverlap && yOverlap && zOverlap;
 }

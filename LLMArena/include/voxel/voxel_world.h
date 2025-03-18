@@ -31,6 +31,9 @@ public:
     // Get all visible voxels for rendering
     QVector<VoxelPos> getVisibleVoxels() const;
     
+    // Get all voxels (not just visible ones)
+    const QHash<VoxelPos, Voxel>& getAllVoxels() const { return m_voxels; }
+    
 signals:
     void worldChanged();
     

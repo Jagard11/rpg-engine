@@ -47,7 +47,7 @@ void PlayerController::createPlayerEntity() {
         GameEntity playerEntity;
         playerEntity.id = "player";
         playerEntity.type = "player";
-        playerEntity.position = QVector3D(5, 0.9, 5); // Start position
+        playerEntity.position = QVector3D(5, 1.0, 5); // Start position - 1 unit above floor (was 0.9)
         playerEntity.dimensions = QVector3D(0.6, 1.8, 0.6); // Human dimensions
         playerEntity.isStatic = false;
         

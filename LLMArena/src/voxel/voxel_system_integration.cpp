@@ -136,16 +136,6 @@ void VoxelSystemIntegration::connectSignals() {
 }
 
 void VoxelSystemIntegration::updateGameScene() {
-    // Prevent frequent updates using static timestamp
-    static qint64 lastUpdateTime = 0;
-    qint64 currentTime = QDateTime::currentMSecsSinceEpoch();
-    
-    // Only update every 5 seconds maximum
-    if (currentTime - lastUpdateTime < 5000) {
-        return;
-    }
-    lastUpdateTime = currentTime;
-
     if (!m_gameScene || !m_world) {
         return;
     }
@@ -159,44 +149,35 @@ void VoxelSystemIntegration::updateGameScene() {
     isUpdating = true;
     
     try {
-        // Get all visible voxels
-        QVector<VoxelPos> visibleVoxels = m_world->getVisibleVoxels();
-        
-        // Limit to a reasonable number to avoid overload
-        const int MAX_VOXELS = 100;
-        int voxelCount = qMin(MAX_VOXELS, visibleVoxels.size());
-        
-        // Keep track of current entities
-        QSet<QString> existingVoxelEntities;
-        QSet<QString> voxelsToKeep;
-        
-        // Get existing voxel entities
+        // First, remove all existing voxel entities from game scene
         QVector<GameEntity> allEntities = m_gameScene->getAllEntities();
         for (const GameEntity& entity : allEntities) {
             if (entity.type == "voxel") {
-                existingVoxelEntities.insert(entity.id);
+                m_gameScene->removeEntity(entity.id);
             }
         }
         
-        // Process visible voxels
-        for (int i = 0; i < voxelCount; i++) {
-            const VoxelPos& pos = visibleVoxels[i];
+        // Get only visible voxels for walls - these are the ones that should have collision
+        QVector<VoxelPos> visibleVoxels = m_world->getVisibleVoxels();
+        
+        // Create a set to track which voxels we've processed
+        QSet<QString> processedVoxels;
+        
+        // Add a collision entity for each visible voxel that's a wall
+        for (const VoxelPos& pos : visibleVoxels) {
             Voxel voxel = m_world->getVoxel(pos);
             
             // Skip air voxels
             if (voxel.type == VoxelType::Air) continue;
             
+            // Skip floor voxels (y=0)
+            if (pos.y == 0) continue;
+            
             // Create ID for this voxel
             QString voxelId = QString("voxel_%1_%2_%3").arg(pos.x).arg(pos.y).arg(pos.z);
-            voxelsToKeep.insert(voxelId);
+            processedVoxels.insert(voxelId);
             
-            // Check if this voxel entity already exists
-            if (existingVoxelEntities.contains(voxelId)) {
-                // Entity exists, no need to re-add it
-                continue;
-            }
-            
-            // Create a new entity for this voxel
+            // Create a collision entity for this voxel
             GameEntity voxelEntity;
             voxelEntity.id = voxelId;
             voxelEntity.type = "voxel";
@@ -208,14 +189,14 @@ void VoxelSystemIntegration::updateGameScene() {
             m_gameScene->addEntity(voxelEntity);
         }
         
-        // Remove voxel entities that are no longer visible
-        QSet<QString> voxelsToRemove = existingVoxelEntities - voxelsToKeep;
-        for (const QString& voxelId : voxelsToRemove) {
-            m_gameScene->removeEntity(voxelId);
+        // Debug output
+        static bool first = true;
+        if (first) {
+            qDebug() << "Added" << processedVoxels.size() << "collision voxels";
+            first = false;
         }
         
         // Update celestial entities (sun and moon)
-        // For these, use direct position updates instead of removing/re-adding
         if (m_sky) {
             // Update sun position
             GameEntity sunEntity = m_gameScene->getEntity("sun");
@@ -231,7 +212,6 @@ void VoxelSystemIntegration::updateGameScene() {
                 m_gameScene->addEntity(sunEntity);
             } else if ((sunEntity.position - sunPos).length() > 0.1f) {
                 // Only update position if it changed significantly
-                // Use updateEntityPosition method directly to avoid remove/add cycle
                 m_gameScene->updateEntityPosition("sun", sunPos);
             }
             
@@ -249,7 +229,6 @@ void VoxelSystemIntegration::updateGameScene() {
                 m_gameScene->addEntity(moonEntity);
             } else if ((moonEntity.position - moonPos).length() > 0.1f) {
                 // Only update position if it changed significantly
-                // Use updateEntityPosition method directly to avoid remove/add cycle
                 m_gameScene->updateEntityPosition("moon", moonPos);
             }
         }

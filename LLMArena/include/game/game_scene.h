@@ -47,7 +47,10 @@ public:
     // Check for collisions and handle them
     Q_INVOKABLE bool checkCollision(const QString &entityId, const QVector3D &newPosition);
     
-    // Create octagonal arena with walls
+    // Create rectangular arena with walls
+    void createRectangularArena(double radius, double wallHeight) { createOctagonalArena(radius, wallHeight); }
+    
+    // Renamed for backward compatibility, actually creates a rectangular arena now
     void createOctagonalArena(double radius, double wallHeight);
     
     // Check if position is inside the arena
