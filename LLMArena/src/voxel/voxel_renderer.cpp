@@ -113,8 +113,8 @@ void VoxelRenderer::createTexture(const QString& name, const QImage& image) {
     
     // Create new texture
     m_textures[name] = new QOpenGLTexture(QOpenGLTexture::Target2D);
-    m_textures[name]->setMinificationFilter(QOpenGLTexture::LinearMipMapLinear);
-    m_textures[name]->setMagnificationFilter(QOpenGLTexture::Linear);
+    m_textures[name]->setMinificationFilter(QOpenGLTexture::NearestMipMapNearest);
+    m_textures[name]->setMagnificationFilter(QOpenGLTexture::Nearest);
     m_textures[name]->setWrapMode(QOpenGLTexture::ClampToEdge);
     
     // Ensure proper format
@@ -398,8 +398,8 @@ void VoxelRenderer::createShaders() {
             float diff = max(dot(norm, lightDir), 0.0);
             vec3 diffuse = diff * materialColor.rgb;
             
-            // Specular
-            float specularStrength = 0.5;
+            // Specular (disabled for non-reflective voxels)
+            float specularStrength = 0.0;
             vec3 viewDir = normalize(viewPos - fragPos);
             vec3 reflectDir = reflect(-lightDir, norm);
             float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32);
