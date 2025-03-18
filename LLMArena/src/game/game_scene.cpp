@@ -1,7 +1,7 @@
 // src/game/game_scene.cpp
 #include "../include/game/game_scene.h"
-#include <QDebug>  // Add this for qDebug
-#include <QDateTime>  // Add this for QDateTime
+#include <QDebug>
+#include <QDateTime>
 #include <cmath>
 
 GameScene::GameScene(QObject *parent) 
@@ -14,7 +14,6 @@ void GameScene::addEntity(const GameEntity &entity) {
         removeEntity(entity.id);
     }
     
-    // Skip all debug logging
     entities[entity.id] = entity;
     emit entityAdded(entity);
 }
@@ -27,7 +26,6 @@ void GameScene::removeEntity(const QString &id) {
 }
 
 void GameScene::updateEntityPosition(const QString &id, const QVector3D &position) {
-    // Silently update position without any logging whatsoever
     if (entities.contains(id)) {
         entities[id].position = position;
         emit entityPositionUpdated(id, position);
@@ -71,26 +69,30 @@ bool GameScene::checkCollision(const QString &entityId, const QVector3D &newPosi
     
     GameEntity &entity = entities[entityId];
     
-    // Check if any part of the entity would be outside the arena bounds
+    // Get entity half-dimensions for collision checks
     float halfWidth = entity.dimensions.x() / 2.0f;
+    float halfHeight = entity.dimensions.y() / 2.0f;
     float halfDepth = entity.dimensions.z() / 2.0f;
     
-    // For a rectangular arena, check simple boundaries
-    if (newPosition.x() - halfWidth < -arenaRadius || 
-        newPosition.x() + halfWidth > arenaRadius ||
-        newPosition.z() - halfDepth < -arenaRadius || 
-        newPosition.z() + halfDepth > arenaRadius) {
-        qDebug() << "Arena boundary collision at" << newPosition.x() << newPosition.y() << newPosition.z();
-        return true; // Collision with arena boundary
+    // Check world boundaries if they are enabled
+    if (worldBoundariesEnabled) {
+        // Simple rectangular boundary check
+        if (newPosition.x() - halfWidth < -arenaRadius || 
+            newPosition.x() + halfWidth > arenaRadius ||
+            newPosition.z() - halfDepth < -arenaRadius || 
+            newPosition.z() + halfDepth > arenaRadius) {
+            
+            return true; // Collision with world boundary
+        }
     }
     
-    // For debugging - count collisions
+    // For voxel-based worlds, we now check all solid entities
     int collisionCount = 0;
     
     // Check collisions with other entities
     for (auto it = entities.constBegin(); it != entities.constEnd(); ++it) {
-        // Skip self and floor
-        if (it.key() == entityId || it.key() == "arena_floor") {
+        // Skip self and non-solid objects
+        if (it.key() == entityId || !isCollidable(it.value().type)) {
             continue;
         }
         
@@ -99,23 +101,7 @@ bool GameScene::checkCollision(const QString &entityId, const QVector3D &newPosi
             continue;
         }
         
-        // Skip player-player collision
-        if (entityId == "player" && it.value().type == "player") {
-            continue;
-        }
-        
-        // Skip non-solid entities and celestial objects
-        if (it.value().type != "voxel" && it.value().type != "character" && 
-            it.value().type != "arena_wall" && it.value().type != "object") {
-            continue;
-        }
-        
-        // Skip sun and moon
-        if (it.key() == "sun" || it.key() == "moon") {
-            continue;
-        }
-        
-        // Create a temporary entity with the new position
+        // Create a temporary entity with the new position for collision testing
         GameEntity tempEntity = entity;
         tempEntity.position = newPosition;
         
@@ -124,7 +110,7 @@ bool GameScene::checkCollision(const QString &entityId, const QVector3D &newPosi
             collisionCount++;
             
             // Only log first few collisions to avoid spamming
-            if (collisionCount <= 3) {
+            if (collisionCount <= 3 && entityId == "player") {
                 qDebug() << "Collision between" << entityId << "and" << it.key() << "at" 
                          << it.value().position.x() << it.value().position.y() << it.value().position.z();
             }
@@ -138,6 +124,7 @@ void GameScene::createOctagonalArena(double radius, double wallHeight) {
     // Store the parameters
     arenaRadius = radius;
     arenaWallHeight = wallHeight;
+    worldBoundariesEnabled = true;
     
     // Remove any existing arena entities before recreating
     QStringList arenaEntities;
@@ -198,10 +185,23 @@ void GameScene::createOctagonalArena(double radius, double wallHeight) {
     addEntity(westWall);
 }
 
+void GameScene::setWorldBoundaries(bool enabled) {
+    worldBoundariesEnabled = enabled;
+}
+
 bool GameScene::isInsideArena(const QVector3D &position) const {
     // For a rectangular arena, just check if the position is within the bounds
     return (position.x() >= -arenaRadius && position.x() <= arenaRadius &&
             position.z() >= -arenaRadius && position.z() <= arenaRadius);
+}
+
+bool GameScene::isCollidable(const QString &entityType) const {
+    // List of entity types that can be collided with
+    static const QSet<QString> collidableTypes = {
+        "voxel", "arena_wall", "character", "object", "block", "solid"
+    };
+    
+    return collidableTypes.contains(entityType);
 }
 
 bool GameScene::areEntitiesColliding(const GameEntity &entityA, const GameEntity &entityB) const {

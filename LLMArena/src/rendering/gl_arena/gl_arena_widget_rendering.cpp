@@ -74,7 +74,7 @@ void GLArenaWidget::paintGL()
             playerRot = 0.0f;
         }
         
-        // Update view matrix based on player position and rotation
+        // Update view matrix based on player position, rotation and pitch
         m_viewMatrix.setToIdentity();
         
         // Position camera at player's eye level based on stance
@@ -87,8 +87,24 @@ void GLArenaWidget::paintGL()
         
         QVector3D eyePos = QVector3D(playerPos.x(), eyeHeight, playerPos.z());
         
-        // Calculate look direction based on player rotation
-        QVector3D lookDir(cos(playerRot), 0.0f, sin(playerRot));
+        // Get player pitch if available
+        float playerPitch = 0.0f;
+        if (m_playerController) {
+            playerPitch = m_playerController->getPitch();
+        }
+        
+        // Calculate look direction based on player rotation (yaw) and pitch
+        // First calculate the horizontal direction vector
+        QVector3D horizontalDir(cos(playerRot), 0.0f, sin(playerRot));
+        
+        // Then apply pitch to get the final direction
+        // sin(pitch) gives vertical component, cos(pitch) scales horizontal component
+        QVector3D lookDir(
+            horizontalDir.x() * cos(playerPitch),
+            sin(playerPitch),
+            horizontalDir.z() * cos(playerPitch)
+        );
+        
         QVector3D lookAt = eyePos + lookDir;
         
         m_viewMatrix.lookAt(eyePos, lookAt, QVector3D(0.0f, 1.0f, 0.0f));

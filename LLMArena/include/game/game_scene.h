@@ -6,15 +6,16 @@
 #include <QString>
 #include <QMap>
 #include <QVector3D>
+#include <QSet>
 
 // Structure to represent a game entity with position and collision data
 struct GameEntity {
     QString id;
-    QString type;        // "player", "npc", "wall", etc.
+    QString type;        // "player", "npc", "wall", "voxel", etc.
     QVector3D position;  
     QVector3D dimensions; // width, height, depth
     QString spritePath;   // Path to sprite image (for billboard entities)
-    bool isStatic;        // Static entities don't move (walls, etc.)
+    bool isStatic;        // Static entities don't move (walls, voxels, etc.)
     
     GameEntity() : isStatic(false) {}
 };
@@ -47,6 +48,9 @@ public:
     // Check for collisions and handle them
     Q_INVOKABLE bool checkCollision(const QString &entityId, const QVector3D &newPosition);
     
+    // Enable/disable world boundaries
+    void setWorldBoundaries(bool enabled);
+    
     // Create rectangular arena with walls
     void createRectangularArena(double radius, double wallHeight) { createOctagonalArena(radius, wallHeight); }
     
@@ -55,6 +59,9 @@ public:
     
     // Check if position is inside the arena
     bool isInsideArena(const QVector3D &position) const;
+    
+    // Check if an entity type can be collided with
+    bool isCollidable(const QString &entityType) const;
 
 signals:
     // Signal for when an entity is added
@@ -76,6 +83,7 @@ private:
     QMap<QString, GameEntity> entities;
     double arenaRadius;
     double arenaWallHeight;
+    bool worldBoundariesEnabled = true;
     
     // Check if two entities are colliding
     bool areEntitiesColliding(const GameEntity &entityA, const GameEntity &entityB) const;

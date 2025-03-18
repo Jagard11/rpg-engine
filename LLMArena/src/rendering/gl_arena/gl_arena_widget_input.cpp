@@ -52,6 +52,11 @@ void GLArenaWidget::onPlayerRotationChanged(float rotation)
     update(); // Request a redraw
 }
 
+void GLArenaWidget::onPlayerPitchChanged(float pitch)
+{
+    update(); // Request a redraw
+}
+
 void GLArenaWidget::mouseMoveEvent(QMouseEvent* event)
 {
     // Safety check before handling mouse events

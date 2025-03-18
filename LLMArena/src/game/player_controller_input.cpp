@@ -120,10 +120,10 @@ void PlayerController::handleMouseMove(QMouseEvent *event) {
             return;
         }
         
-        // Calculate delta and update rotation
+        // Calculate horizontal delta (dx) and update yaw rotation
         int dx = currentPos.x() - lastPos.x();
         if (dx != 0) {
-            // Apply mouse sensitivity with inverted controls
+            // Apply mouse sensitivity
             rotation += dx * 0.01f;
             
             // Normalize rotation to 0-2π
@@ -132,6 +132,22 @@ void PlayerController::handleMouseMove(QMouseEvent *event) {
             
             // Emit rotation changed signal
             emit rotationChanged(rotation);
+        }
+        
+        // Calculate vertical delta (dy) and update pitch rotation
+        int dy = currentPos.y() - lastPos.y();
+        if (dy != 0) {
+            // Apply mouse sensitivity (negative to make up = look up)
+            pitch -= dy * 0.01f;
+            
+            // Clamp pitch to prevent looking too far up or down
+            // Limit to roughly -85 to +85 degrees (in radians)
+            const float maxPitch = 1.48f; // ~85 degrees
+            if (pitch > maxPitch) pitch = maxPitch;
+            if (pitch < -maxPitch) pitch = -maxPitch;
+            
+            // Emit pitch changed signal
+            emit pitchChanged(pitch);
         }
         
         // Store current position for next time

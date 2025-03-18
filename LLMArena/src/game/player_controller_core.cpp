@@ -14,7 +14,7 @@ PlayerController::PlayerController(GameScene *scene, QObject *parent)
     position(0, 0, 0), 
     velocity(0, 0, 0),
     targetVelocity(0, 0, 0),
-    rotation(0),
+    rotation(0), pitch(0),
     movementSpeed(0.1), rotationSpeed(0.05),
     acceleration(0.01), friction(0.05),
     stance(PlayerStance::Standing), targetStance(PlayerStance::Standing),
@@ -84,10 +84,12 @@ void PlayerController::createPlayerEntity() {
         
         // Initial rotation (facing toward center of room)
         rotation = atan2(-position.z(), -position.x());
+        pitch = 0.0f; // Looking straight ahead initially
         
-        // Emit initial position and stance
+        // Emit initial position, rotation, pitch and stance
         emit positionChanged(position);
         emit rotationChanged(rotation);
+        emit pitchChanged(pitch);
         emit stanceChanged(stance);
     }
     catch (const std::exception& e) {

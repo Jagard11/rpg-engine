@@ -2,16 +2,17 @@
 #include "../../include/rendering/gl_arena_widget.h"
 #include "../../include/game/game_scene.h"
 #include "../../include/game/player_controller.h"
-#include <QOpenGLContext>
+#include <QWebEngineSettings>
+#include <QWebEngineScript>
+#include <QWebEnginePage>
+#include <QWebEngineProfile>
+#include <QWebChannel>
 #include <QMessageBox>
-#include <QDebug>
 #include <QFile>
 #include <QDir>
-#include <stdexcept>
-#include <cmath>
-#include <vector>
+#include <QDebug>
 
-GLArenaWidget::GLArenaWidget(CharacterManager* charManager, QWidget* parent)
+GLArenaWidget::GLArenaWidget(CharacterManager* charManager, QWidget* parent) 
     : QOpenGLWidget(parent), m_characterManager(charManager), 
       m_initialized(false),
       m_billboardProgram(nullptr),
@@ -25,6 +26,8 @@ GLArenaWidget::GLArenaWidget(CharacterManager* charManager, QWidget* parent)
             this, &GLArenaWidget::onPlayerPositionChanged);
     connect(m_playerController, &PlayerController::rotationChanged, 
             this, &GLArenaWidget::onPlayerRotationChanged);
+    connect(m_playerController, &PlayerController::pitchChanged, 
+            this, &GLArenaWidget::onPlayerPitchChanged);
     
     // Don't create voxel system yet - we'll do it in initializeGL
     

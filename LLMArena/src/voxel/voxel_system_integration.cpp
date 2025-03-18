@@ -163,14 +163,14 @@ void VoxelSystemIntegration::updateGameScene() {
         // Create a set to track which voxels we've processed
         QSet<QString> processedVoxels;
         
-        // Add a collision entity for each visible voxel that's a wall
+        // Add a collision entity for each visible voxel
         for (const VoxelPos& pos : visibleVoxels) {
             Voxel voxel = m_world->getVoxel(pos);
             
             // Skip air voxels
             if (voxel.type == VoxelType::Air) continue;
             
-            // Skip floor voxels (y=0)
+            // Skip floor voxels (y=0) for collision but keep them for rendering
             if (pos.y == 0) continue;
             
             // Create ID for this voxel

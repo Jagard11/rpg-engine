@@ -96,7 +96,8 @@ private slots:
     // Update rendering on player movement
     void onPlayerPositionChanged(const QVector3D& position);
     void onPlayerRotationChanged(float rotation);
-    
+    void onPlayerPitchChanged(float pitch);
+
 private:
     // Initialize shaders
     bool initShaders();

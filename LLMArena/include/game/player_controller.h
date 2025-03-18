@@ -35,6 +35,9 @@ public:
     // Get player rotation (in radians)
     float getRotation() const { return rotation; }
     
+    // Get player pitch (in radians)
+    float getPitch() const { return pitch; }
+    
     // Get player stance
     PlayerStance getStance() const { return stance; }
     
@@ -73,6 +76,9 @@ signals:
     // Signal for when player rotation changes
     void rotationChanged(float newRotation);
     
+    // Signal for when player pitch changes
+    void pitchChanged(float newPitch);
+    
     // Signal for when player stance changes
     void stanceChanged(PlayerStance newStance);
 
@@ -81,7 +87,8 @@ private:
     QVector3D position;
     QVector3D velocity;       // Current velocity vector 
     QVector3D targetVelocity; // Target velocity based on input
-    float rotation;
+    float rotation;           // Horizontal rotation (yaw)
+    float pitch;              // Vertical rotation (pitch)
     float movementSpeed;
     float rotationSpeed;
     float acceleration;       // How fast to reach target velocity
