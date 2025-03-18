@@ -8,8 +8,10 @@
 #include <QOpenGLBuffer>
 #include <QOpenGLVertexArrayObject>
 #include <QOpenGLShaderProgram>
+#include <QOpenGLTexture>
 #include <QMatrix4x4>
 #include <QVector>
+#include <QMap>
 
 // Class to render voxels using OpenGL
 class VoxelRenderer : public QObject, protected QOpenGLFunctions {
@@ -40,10 +42,14 @@ private:
     QOpenGLVertexArrayObject m_vao;
     QOpenGLShaderProgram* m_shaderProgram;
     
+    // Texture resources
+    QMap<QString, QOpenGLTexture*> m_textures;
+    
     // Rendering data
     struct RenderVoxel {
         VoxelPos pos;
         QColor color;
+        VoxelType type;
     };
     
     QVector<RenderVoxel> m_visibleVoxels;
@@ -52,6 +58,9 @@ private:
     // Helper functions
     void createCubeGeometry(float size);
     void createShaders();
+    void loadTextures();
+    void createTexture(const QString& name, const QImage& image);
+    void createDefaultTexture(const QString& name);
 };
 
 #endif // VOXEL_RENDERER_H

@@ -176,11 +176,37 @@ void GameScene::createOctagonalArena(double radius, double wallHeight) {
 }
 
 bool GameScene::isInsideArena(const QVector3D &position) const {
-    // Check if distance from center is less than arena radius
-    double distanceFromCenter = sqrt(position.x() * position.x() + position.z() * position.z());
+    // For an octagon, we can use a simplified check
+    // The octagon can be defined as the intersection of 8 half-planes
     
-    // Use a small buffer (0.5m) to prevent getting too close to walls
-    return distanceFromCenter < (arenaRadius - 0.5);
+    const int numSides = 8;
+    for (int i = 0; i < numSides; i++) {
+        // Calculate the angle of the wall normal
+        double angle = M_PI * 2 * i / numSides + M_PI / numSides;
+        
+        // Normal pointing inward
+        double nx = cos(angle);
+        double nz = sin(angle);
+        
+        // A point on the wall
+        double wx = arenaRadius * cos(angle - M_PI / numSides);
+        double wz = arenaRadius * sin(angle - M_PI / numSides);
+        
+        // Vector from wall to position
+        double dx = position.x() - wx;
+        double dz = position.z() - wz;
+        
+        // Dot product (distance to wall along normal)
+        double dist = dx * nx + dz * nz;
+        
+        // If outside any wall, return false
+        if (dist < 0.5) { // 0.5m buffer
+            return false;
+        }
+    }
+    
+    // Inside all walls
+    return true;
 }
 
 bool GameScene::areEntitiesColliding(const GameEntity &entityA, const GameEntity &entityB) const {

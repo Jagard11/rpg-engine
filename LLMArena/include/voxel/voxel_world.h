@@ -6,6 +6,7 @@
 #include <QObject>
 #include <QHash>
 #include <QVector>
+#include <QMap>
 
 // Class to manage the voxel world
 class VoxelWorld : public QObject {
@@ -36,6 +37,9 @@ signals:
 private:
     // Store voxels in a sparse data structure
     QHash<VoxelPos, Voxel> m_voxels;
+    
+    // Map of texture paths for each voxel type
+    QMap<VoxelType, QString> m_texturePaths;
     
     // Check if a voxel is visible (has at least one empty neighbor)
     bool hasEmptyNeighbor(const VoxelPos& pos) const;

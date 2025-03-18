@@ -4,21 +4,25 @@
 
 #include <QVector3D>
 #include <QColor>
+#include <QString>
 
-// Simple enum for voxel types
+// Expanded enum for voxel types
 enum class VoxelType {
-    Air,        // Empty space
-    Solid,      // Solid block
-    // Add more types as needed
+    Air,         // Empty space
+    Solid,       // Generic solid block
+    Cobblestone, // Cobblestone block
+    Grass,       // Grass block
+    Dirt         // Dirt block
 };
 
 // Structure to represent a single voxel
 struct Voxel {
     VoxelType type;
     QColor color;
+    QString texturePath; // Path to texture file
     
-    Voxel() : type(VoxelType::Air), color(Qt::transparent) {}
-    Voxel(VoxelType t, const QColor& c) : type(t), color(c) {}
+    Voxel() : type(VoxelType::Air), color(Qt::transparent), texturePath("") {}
+    Voxel(VoxelType t, const QColor& c, const QString& tex = "") : type(t), color(c), texturePath(tex) {}
 };
 
 // Position in the voxel grid

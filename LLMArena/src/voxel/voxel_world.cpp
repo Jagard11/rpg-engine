@@ -2,9 +2,14 @@
 #include "../../include/voxel/voxel_world.h"
 #include <QDebug>
 #include <QDateTime>
+#include <QDir>
 
 VoxelWorld::VoxelWorld(QObject* parent) : QObject(parent) {
     // Initialize with an empty world
+    // Set texture paths
+    m_texturePaths[VoxelType::Cobblestone] = QDir::currentPath() + "/resources/cobblestone.png";
+    m_texturePaths[VoxelType::Grass] = QDir::currentPath() + "/resources/grass.png";
+    m_texturePaths[VoxelType::Dirt] = QDir::currentPath() + "/resources/dirt.png";
 }
 
 Voxel VoxelWorld::getVoxel(int x, int y, int z) const {
@@ -30,7 +35,12 @@ void VoxelWorld::setVoxel(const VoxelPos& pos, const Voxel& voxel) {
         }
     } else {
         if (!m_voxels.contains(pos) || m_voxels[pos].type != voxel.type || m_voxels[pos].color != voxel.color) {
-            m_voxels[pos] = voxel;
+            // Create a copy of the voxel with the texture path if needed
+            Voxel finalVoxel = voxel;
+            if (finalVoxel.texturePath.isEmpty() && m_texturePaths.contains(finalVoxel.type)) {
+                finalVoxel.texturePath = m_texturePaths[finalVoxel.type];
+            }
+            m_voxels[pos] = finalVoxel;
             changed = true;
         }
     }
@@ -46,7 +56,7 @@ void VoxelWorld::createFlatWorld() {
     m_voxels.clear();
     
     // Create a flat terrain at y=0 with some color
-    Voxel grass(VoxelType::Solid, QColor(34, 139, 34)); // Forest green
+    Voxel grass(VoxelType::Grass, QColor(34, 139, 34), m_texturePaths[VoxelType::Grass]); // Forest green
     
     // Generate 50x50 flat world
     for (int x = -25; x < 25; x++) {
@@ -66,24 +76,43 @@ void VoxelWorld::createRoomWithWalls(int width, int length, int height) {
     int halfWidth = width / 2;
     int halfLength = length / 2;
     
-    // Create floor
-    Voxel floorVoxel(VoxelType::Solid, QColor(160, 82, 45)); // Brown
-    generateFloor(0, width, length, floorVoxel);
+    // Create floor with grass and dirt
+    Voxel grassVoxel(VoxelType::Grass, QColor(34, 139, 34), m_texturePaths[VoxelType::Grass]);
+    Voxel dirtVoxel(VoxelType::Dirt, QColor(160, 82, 45), m_texturePaths[VoxelType::Dirt]);
     
-    // Create walls
-    Voxel wallVoxel(VoxelType::Solid, QColor(192, 192, 192)); // Light gray
+    // Create grass in the center (2/3 of the floor)
+    int grassWidth = (width * 2) / 3;
+    int grassLength = (length * 2) / 3;
+    int grassHalfWidth = grassWidth / 2;
+    int grassHalfLength = grassLength / 2;
+    
+    // Generate the floor with grass in center and dirt on perimeter
+    for (int x = -halfWidth; x < halfWidth; x++) {
+        for (int z = -halfLength; z < halfLength; z++) {
+            // Check if this is in the center grass area
+            if (x >= -grassHalfWidth && x < grassHalfWidth &&
+                z >= -grassHalfLength && z < grassHalfLength) {
+                setVoxel(x, 0, z, grassVoxel);
+            } else {
+                setVoxel(x, 0, z, dirtVoxel);
+            }
+        }
+    }
+    
+    // Create walls with cobblestone
+    Voxel wallVoxel(VoxelType::Cobblestone, QColor(192, 192, 192), m_texturePaths[VoxelType::Cobblestone]);
     
     // North wall (positive Z)
-    generateWall(-halfWidth, halfLength, halfWidth, halfLength, 1, height, wallVoxel);
+    generateWall(-halfWidth, halfLength-1, halfWidth-1, halfLength-1, 1, height, wallVoxel);
     
     // South wall (negative Z)
-    generateWall(-halfWidth, -halfLength, halfWidth, -halfLength, 1, height, wallVoxel);
+    generateWall(-halfWidth, -halfLength, halfWidth-1, -halfLength, 1, height, wallVoxel);
     
     // East wall (positive X)
-    generateWall(halfWidth, -halfLength, halfWidth, halfLength, 1, height, wallVoxel);
+    generateWall(halfWidth-1, -halfLength, halfWidth-1, halfLength-1, 1, height, wallVoxel);
     
     // West wall (negative X)
-    generateWall(-halfWidth, -halfLength, -halfWidth, halfLength, 1, height, wallVoxel);
+    generateWall(-halfWidth, -halfLength, -halfWidth, halfLength-1, 1, height, wallVoxel);
     
     emit worldChanged();
 }
