@@ -1,6 +1,11 @@
 // src/rendering/gl_arena/gl_arena_widget_rendering.cpp
 #include "../../include/rendering/gl_arena_widget.h"
 #include <QDebug>
+#include <QOpenGLExtraFunctions>
+#include <QOpenGLFramebufferObject>
+#include <QOpenGLContext>
+#include <QCursor>
+#include <QImage>
 #include <QMutex>
 #include <stdexcept>
 #include <cmath>
@@ -8,6 +13,134 @@
 // Static mutex for thread safety during rendering
 static QMutex renderingMutex;
 static int errorCount = 0;  // To limit error reporting
+
+void GLArenaWidget::initializeGL() {
+    qDebug() << "Initializing OpenGL context...";
+    
+    // Initialize OpenGL functions BEFORE accessing any OpenGL functions
+    // This is critical - OpenGL function pointers must be resolved first
+    initializeOpenGLFunctions();
+    
+    // Add safety checks for OpenGL context
+    if (!QOpenGLContext::currentContext() || !QOpenGLContext::currentContext()->isValid()) {
+        qCritical() << "Invalid OpenGL context in initializeGL";
+        return;
+    }
+    
+    // Now safely get OpenGL information with additional error handling
+    QString vendor, renderer, version;
+    try {
+        const GLubyte* vendorStr = glGetString(GL_VENDOR);
+        if (vendorStr) vendor = QString::fromLatin1(reinterpret_cast<const char*>(vendorStr));
+        
+        const GLubyte* rendererStr = glGetString(GL_RENDERER);
+        if (rendererStr) renderer = QString::fromLatin1(reinterpret_cast<const char*>(rendererStr));
+        
+        const GLubyte* versionStr = glGetString(GL_VERSION);
+        if (versionStr) version = QString::fromLatin1(reinterpret_cast<const char*>(versionStr));
+    }
+    catch (...) {
+        qCritical() << "Exception during OpenGL information retrieval";
+        return;
+    }
+    
+    // Output the information with null checks
+    qDebug() << "OpenGL Vendor:" << (!vendor.isEmpty() ? vendor : "Unknown");
+    qDebug() << "OpenGL Renderer:" << (!renderer.isEmpty() ? renderer : "Unknown");
+    qDebug() << "OpenGL Version:" << (!version.isEmpty() ? version : "Unknown");
+    
+    // Check for OpenGL support
+    bool hasOpenGL = QOpenGLContext::currentContext()->isValid();
+    qDebug() << "OpenGL availability:" << hasOpenGL;
+    
+    // Set clear color (sky blue)
+    glClearColor(0.5f, 0.7f, 1.0f, 1.0f);
+    
+    // Enable depth testing for 3D rendering
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+    
+    // Enable alpha blending
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    
+    // Init shaders - must be done first as other components depend on them
+    if (!initShaders()) {
+        qCritical() << "Failed to initialize shaders";
+        return;
+    }
+    
+    // Set up initial view and projection matrices
+    m_projectionMatrix.setToIdentity();
+    m_viewMatrix.setToIdentity();
+    
+    // Set projection matrix (perspective projection)
+    float aspectRatio = static_cast<float>(width()) / static_cast<float>(height());
+    m_projectionMatrix.perspective(45.0f, aspectRatio, 0.1f, 100.0f);
+    
+    // Set up view matrix (camera looking down -Z axis from origin)
+    m_viewMatrix.lookAt(
+        QVector3D(0, 1.5, 5),  // Eye position
+        QVector3D(0, 1, 0),    // Look at point
+        QVector3D(0, 1, 0)     // Up vector
+    );
+    
+    // Initialize voxel system
+    try {
+        qDebug() << "Creating voxel system...";
+        m_voxelSystem = new VoxelSystemIntegration(m_gameScene, this);
+        if (!m_voxelSystem) {
+            throw std::runtime_error("Failed to create voxel system");
+        }
+        
+        // Initialize voxel system
+        qDebug() << "Initializing voxel system...";
+        m_voxelSystem->initialize();
+    }
+    catch (const std::exception& e) {
+        qCritical() << "Failed to initialize voxel system:" << e.what();
+    }
+    
+    // Initialize inventory system
+    try {
+        qDebug() << "Creating inventory...";
+        initializeInventory();
+    }
+    catch (const std::exception& e) {
+        qCritical() << "Failed to initialize inventory system:" << e.what();
+    }
+    
+    // Mark initialization as complete
+    m_initialized = true;
+    
+    // Signal that rendering is initialized
+    emit renderingInitialized();
+    
+    // Hide cursor in game mode
+    setCursor(Qt::BlankCursor);
+}
+
+void GLArenaWidget::resizeGL(int w, int h) {
+    // Check for valid dimensions
+    if (w <= 0 || h <= 0) {
+        qWarning() << "Invalid resize dimensions:" << w << "x" << h;
+        return;
+    }
+    
+    // Update projection matrix with new aspect ratio
+    float aspectRatio = static_cast<float>(w) / static_cast<float>(h);
+    m_projectionMatrix.setToIdentity();
+    m_projectionMatrix.perspective(45.0f, aspectRatio, 0.1f, 100.0f);
+    
+    // Update the viewport
+    glViewport(0, 0, w, h);
+    
+    // Re-center the cursor if not in UI mode
+    if (m_inventoryUI && !m_inventoryUI->isVisible()) {
+        QPoint center(w / 2, h / 2);
+        QCursor::setPos(mapToGlobal(center));
+    }
+}
 
 void GLArenaWidget::paintGL()
 {
@@ -113,10 +246,74 @@ void GLArenaWidget::paintGL()
         
         m_viewMatrix.lookAt(eyePos, lookAt, QVector3D(0.0f, 1.0f, 0.0f));
         
+        // Draw grid - disable depth test temporarily if needed
+        if (m_gridVAO.isCreated() && m_gridVBO.isCreated()) {
+            glLineWidth(1.0f);
+            
+            // Bind shader
+            if (m_billboardProgram && m_billboardProgram->bind()) {
+                // Set uniforms
+                m_billboardProgram->setUniformValue("view", m_viewMatrix);
+                m_billboardProgram->setUniformValue("projection", m_projectionMatrix);
+                
+                // Draw grid
+                m_gridVAO.bind();
+                m_billboardProgram->setUniformValue("modelView", QMatrix4x4());
+                m_billboardProgram->setUniformValue("color", QVector4D(0.5f, 0.5f, 0.5f, 0.5f));
+                glDrawArrays(GL_LINES, 0, m_gridVertexCount);
+                m_gridVAO.release();
+                
+                m_billboardProgram->release();
+            }
+        }
+        
+        // Draw floor
+        if (m_floorVAO.isCreated() && m_floorVBO.isCreated() && m_floorIBO.isCreated()) {
+            // Bind shader
+            if (m_billboardProgram && m_billboardProgram->bind()) {
+                // Set uniforms
+                m_billboardProgram->setUniformValue("view", m_viewMatrix);
+                m_billboardProgram->setUniformValue("projection", m_projectionMatrix);
+                
+                // Draw floor
+                m_floorVAO.bind();
+                m_floorIBO.bind();
+                m_billboardProgram->setUniformValue("modelView", QMatrix4x4());
+                m_billboardProgram->setUniformValue("color", QVector4D(0.2f, 0.6f, 0.2f, 1.0f));
+                glDrawElements(GL_TRIANGLES, m_floorIndexCount, GL_UNSIGNED_INT, nullptr);
+                m_floorIBO.release();
+                m_floorVAO.release();
+                
+                m_billboardProgram->release();
+            }
+        }
+        
+        // Draw walls
+        for (const auto& wall : m_walls) {
+            if (wall.vao && wall.vao->isCreated() && wall.ibo && wall.ibo->isCreated()) {
+                // Bind shader
+                if (m_billboardProgram && m_billboardProgram->bind()) {
+                    // Set uniforms
+                    m_billboardProgram->setUniformValue("view", m_viewMatrix);
+                    m_billboardProgram->setUniformValue("projection", m_projectionMatrix);
+                    
+                    // Draw wall
+                    wall.vao->bind();
+                    wall.ibo->bind();
+                    m_billboardProgram->setUniformValue("modelView", QMatrix4x4());
+                    m_billboardProgram->setUniformValue("color", QVector4D(0.7f, 0.7f, 0.7f, 1.0f));
+                    glDrawElements(GL_TRIANGLES, wall.indexCount, GL_UNSIGNED_INT, nullptr);
+                    wall.ibo->release();
+                    wall.vao->release();
+                    
+                    m_billboardProgram->release();
+                }
+            }
+        }
+        
         // Enhanced safety checks for voxel highlighting
         // Only perform raycast if all necessary components are available and initialized
-        bool canPerformRaycast = m_voxelSystem && m_voxelSystem->getWorld() && 
-                                m_inventoryUI && m_inventoryUI->hasVoxelTypeSelected();
+        bool canPerformRaycast = m_voxelSystem && m_voxelSystem->getWorld();
         
         if (canPerformRaycast) {
             try {
@@ -160,7 +357,6 @@ void GLArenaWidget::paintGL()
         // Enhanced safety checks for voxel highlight rendering
         // Only render highlight if all necessary components are available and initialized
         bool canRenderHighlight = m_voxelSystem && m_voxelSystem->getWorld() && 
-                                 m_inventoryUI && m_inventoryUI->hasVoxelTypeSelected() && 
                                  m_highlightedVoxelFace >= 0 && m_highlightedVoxelFace < 6;
         
         if (canRenderHighlight) {
@@ -266,6 +462,20 @@ void GLArenaWidget::renderCharactersSimple()
     if (m_characterSprites.size() > 0 && context() && context()->isValid() && m_billboardProgram && m_billboardProgram->isLinked()) {
         renderCharactersFallback();
     }
+}
+
+// World to NDC conversion helper for character sprites
+QVector3D GLArenaWidget::worldToNDC(const QVector3D& worldPos) {
+    // Convert from world to clip space
+    QVector4D clipPos = m_projectionMatrix * m_viewMatrix * QVector4D(worldPos, 1.0);
+    
+    // Perform perspective division to get normalized device coordinates
+    if (qAbs(clipPos.w()) > 0.0001f) {
+        return QVector3D(clipPos.x() / clipPos.w(), clipPos.y() / clipPos.w(), clipPos.z() / clipPos.w());
+    }
+    
+    // Handle invalid w (should not happen in practice)
+    return QVector3D(clipPos.x(), clipPos.y(), clipPos.z());
 }
 
 // Render inventory UI

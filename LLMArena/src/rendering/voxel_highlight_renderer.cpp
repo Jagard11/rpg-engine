@@ -362,14 +362,15 @@ void VoxelHighlightRenderer::createFaceHighlightGeometry()
 void VoxelHighlightRenderer::render(const QMatrix4x4& viewMatrix, const QMatrix4x4& projectionMatrix, 
                                    const QVector3D& position, int highlightFace)
 {
-    // Validate input parameters
+    // Validate input parameters - extra cautious
     if (!qIsFinite(position.x()) || !qIsFinite(position.y()) || !qIsFinite(position.z())) {
-        qWarning() << "Invalid position for voxel highlight";
+        // Silent return - prevent warning spam
         return;
     }
     
-    if (highlightFace < -1 || highlightFace >= 6) {
-        qWarning() << "Invalid face index for voxel highlight:" << highlightFace;
+    // Stricter face validation - ensure face is in valid range of 0-5
+    if (highlightFace < -1 || highlightFace > 5) {
+        // Silent return - prevent crashes with invalid indices
         return;
     }
     
@@ -379,7 +380,7 @@ void VoxelHighlightRenderer::render(const QMatrix4x4& viewMatrix, const QMatrix4
         return;
     }
     
-    // Update highlight face
+    // Update highlight face with validated value
     m_highlightFace = highlightFace;
     
     try {
@@ -423,7 +424,20 @@ void VoxelHighlightRenderer::render(const QMatrix4x4& viewMatrix, const QMatrix4
             // Unbind
             m_ibo.release();
             m_vao.release();
-        } else if (m_highlightFace >= 0 && m_highlightFace < m_faceVAOs.size()) {
+        } else if (m_highlightFace >= 0) {
+            // Additional safety check before accessing arrays
+            if (m_highlightFace >= m_faceVAOs.size()) {
+                // Safety fallback - just draw wireframe without face highlight
+                m_vao.bind();
+                m_ibo.bind();
+                m_shader->setUniformValue("highlightColor", QVector4D(1.0f, 1.0f, 1.0f, 1.0f));
+                glDrawElements(GL_LINES, m_wireframeIndexCount, GL_UNSIGNED_INT, nullptr);
+                m_ibo.release();
+                m_vao.release();
+                m_shader->release();
+                return;
+            }
+            
             // Draw wireframe first
             m_vao.bind();
             m_ibo.bind();

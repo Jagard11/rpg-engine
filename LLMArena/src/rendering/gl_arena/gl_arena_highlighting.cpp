@@ -2,6 +2,7 @@
 #include "../../include/rendering/gl_arena_widget.h"
 #include <QDebug>
 #include <cmath>
+#include <limits> // For std::numeric_limits
 
 // Render a highlight box around the selected voxel face
 void GLArenaWidget::renderVoxelHighlight() {
@@ -134,64 +135,132 @@ void GLArenaWidget::renderVoxelHighlight() {
     }
 }
 
-// Raycast to find voxel under cursor
+// Raycast to find voxel under cursor - using Digital Differential Analyzer (DDA) algorithm
 void GLArenaWidget::raycastVoxels(const QVector3D& origin, const QVector3D& direction) {
-    // Enhanced safety checks
+    // Safety check - return early if voxel system or world is not available
     if (!m_voxelSystem || !m_voxelSystem->getWorld()) {
         m_highlightedVoxelFace = -1; // Reset highlight
         return;
     }
     
     try {
-        // Normalize direction
-        QVector3D dir = direction.normalized();
+        // Normalize direction vector and perform validation
+        QVector3D dir = direction;
+        if (dir.length() < 0.0001f) {
+            // If direction vector is too small, reset highlight and return
+            m_highlightedVoxelFace = -1;
+            return;
+        }
+        dir.normalize();
         
-        // Simple raycast implementation
-        // Step along the ray checking for voxels at each step
-        float step = 0.1f; // Small step size for accuracy
+        // Reset highlight state at the beginning to ensure clean state
+        m_highlightedVoxelFace = -1;
+        m_highlightedVoxelPos = QVector3D(0, 0, 0);
+        
+        // Input validation
+        if (!qIsFinite(origin.x()) || !qIsFinite(origin.y()) || !qIsFinite(origin.z()) ||
+            !qIsFinite(dir.x()) || !qIsFinite(dir.y()) || !qIsFinite(dir.z())) {
+            return; // Invalid input
+        }
+        
+        // Initialize voxel position at ray origin
+        int currentX = floor(origin.x());
+        int currentY = floor(origin.y());
+        int currentZ = floor(origin.z());
+        
+        // Calculate step direction (-1, 0, or 1) for each axis
+        int stepX = (dir.x() > 0) ? 1 : ((dir.x() < 0) ? -1 : 0);
+        int stepY = (dir.y() > 0) ? 1 : ((dir.y() < 0) ? -1 : 0);
+        int stepZ = (dir.z() > 0) ? 1 : ((dir.z() < 0) ? -1 : 0);
+        
+        // Prevent division by zero by using small epsilon values
+        const float epsilon = 0.0001f;
+        float dirX = (qAbs(dir.x()) < epsilon) ? (dir.x() >= 0 ? epsilon : -epsilon) : dir.x();
+        float dirY = (qAbs(dir.y()) < epsilon) ? (dir.y() >= 0 ? epsilon : -epsilon) : dir.y();
+        float dirZ = (qAbs(dir.z()) < epsilon) ? (dir.z() >= 0 ? epsilon : -epsilon) : dir.z();
+        
+        // Calculate initial tMax values - distance to first voxel boundary
+        float tMaxX = (stepX == 0) ? std::numeric_limits<float>::max() : 
+                      (stepX > 0) ? 
+                      ((currentX + 1.0f - origin.x()) / dirX) : 
+                      ((origin.x() - currentX) / -dirX);
+        
+        float tMaxY = (stepY == 0) ? std::numeric_limits<float>::max() : 
+                      (stepY > 0) ? 
+                      ((currentY + 1.0f - origin.y()) / dirY) : 
+                      ((origin.y() - currentY) / -dirY);
+        
+        float tMaxZ = (stepZ == 0) ? std::numeric_limits<float>::max() : 
+                      (stepZ > 0) ? 
+                      ((currentZ + 1.0f - origin.z()) / dirZ) : 
+                      ((origin.z() - currentZ) / -dirZ);
+        
+        // Calculate tDelta values - how far along ray to move for one voxel step
+        float tDeltaX = (stepX == 0) ? std::numeric_limits<float>::max() : (1.0f / qAbs(dirX));
+        float tDeltaY = (stepY == 0) ? std::numeric_limits<float>::max() : (1.0f / qAbs(dirY));
+        float tDeltaZ = (stepZ == 0) ? std::numeric_limits<float>::max() : (1.0f / qAbs(dirZ));
+        
+        // Track which face of the voxel was entered
+        int enteredFace = -1;
+        
+        // Maximum distance and iteration limit to prevent infinite loops
         float maxDistance = m_maxPlacementDistance;
+        float totalDistance = 0.0f;
+        int maxIterations = 100;
+        int iterations = 0;
         
-        m_highlightedVoxelFace = -1; // Reset highlight
-        
-        for (float distance = 0.0f; distance < maxDistance; distance += step) {
-            QVector3D pos = origin + dir * distance;
+        // DDA algorithm main loop
+        while (totalDistance < maxDistance && iterations < maxIterations) {
+            iterations++;
             
-            // Make sure position is valid
-            if (!pos.isNull() && qIsFinite(pos.x()) && qIsFinite(pos.y()) && qIsFinite(pos.z())) {
-                // Convert to voxel coordinates
-                VoxelPos voxelPos(floor(pos.x()), floor(pos.y()), floor(pos.z()));
+            // Check current voxel for solid block
+            VoxelPos voxelPos(currentX, currentY, currentZ);
+            
+            // Validate voxel position
+            if (voxelPos.isValid()) {
+                Voxel voxel = m_voxelSystem->getWorld()->getVoxel(voxelPos);
                 
-                // Check if voxel position is valid
-                if (voxelPos.isValid()) {
-                    // Check if we hit a solid voxel
-                    Voxel voxel = m_voxelSystem->getWorld()->getVoxel(voxelPos);
+                // If we found a solid voxel, set highlight and exit loop
+                if (voxel.type != VoxelType::Air) {
+                    m_highlightedVoxelPos = QVector3D(currentX, currentY, currentZ);
+                    m_highlightedVoxelFace = enteredFace;
                     
-                    if (voxel.type != VoxelType::Air) {
-                        // We hit a voxel - determine which face
-                        // Calculate exact hit point
-                        QVector3D hitPoint = origin + dir * (distance - step/2);
-                        
-                        // Calculate offsets from voxel center
-                        float xOffset = hitPoint.x() - (voxelPos.x + 0.5f);
-                        float yOffset = hitPoint.y() - (voxelPos.y + 0.5f);
-                        float zOffset = hitPoint.z() - (voxelPos.z + 0.5f);
-                        
-                        // Determine which face was hit based on largest offset
-                        if (fabs(xOffset) > fabs(yOffset) && fabs(xOffset) > fabs(zOffset)) {
-                            m_highlightedVoxelFace = (xOffset > 0) ? 0 : 1; // +X or -X face
-                        } else if (fabs(yOffset) > fabs(xOffset) && fabs(yOffset) > fabs(zOffset)) {
-                            m_highlightedVoxelFace = (yOffset > 0) ? 2 : 3; // +Y or -Y face
-                        } else {
-                            m_highlightedVoxelFace = (zOffset > 0) ? 4 : 5; // +Z or -Z face
-                        }
-                        
-                        m_highlightedVoxelPos = QVector3D(voxelPos.x, voxelPos.y, voxelPos.z);
-                        break;
+                    // Safety validation for face index
+                    if (m_highlightedVoxelFace < 0 || m_highlightedVoxelFace > 5) {
+                        m_highlightedVoxelFace = 0; // Default to safe value
                     }
+                    
+                    break;
                 }
             }
+            
+            // Find axis with minimum tMax to determine next voxel boundary to cross
+            if (tMaxX < tMaxY && tMaxX < tMaxZ) {
+                // X-axis boundary is closest
+                totalDistance = tMaxX;
+                currentX += stepX;
+                tMaxX += tDeltaX;
+                // -X face when stepping positively, +X face when stepping negatively
+                enteredFace = (stepX > 0) ? 1 : 0;
+            } 
+            else if (tMaxY < tMaxZ) {
+                // Y-axis boundary is closest
+                totalDistance = tMaxY;
+                currentY += stepY;
+                tMaxY += tDeltaY;
+                // -Y face when stepping positively, +Y face when stepping negatively
+                enteredFace = (stepY > 0) ? 3 : 2;
+            } 
+            else {
+                // Z-axis boundary is closest
+                totalDistance = tMaxZ;
+                currentZ += stepZ;
+                tMaxZ += tDeltaZ;
+                // -Z face when stepping positively, +Z face when stepping negatively
+                enteredFace = (stepZ > 0) ? 5 : 4;
+            }
         }
-    } 
+    }
     catch (const std::exception& e) {
         qWarning() << "Exception in raycastVoxels:" << e.what();
         m_highlightedVoxelFace = -1; // Reset highlight on error
@@ -234,7 +303,9 @@ void GLArenaWidget::placeVoxel() {
             case 3: newPos.setY(newPos.y() - 1); break; // -Y face
             case 4: newPos.setZ(newPos.z() + 1); break; // +Z face
             case 5: newPos.setZ(newPos.z() - 1); break; // -Z face
-            default: return; // Invalid face
+            default: 
+                qWarning() << "Invalid face in placeVoxel:" << m_highlightedVoxelFace;
+                return; // Invalid face
         }
         
         // Convert to voxel position
