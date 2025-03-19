@@ -9,8 +9,10 @@
 // Forward declaration of astronomical calculation functions
 QVector3D calculateSunPositionSimple(float skyboxRadius, const QDateTime& time);
 QVector3D calculateMoonPositionSimple(float skyboxRadius, const QDateTime& time);
-QVector3D calculateSunPositionAstronomical(float skyboxRadius, const QDateTime& time);
-QVector3D calculateMoonPositionAstronomical(float skyboxRadius, const QDateTime& time);
+
+// These are now implemented in sky_astronomical.cpp
+//QVector3D calculateSunPositionAstronomical(float skyboxRadius, const QDateTime& time);
+//QVector3D calculateMoonPositionAstronomical(float skyboxRadius, const QDateTime& time);
 
 SkySystem::SkySystem(QObject* parent) 
     : QObject(parent),
@@ -173,8 +175,8 @@ void SkySystem::updateTime() {
 
 void SkySystem::updateCelestialPositions() {
     // Call the external functions with our parameters
-    m_sunPosition = ::calculateSunPositionAstronomical(m_skyboxRadius, m_currentTime);
-    m_moonPosition = ::calculateMoonPositionAstronomical(m_skyboxRadius, m_currentTime);
+    m_sunPosition = calculateSunPositionAstronomical(m_currentTime);
+    m_moonPosition = calculateMoonPositionAstronomical(m_currentTime);
     
     // Emit signals
     emit sunPositionChanged(m_sunPosition);
@@ -182,20 +184,17 @@ void SkySystem::updateCelestialPositions() {
 }
 
 QVector3D SkySystem::calculateSunPosition(const QDateTime& time) {
-    return ::calculateSunPositionSimple(m_skyboxRadius, time);
+    return calculateSunPositionSimple(m_skyboxRadius, time);
 }
 
 QVector3D SkySystem::calculateMoonPosition(const QDateTime& time) {
-    return ::calculateMoonPositionSimple(m_skyboxRadius, time);
+    return calculateMoonPositionSimple(m_skyboxRadius, time);
 }
 
-QVector3D SkySystem::calculateSunPositionAstronomical(const QDateTime& time) {
-    return ::calculateSunPositionAstronomical(m_skyboxRadius, time);
-}
-
-QVector3D SkySystem::calculateMoonPositionAstronomical(const QDateTime& time) {
-    return ::calculateMoonPositionAstronomical(m_skyboxRadius, time);
-}
+// Delegate to the functions implemented in sky_astronomical.cpp
+// Declaration only, no implementation here
+//QVector3D SkySystem::calculateSunPositionAstronomical(const QDateTime& time);
+//QVector3D SkySystem::calculateMoonPositionAstronomical(const QDateTime& time);
 
 void SkySystem::calculateSkyColor() {
     // Calculate sky color based on sun position

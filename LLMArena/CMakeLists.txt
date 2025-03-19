@@ -37,7 +37,6 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include/voxel
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui
     ${CMAKE_CURRENT_SOURCE_DIR}/include/utils
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/debug  # Keep for backward compatibility
 )
 
 # List all header files that contain Q_OBJECT macro
@@ -73,6 +72,7 @@ set(HEADERS
     
     # Utils Module
     include/utils/crash_handler.h
+    include/utils/opengl_debug.h
 )
 
 # Main source file
@@ -89,7 +89,7 @@ set(CHARACTER_SOURCES
     src/character/manager/character_manager_memory.cpp
     src/character/manager/character_manager_context.cpp
     
-    # UI
+    # UI - Keep all files for now but use --allow-multiple-definition
     src/character/ui/character_editor.cpp
     src/character/ui/character_editor_basic.cpp
     src/character/ui/character_editor_appearance.cpp
@@ -336,6 +336,11 @@ add_executable(${PROJECT_NAME}
     ${SOURCES}
     ${CMAKE_CURRENT_BINARY_DIR}/resources.qrc
 )
+
+# Allow duplicate symbols for now (temporary fix)
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--allow-multiple-definition")
+endif()
 
 # Find OpenGL
 find_package(OpenGL REQUIRED)

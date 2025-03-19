@@ -39,17 +39,17 @@ namespace {
         
         // Get time components and convert to decimal day
         double h = dateTime.time().hour();
-        double m = dateTime.time().minute();
+        double minutes = dateTime.time().minute();
         double s = dateTime.time().second();
         double ms = dateTime.time().msec();
-        double dayFraction = (h + m/60.0 + s/3600.0 + ms/3600000.0) / 24.0;
+        double dayFraction = (h + minutes/60.0 + s/3600.0 + ms/3600000.0) / 24.0;
         
         // Calculate Julian Day
         int a = (14 - M) / 12;
         int y = Y + 4800 - a;
-        int m = M + 12*a - 3;
+        int adjustedMonth = M + 12*a - 3;
         
-        double jd = D + (153*m + 2)/5 + 365*y + y/4 - y/100 + y/400 - 32045 + dayFraction;
+        double jd = D + (153*adjustedMonth + 2)/5 + 365*y + y/4 - y/100 + y/400 - 32045 + dayFraction;
         
         return jd;
     }
