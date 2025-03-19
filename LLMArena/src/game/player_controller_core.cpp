@@ -16,7 +16,7 @@ PlayerController::PlayerController(GameScene *scene, QObject *parent)
     targetVelocity(0, 0, 0),
     rotation(0), pitch(0),
     movementSpeed(0.1), rotationSpeed(0.05),
-    acceleration(0.01), friction(0.05),
+    acceleration(0.04), friction(0.20),
     stance(PlayerStance::Standing), targetStance(PlayerStance::Standing),
     inStanceTransition(false),
     movingForward(false), movingBackward(false), 
