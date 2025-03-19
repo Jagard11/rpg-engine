@@ -68,12 +68,6 @@ void VoxelSystemIntegration::initialize() {
         return;
     }
     
-    // Check for valid OpenGL context before attempting to initialize OpenGL functions
-    if (!QOpenGLContext::currentContext() || !QOpenGLContext::currentContext()->isValid()) {
-        qCritical() << "Cannot initialize voxel system: no valid OpenGL context";
-        return;
-    }
-    
     // Wrap in try-catch to prevent crashes
     try {
         qDebug() << "Initializing VoxelSystemIntegration...";

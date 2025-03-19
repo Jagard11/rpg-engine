@@ -1,479 +1,297 @@
 // src/rendering/gl_arena/gl_arena_widget_geometry.cpp
 #include "../../include/rendering/gl_arena_widget.h"
 #include <QDebug>
-#include <QOpenGLContext>
-#include <stdexcept>
+#include <cmath>
 
-void GLArenaWidget::createFloor(double radius) {
-    try {
-        qDebug() << "Creating floor geometry...";
-        
-        // Clean up existing buffers if they exist
-        if (m_floorVAO.isCreated()) {
-            m_floorVAO.destroy();
-        }
-        
-        if (m_floorVBO.isCreated()) {
-            m_floorVBO.destroy();
-        }
-        
-        if (m_floorIBO.isCreated()) {
-            m_floorIBO.destroy();
-        }
-        
-        // Verify OpenGL context before proceeding
-        if (!QOpenGLContext::currentContext() || !QOpenGLContext::currentContext()->isValid()) {
-            qCritical() << "No valid OpenGL context during floor creation";
-            return;
-        }
-        
-        // Create new buffers
-        if (!m_floorVAO.create()) {
-            qCritical() << "Failed to create floor VAO";
-            return;
-        }
-        
-        if (!m_floorVBO.create()) {
-            qCritical() << "Failed to create floor VBO";
-            m_floorVAO.destroy();
-            return;
-        }
-        
-        if (!m_floorIBO.create()) {
-            qCritical() << "Failed to create floor IBO";
-            m_floorVBO.destroy();
-            m_floorVAO.destroy();
-            return;
-        }
-        
-        // Generate floor vertices (simple, flat square)
-        QVector<float> vertices;
-        QVector<unsigned int> indices;
-        
-        // Floor vertices (x, y, z, nx, ny, nz, s, t)
-        // Bottom (flat at y=0)
-        float halfSize = static_cast<float>(radius);
-        
-        vertices << -halfSize << 0.0f << -halfSize << 0.0f << 1.0f << 0.0f << 0.0f << 0.0f;
-        vertices << halfSize << 0.0f << -halfSize << 0.0f << 1.0f << 0.0f << 1.0f << 0.0f;
-        vertices << halfSize << 0.0f << halfSize << 0.0f << 1.0f << 0.0f << 1.0f << 1.0f;
-        vertices << -halfSize << 0.0f << halfSize << 0.0f << 1.0f << 0.0f << 0.0f << 1.0f;
-        
-        // Indices (two triangles for the floor)
-        indices << 0 << 1 << 2;  // Triangle 1
-        indices << 0 << 2 << 3;  // Triangle 2
-        
-        // Store index count for rendering
-        m_floorIndexCount = indices.size();
-        
-        if (m_floorIndexCount == 0) {
-            qCritical() << "Floor creation failed: no indices generated";
-            return;
-        }
-        
-        // Bind VAO and set up buffers
-        m_floorVAO.bind();
-        
-        // Load vertex buffer
-        m_floorVBO.bind();
-        m_floorVBO.allocate(vertices.constData(), vertices.size() * sizeof(float));
-        
-        // Set up vertex attributes
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), nullptr);  // Position
-        glEnableVertexAttribArray(0);
-        
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), 
-                            reinterpret_cast<void*>(3 * sizeof(float)));  // Normal
-        glEnableVertexAttribArray(1);
-        
-        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), 
-                            reinterpret_cast<void*>(6 * sizeof(float)));  // TexCoord
-        glEnableVertexAttribArray(2);
-        
-        // Load index buffer
-        m_floorIBO.bind();
-        m_floorIBO.allocate(indices.constData(), indices.size() * sizeof(unsigned int));
-        
-        // Unbind VAO to prevent accidental modification
-        m_floorVAO.release();
-        m_floorVBO.release();
-        m_floorIBO.release();
-        
-        qDebug() << "Floor geometry created successfully with" << m_floorIndexCount << "indices";
+// Vertex struct for geometry creation
+struct Vertex {
+    QVector3D position;
+    QVector3D normal;
+    QVector2D texCoord;
+};
+
+void GLArenaWidget::createFloor(double radius)
+{
+    // Step 1: Clean up existing buffers if they exist
+    if (m_floorVAO.isCreated()) {
+        m_floorVAO.destroy();
     }
-    catch (const std::exception& e) {
-        qCritical() << "Exception in createFloor:" << e.what();
-        
-        // Clean up on error
-        if (m_floorVAO.isCreated()) m_floorVAO.destroy();
-        if (m_floorVBO.isCreated()) m_floorVBO.destroy();
-        if (m_floorIBO.isCreated()) m_floorIBO.destroy();
-        m_floorIndexCount = 0;
+    if (m_floorVBO.isCreated()) {
+        m_floorVBO.destroy();
     }
-    catch (...) {
-        qCritical() << "Unknown exception in createFloor";
-        
-        // Clean up on error
-        if (m_floorVAO.isCreated()) m_floorVAO.destroy();
-        if (m_floorVBO.isCreated()) m_floorVBO.destroy();
-        if (m_floorIBO.isCreated()) m_floorIBO.destroy();
-        m_floorIndexCount = 0;
+    if (m_floorIBO.isCreated()) {
+        m_floorIBO.destroy();
     }
+
+    // Step 2: Generate circular floor geometry
+    const int segments = 32; // Number of segments for the circle
+    const float angleStep = 2.0f * M_PI / segments;
+
+    std::vector<float> vertices;         // Position (x, y, z) + Normal (nx, ny, nz)
+    std::vector<unsigned int> indices;   // Indices for triangle fan
+
+    // Center vertex
+    vertices.push_back(0.0f);  // x
+    vertices.push_back(0.0f);  // y
+    vertices.push_back(0.0f);  // z
+    vertices.push_back(0.0f);  // normal x
+    vertices.push_back(1.0f);  // normal y (upward)
+    vertices.push_back(0.0f);  // normal z
+
+    // Outer rim vertices
+    for (int i = 0; i <= segments; ++i) {
+        float angle = i * angleStep;
+        float x = radius * cos(angle);
+        float z = radius * sin(angle);
+        vertices.push_back(x);      // x
+        vertices.push_back(0.0f);   // y
+        vertices.push_back(z);      // z
+        vertices.push_back(0.0f);   // normal x
+        vertices.push_back(1.0f);   // normal y
+        vertices.push_back(0.0f);   // normal z
+    }
+
+    // Indices for triangle fan
+    for (int i = 1; i < segments; ++i) {
+        indices.push_back(0);       // Center vertex
+        indices.push_back(i);       // Current vertex
+        indices.push_back(i + 1);   // Next vertex
+    }
+    // Close the fan
+    indices.push_back(0);
+    indices.push_back(segments);
+    indices.push_back(1);
+
+    m_floorIndexCount = indices.size();
+
+    // Step 3: Set up OpenGL buffers
+    // Create and bind VAO
+    m_floorVAO.create();
+    m_floorVAO.bind();
+
+    // Create and populate VBO
+    m_floorVBO.create();
+    m_floorVBO.bind();
+    m_floorVBO.allocate(vertices.data(), vertices.size() * sizeof(float));
+
+    // Configure vertex attributes
+    glEnableVertexAttribArray(0); // Position
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(1); // Normal
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+
+    // Create and populate IBO
+    m_floorIBO.create();
+    m_floorIBO.bind();
+    m_floorIBO.allocate(indices.data(), indices.size() * sizeof(unsigned int));
+
+    // Step 4: Release bindings
+    m_floorVAO.release();
+    m_floorVBO.release();
+    m_floorIBO.release();
+
+    // Step 5: Update game scene
+    
+    // First, remove old floor entity if exists
+    m_gameScene->removeEntity("arena_floor");
+    
+    // Create a proper GameEntity for the floor
+    GameEntity floorEntity;
+    floorEntity.id = "arena_floor";
+    floorEntity.type = "arena_floor";
+    floorEntity.position = QVector3D(0.0f, -0.05f, 0.0f);
+    floorEntity.dimensions = QVector3D(radius * 2, 0.1, radius * 2);
+    floorEntity.isStatic = true;
+    
+    // Add entity to game scene
+    m_gameScene->addEntity(floorEntity);
 }
 
-void GLArenaWidget::createArena(double radius, double wallHeight) {
+void GLArenaWidget::createArena(double radius, double wallHeight)
+{
+    // Store parameters
+    m_arenaRadius = radius;
+    m_wallHeight = wallHeight;
+    
+    // Clear old walls
+    m_walls.clear();
+    
     try {
-        qDebug() << "Creating arena geometry...";
-        m_arenaRadius = radius;
-        m_wallHeight = wallHeight;
+        // Create octagonal arena walls
+        const int numWalls = 8;
+        m_walls.resize(numWalls);
         
-        // Create floor
-        createFloor(radius);
-        
-        // Create grid
-        createGrid(radius * 2, 20);
-        
-        // Create walls - with safety check for OpenGL context
-        if (!QOpenGLContext::currentContext() || !QOpenGLContext::currentContext()->isValid()) {
-            qCritical() << "No valid OpenGL context during arena creation";
-            return;
-        }
-        
-        // Clear existing walls
-        m_walls.clear();
-        
-        // Create rectangular walls
-        const float halfWidth = static_cast<float>(radius);
-        const float height = static_cast<float>(wallHeight);
-        
-        // Temporary vectors to hold wall positions
-        QVector<QVector3D> wallPositions;
-        QVector<QVector3D> wallSizes;
-        
-        // North wall (positive Z)
-        wallPositions.append(QVector3D(0, height/2, halfWidth));
-        wallSizes.append(QVector3D(2*halfWidth, height, 0.2f)); // thin wall
-        
-        // South wall (negative Z)
-        wallPositions.append(QVector3D(0, height/2, -halfWidth));
-        wallSizes.append(QVector3D(2*halfWidth, height, 0.2f));
-        
-        // East wall (positive X)
-        wallPositions.append(QVector3D(halfWidth, height/2, 0));
-        wallSizes.append(QVector3D(0.2f, height, 2*halfWidth));
-        
-        // West wall (negative X)
-        wallPositions.append(QVector3D(-halfWidth, height/2, 0));
-        wallSizes.append(QVector3D(0.2f, height, 2*halfWidth));
-        
-        // Create the wall geometries - inline implementation instead of separate function
-        for (int i = 0; i < wallPositions.size(); i++) {
-            const QVector3D& position = wallPositions[i];
-            const QVector3D& size = wallSizes[i];
+        for (int i = 0; i < numWalls; i++) {
+            double angle1 = 2.0 * M_PI * i / numWalls;
+            double angle2 = 2.0 * M_PI * (i + 1) / numWalls;
             
-            try {
-                // Verify OpenGL context first
-                if (!QOpenGLContext::currentContext() || !QOpenGLContext::currentContext()->isValid()) {
-                    qCritical() << "No valid OpenGL context during wall creation";
-                    continue;
-                }
-                
-                // Create a new wall geometry
-                WallGeometry wall;
-                
-                // Create and check buffers
-                wall.vao = std::make_unique<QOpenGLVertexArrayObject>();
-                if (!wall.vao->create()) {
-                    qCritical() << "Failed to create wall VAO";
-                    continue;
-                }
-                
-                wall.vbo = std::make_unique<QOpenGLBuffer>(QOpenGLBuffer::VertexBuffer);
-                if (!wall.vbo->create()) {
-                    qCritical() << "Failed to create wall VBO";
-                    wall.vao->destroy();
-                    continue;
-                }
-                
-                wall.ibo = std::make_unique<QOpenGLBuffer>(QOpenGLBuffer::IndexBuffer);
-                if (!wall.ibo->create()) {
-                    qCritical() << "Failed to create wall IBO";
-                    wall.vbo->destroy();
-                    wall.vao->destroy();
-                    continue;
-                }
-                
-                // Generate wall vertices and indices
-                QVector<float> vertices;
-                QVector<unsigned int> indices;
-                
-                // Wall dimensions
-                float width = size.x();
-                float height = size.y();
-                float depth = size.z();
-                
-                // Wall half-dimensions
-                float halfWidth = width / 2.0f;
-                float halfHeight = height / 2.0f;
-                float halfDepth = depth / 2.0f;
-                
-                // Vertex format: x, y, z, nx, ny, nz, s, t
-                
-                // For very thin walls (like those along X or Z axis),
-                // we'll just create a single quad instead of a full box
-                
-                // Check if the wall is very thin along X axis
-                if (width < 0.3f) {
-                    // It's a vertical wall along X axis (East-West)
-                    // Create a flat quad oriented along Z axis
-                    
-                    // Front face
-                    vertices << 0.0f << -halfHeight << -halfDepth << 1.0f << 0.0f << 0.0f << 0.0f << 0.0f;
-                    vertices << 0.0f << halfHeight << -halfDepth << 1.0f << 0.0f << 0.0f << 1.0f << 0.0f;
-                    vertices << 0.0f << halfHeight << halfDepth << 1.0f << 0.0f << 0.0f << 1.0f << 1.0f;
-                    vertices << 0.0f << -halfHeight << halfDepth << 1.0f << 0.0f << 0.0f << 0.0f << 1.0f;
-                    
-                    // Indices for the quad
-                    indices << 0 << 1 << 2;
-                    indices << 0 << 2 << 3;
-                }
-                // Check if the wall is very thin along Z axis
-                else if (depth < 0.3f) {
-                    // It's a vertical wall along Z axis (North-South)
-                    // Create a flat quad oriented along X axis
-                    
-                    // Front face
-                    vertices << -halfWidth << -halfHeight << 0.0f << 0.0f << 0.0f << 1.0f << 0.0f << 0.0f;
-                    vertices << halfWidth << -halfHeight << 0.0f << 0.0f << 0.0f << 1.0f << 1.0f << 0.0f;
-                    vertices << halfWidth << halfHeight << 0.0f << 0.0f << 0.0f << 1.0f << 1.0f << 1.0f;
-                    vertices << -halfWidth << halfHeight << 0.0f << 0.0f << 0.0f << 1.0f << 0.0f << 1.0f;
-                    
-                    // Indices for the quad
-                    indices << 0 << 1 << 2;
-                    indices << 0 << 2 << 3;
-                }
-                else {
-                    // It's a full wall box, create all six faces
-                    // (Front, back, left, right, top, bottom)
-                    
-                    // Front face
-                    vertices << -halfWidth << -halfHeight << halfDepth << 0.0f << 0.0f << 1.0f << 0.0f << 0.0f;
-                    vertices << halfWidth << -halfHeight << halfDepth << 0.0f << 0.0f << 1.0f << 1.0f << 0.0f;
-                    vertices << halfWidth << halfHeight << halfDepth << 0.0f << 0.0f << 1.0f << 1.0f << 1.0f;
-                    vertices << -halfWidth << halfHeight << halfDepth << 0.0f << 0.0f << 1.0f << 0.0f << 1.0f;
-                    
-                    // Back face
-                    vertices << halfWidth << -halfHeight << -halfDepth << 0.0f << 0.0f << -1.0f << 0.0f << 0.0f;
-                    vertices << -halfWidth << -halfHeight << -halfDepth << 0.0f << 0.0f << -1.0f << 1.0f << 0.0f;
-                    vertices << -halfWidth << halfHeight << -halfDepth << 0.0f << 0.0f << -1.0f << 1.0f << 1.0f;
-                    vertices << halfWidth << halfHeight << -halfDepth << 0.0f << 0.0f << -1.0f << 0.0f << 1.0f;
-                    
-                    // Left face
-                    vertices << -halfWidth << -halfHeight << -halfDepth << -1.0f << 0.0f << 0.0f << 0.0f << 0.0f;
-                    vertices << -halfWidth << -halfHeight << halfDepth << -1.0f << 0.0f << 0.0f << 1.0f << 0.0f;
-                    vertices << -halfWidth << halfHeight << halfDepth << -1.0f << 0.0f << 0.0f << 1.0f << 1.0f;
-                    vertices << -halfWidth << halfHeight << -halfDepth << -1.0f << 0.0f << 0.0f << 0.0f << 1.0f;
-                    
-                    // Right face
-                    vertices << halfWidth << -halfHeight << halfDepth << 1.0f << 0.0f << 0.0f << 0.0f << 0.0f;
-                    vertices << halfWidth << -halfHeight << -halfDepth << 1.0f << 0.0f << 0.0f << 1.0f << 0.0f;
-                    vertices << halfWidth << halfHeight << -halfDepth << 1.0f << 0.0f << 0.0f << 1.0f << 1.0f;
-                    vertices << halfWidth << halfHeight << halfDepth << 1.0f << 0.0f << 0.0f << 0.0f << 1.0f;
-                    
-                    // Top face
-                    vertices << -halfWidth << halfHeight << halfDepth << 0.0f << 1.0f << 0.0f << 0.0f << 0.0f;
-                    vertices << halfWidth << halfHeight << halfDepth << 0.0f << 1.0f << 0.0f << 1.0f << 0.0f;
-                    vertices << halfWidth << halfHeight << -halfDepth << 0.0f << 1.0f << 0.0f << 1.0f << 1.0f;
-                    vertices << -halfWidth << halfHeight << -halfDepth << 0.0f << 1.0f << 0.0f << 0.0f << 1.0f;
-                    
-                    // Bottom face
-                    vertices << -halfWidth << -halfHeight << -halfDepth << 0.0f << -1.0f << 0.0f << 0.0f << 0.0f;
-                    vertices << halfWidth << -halfHeight << -halfDepth << 0.0f << -1.0f << 0.0f << 1.0f << 0.0f;
-                    vertices << halfWidth << -halfHeight << halfDepth << 0.0f << -1.0f << 0.0f << 1.0f << 1.0f;
-                    vertices << -halfWidth << -halfHeight << halfDepth << 0.0f << -1.0f << 0.0f << 0.0f << 1.0f;
-                    
-                    // Indices for all six faces
-                    for (int face = 0; face < 6; face++) {
-                        int baseVertex = face * 4;
-                        indices << baseVertex << baseVertex + 1 << baseVertex + 2;
-                        indices << baseVertex << baseVertex + 2 << baseVertex + 3;
-                    }
-                }
-                
-                // Set the index count
-                wall.indexCount = indices.size();
-                
-                if (wall.indexCount == 0) {
-                    qCritical() << "Wall creation failed: no indices generated";
-                    continue;
-                }
-                
-                // Now bind and initialize buffers
-                wall.vao->bind();
-                
-                // Load vertex data
-                wall.vbo->bind();
-                wall.vbo->allocate(vertices.constData(), vertices.size() * sizeof(float));
-                
-                // Set up vertex attributes (position, normal, texcoord)
-                glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), nullptr);  // Position
-                glEnableVertexAttribArray(0);
-                
-                glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), 
-                                    reinterpret_cast<void*>(3 * sizeof(float)));  // Normal
-                glEnableVertexAttribArray(1);
-                
-                glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), 
-                                    reinterpret_cast<void*>(6 * sizeof(float)));  // TexCoord
-                glEnableVertexAttribArray(2);
-                
-                // Load index data
-                wall.ibo->bind();
-                wall.ibo->allocate(indices.constData(), indices.size() * sizeof(unsigned int));
-                
-                // Unbind to prevent accidental modification
-                wall.ibo->release();
+            double x1 = radius * cos(angle1);
+            double z1 = radius * sin(angle1);
+            double x2 = radius * cos(angle2);
+            double z2 = radius * sin(angle2);
+            
+            // Compute wall normal (pointing inward)
+            QVector3D wallDir(x2 - x1, 0.0, z2 - z1);
+            QVector3D normal = QVector3D::crossProduct(wallDir, QVector3D(0.0, 1.0, 0.0)).normalized();
+            normal = -normal; // Point inward
+            
+            // Calculate wall length
+            float wallLength = QVector2D(x2 - x1, z2 - z1).length();
+            
+            // Create vertices for wall
+            Vertex vertices[4];
+            // Bottom left
+            vertices[0].position = QVector3D(x1, 0.0, z1);
+            vertices[0].normal = normal;
+            vertices[0].texCoord = QVector2D(0.0, 1.0);
+            
+            // Bottom right
+            vertices[1].position = QVector3D(x2, 0.0, z2);
+            vertices[1].normal = normal;
+            vertices[1].texCoord = QVector2D(1.0, 1.0);
+            
+            // Top right
+            vertices[2].position = QVector3D(x2, wallHeight, z2);
+            vertices[2].normal = normal;
+            vertices[2].texCoord = QVector2D(1.0, 0.0);
+            
+            // Top left
+            vertices[3].position = QVector3D(x1, wallHeight, z1);
+            vertices[3].normal = normal;
+            vertices[3].texCoord = QVector2D(0.0, 0.0);
+            
+            // Indices for two triangles
+            GLuint indices[6] = { 0, 1, 2, 2, 3, 0 };
+            
+            // Create new WallGeometry
+            WallGeometry& wall = m_walls[i];
+            
+            // Initialize OpenGL objects if they don't exist
+            if (!wall.vao) wall.vao.reset(new QOpenGLVertexArrayObject);
+            if (!wall.vbo) wall.vbo.reset(new QOpenGLBuffer(QOpenGLBuffer::VertexBuffer));
+            if (!wall.ibo) wall.ibo.reset(new QOpenGLBuffer(QOpenGLBuffer::IndexBuffer));
+            
+            // Create and bind VAO first
+            if (!wall.vao->create()) {
+                qWarning() << "Failed to create VAO for wall" << i;
+                continue;
+            }
+            wall.vao->bind();
+            
+            // Create and bind VBO
+            if (!wall.vbo->create()) {
+                qWarning() << "Failed to create VBO for wall" << i;
+                wall.vao->release();
+                continue;
+            }
+            wall.vbo->bind();
+            wall.vbo->allocate(vertices, 4 * sizeof(Vertex));
+            
+            // Enable vertex attributes
+            glEnableVertexAttribArray(0);
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), 
+                                reinterpret_cast<void*>(offsetof(Vertex, position)));
+            
+            glEnableVertexAttribArray(1);
+            glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), 
+                                reinterpret_cast<void*>(offsetof(Vertex, normal)));
+            
+            glEnableVertexAttribArray(2);
+            glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), 
+                                reinterpret_cast<void*>(offsetof(Vertex, texCoord)));
+            
+            // Create and bind IBO
+            if (!wall.ibo->create()) {
+                qWarning() << "Failed to create IBO for wall" << i;
                 wall.vbo->release();
                 wall.vao->release();
-                
-                qDebug() << "Wall geometry created with" << wall.indexCount << "indices";
-                
-                // Add to walls list
-                m_walls.push_back(std::move(wall));
+                continue;
             }
-            catch (const std::exception& e) {
-                qCritical() << "Exception in wall creation:" << e.what();
-            }
-            catch (...) {
-                qCritical() << "Unknown exception in wall creation";
-            }
+            wall.ibo->bind();
+            wall.ibo->allocate(indices, 6 * sizeof(GLuint));
+            
+            wall.indexCount = 6;
+            
+            // Release bindings
+            wall.ibo->release();
+            wall.vbo->release();
+            wall.vao->release();
+            
+            // Create wall entity in game scene
+            GameEntity wallEntity;
+            wallEntity.id = QString("arena_wall_%1").arg(i);
+            wallEntity.type = "arena_wall";
+            wallEntity.position = QVector3D((x1 + x2) / 2, wallHeight / 2, (z1 + z2) / 2);
+            wallEntity.dimensions = QVector3D(wallLength, wallHeight, 0.2);
+            wallEntity.isStatic = true;
+            
+            m_gameScene->addEntity(wallEntity);
         }
         
-        // Update the game scene with wall entities
-        if (m_gameScene) {
-            // First remove any existing walls
-            QVector<GameEntity> entities = m_gameScene->getAllEntities();
-            for (const GameEntity& entity : entities) {
-                if (entity.type == "wall") {
-                    m_gameScene->removeEntity(entity.id);
-                }
-            }
-            
-            // Add new wall entities for collision
-            for (int i = 0; i < wallPositions.size(); i++) {
-                GameEntity entity;
-                entity.id = QString("wall_%1").arg(i);
-                entity.type = "wall";
-                entity.position = wallPositions[i];
-                entity.dimensions = wallSizes[i];
-                entity.isStatic = true;
-                
-                m_gameScene->addEntity(entity);
-            }
-        }
-    }
-    catch (const std::exception& e) {
+        createFloor(radius);
+        createGrid(radius * 2, 20);
+    } catch (const std::exception& e) {
         qCritical() << "Exception in createArena:" << e.what();
-    }
-    catch (...) {
-        qCritical() << "Unknown exception in createArena";
     }
 }
 
-void GLArenaWidget::createGrid(double size, int divisions) {
+void GLArenaWidget::createGrid(double size, int divisions)
+{
     try {
-        qDebug() << "Creating grid geometry...";
-        
-        // Clean up existing grid buffers if they exist
+        // Clean up existing grid if needed
         if (m_gridVAO.isCreated()) {
             m_gridVAO.destroy();
         }
-        
         if (m_gridVBO.isCreated()) {
             m_gridVBO.destroy();
         }
         
-        // Verify OpenGL context before proceeding
-        if (!QOpenGLContext::currentContext() || !QOpenGLContext::currentContext()->isValid()) {
-            qCritical() << "No valid OpenGL context during grid creation";
-            return;
-        }
+        // Create a grid of lines for orientation
+        QVector<QVector3D> lineVertices;
         
-        // Create new buffers
-        if (!m_gridVAO.create()) {
-            qCritical() << "Failed to create grid VAO";
-            return;
-        }
+        float step = size / divisions;
+        float halfSize = size / 2.0f;
         
-        if (!m_gridVBO.create()) {
-            qCritical() << "Failed to create grid VBO";
-            m_gridVAO.destroy();
-            return;
-        }
-        
-        // Generate grid lines
-        QVector<float> vertices;
-        
-        // Grid parameters
-        float halfSize = static_cast<float>(size) / 2.0f;
-        float step = static_cast<float>(size) / static_cast<float>(divisions);
-        
-        // Create a single line at y=0
-        // X-axis grid lines (vary along Z)
-        for (int i = 0; i <= divisions; i++) {
-            float z = -halfSize + i * step;
-            
-            vertices << -halfSize << 0.01f << z;  // Slightly above floor
-            vertices << halfSize << 0.01f << z;
-        }
-        
-        // Z-axis grid lines (vary along X)
+        // Create grid lines along x-axis
         for (int i = 0; i <= divisions; i++) {
             float x = -halfSize + i * step;
-            
-            vertices << x << 0.01f << -halfSize;  // Slightly above floor
-            vertices << x << 0.01f << halfSize;
+            lineVertices.append(QVector3D(x, -0.04f, -halfSize)); // Start point
+            lineVertices.append(QVector3D(x, -0.04f, halfSize));  // End point
         }
         
-        // Store vertex count for rendering
-        m_gridVertexCount = vertices.size() / 3;  // 3 components per vertex
+        // Create grid lines along z-axis
+        for (int i = 0; i <= divisions; i++) {
+            float z = -halfSize + i * step;
+            lineVertices.append(QVector3D(-halfSize, -0.04f, z)); // Start point
+            lineVertices.append(QVector3D(halfSize, -0.04f, z));  // End point
+        }
         
-        if (m_gridVertexCount == 0) {
-            qCritical() << "Grid creation failed: no vertices generated";
+        // Create VAO
+        if (!m_gridVAO.create()) {
+            qWarning() << "Failed to create grid VAO";
             return;
         }
-        
-        // Bind VAO and set up buffer
         m_gridVAO.bind();
         
-        // Load vertex buffer
+        // Create VBO
+        if (!m_gridVBO.create()) {
+            qWarning() << "Failed to create grid VBO";
+            m_gridVAO.release();
+            return;
+        }
         m_gridVBO.bind();
-        m_gridVBO.allocate(vertices.constData(), vertices.size() * sizeof(float));
+        m_gridVBO.allocate(lineVertices.constData(), lineVertices.size() * sizeof(QVector3D));
         
-        // Set up vertex attributes
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), nullptr);  // Position
+        // Set vertex attribute
         glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(QVector3D), nullptr);
         
-        // Unbind VAO to prevent accidental modification
-        m_gridVAO.release();
+        m_gridVertexCount = lineVertices.size();
+        
+        // Release bindings
         m_gridVBO.release();
-        
-        qDebug() << "Grid geometry created successfully with" << m_gridVertexCount << "vertices";
-    }
-    catch (const std::exception& e) {
+        m_gridVAO.release();
+    } catch (const std::exception& e) {
         qCritical() << "Exception in createGrid:" << e.what();
-        
-        // Clean up on error
-        if (m_gridVAO.isCreated()) m_gridVAO.destroy();
-        if (m_gridVBO.isCreated()) m_gridVBO.destroy();
-        m_gridVertexCount = 0;
-    }
-    catch (...) {
-        qCritical() << "Unknown exception in createGrid";
-        
-        // Clean up on error
-        if (m_gridVAO.isCreated()) m_gridVAO.destroy();
-        if (m_gridVBO.isCreated()) m_gridVBO.destroy();
-        m_gridVertexCount = 0;
     }
 }

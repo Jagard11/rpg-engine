@@ -14,75 +14,6 @@
 static QMutex renderingMutex;
 static int errorCount = 0;  // To limit error reporting
 
-// Helper function to output OpenGL info
-void printOpenGLInfo() {
-    QOpenGLContext* context = QOpenGLContext::currentContext();
-    if (!context) {
-        qWarning() << "No current OpenGL context";
-        return;
-    }
-    
-    QString glVendor = reinterpret_cast<const char*>(glGetString(GL_VENDOR));
-    QString glRenderer = reinterpret_cast<const char*>(glGetString(GL_RENDERER));
-    QString glVersion = reinterpret_cast<const char*>(glGetString(GL_VERSION));
-    
-    qDebug() << "OpenGL Vendor:" << glVendor;
-    qDebug() << "OpenGL Renderer:" << glRenderer;
-    qDebug() << "OpenGL Version:" << glVersion;
-    
-    bool hasOpenGL = QOpenGLContext::currentContext()->isValid();
-    qDebug() << "OpenGL availability:" << hasOpenGL;
-}
-
-// Helper function to update the view matrix within paintGL
-// This is not a class method, just a local helper function
-void updateViewMatrixFromPlayer(QMatrix4x4& viewMatrix, PlayerController* playerController) {
-    if (!playerController) {
-        // Default view if no player
-        viewMatrix.setToIdentity();
-        return;
-    }
-    
-    try {
-        // Get player position
-        const QVector3D& position = playerController->getPosition();
-        float rotation = playerController->getRotation();
-        float pitch = playerController->getPitch();
-        
-        // Get player eye height based on stance
-        float eyeHeight = playerController->getEyeHeight();
-        
-        // Player position with eye height
-        QVector3D eyePosition = position + QVector3D(0, eyeHeight, 0);
-        
-        // Direction vectors
-        float cosYaw = cos(rotation);
-        float sinYaw = sin(rotation);
-        float cosPitch = cos(pitch);
-        float sinPitch = sin(pitch);
-        
-        // Forward, up, and right vectors
-        QVector3D forward(sinYaw * cosPitch, -sinPitch, cosYaw * cosPitch);
-        QVector3D up(0, 1, 0); // World up
-        QVector3D right = QVector3D::crossProduct(forward, up).normalized();
-        up = QVector3D::crossProduct(right, forward); // Corrected up
-        
-        // Set up view matrix
-        viewMatrix.setToIdentity();
-        viewMatrix.lookAt(
-            eyePosition,                // Eye position
-            eyePosition + forward,      // Look at point
-            up                          // Up vector
-        );
-    }
-    catch (const std::exception& e) {
-        qWarning() << "Exception in updateViewMatrix:" << e.what();
-        
-        // Reset view matrix on failure
-        viewMatrix.setToIdentity();
-    }
-}
-
 void GLArenaWidget::initializeGL() {
     qDebug() << "Initializing OpenGL context...";
     
@@ -154,26 +85,6 @@ void GLArenaWidget::initializeGL() {
         QVector3D(0, 1, 0)     // Up vector
     );
     
-    // Create game scene if not already created
-    if (!m_gameScene) {
-        m_gameScene = new GameScene(this);
-    }
-    
-    // Create player controller if not already created
-    if (!m_playerController) {
-        m_playerController = new PlayerController(m_gameScene, this);
-        
-        // Connect player position updates to view matrix updates
-        connect(m_playerController, &PlayerController::positionChanged,
-                this, &GLArenaWidget::onPlayerPositionChanged);
-        
-        connect(m_playerController, &PlayerController::rotationChanged,
-                this, &GLArenaWidget::onPlayerRotationChanged);
-        
-        connect(m_playerController, &PlayerController::pitchChanged,
-                this, &GLArenaWidget::onPlayerPitchChanged);
-    }
-    
     // Initialize voxel system
     try {
         qDebug() << "Creating voxel system...";
@@ -182,29 +93,12 @@ void GLArenaWidget::initializeGL() {
             throw std::runtime_error("Failed to create voxel system");
         }
         
-        // Make absolutely sure the context is current before initializing voxel system
-        if (!QOpenGLContext::currentContext() || !QOpenGLContext::currentContext()->isValid()) {
-            qCritical() << "No valid OpenGL context before voxel system initialization";
-            makeCurrent();
-        }
-        
         // Initialize voxel system
         qDebug() << "Initializing voxel system...";
         m_voxelSystem->initialize();
     }
     catch (const std::exception& e) {
         qCritical() << "Failed to initialize voxel system:" << e.what();
-    }
-    
-    // Create character sprites after initialization
-    foreach (const QString &name, m_characterSprites.keys()) {
-        if (m_characterManager && !name.isEmpty()) {
-            // Try to load or refresh character sprite
-            CharacterAppearance appearance = m_characterManager->loadCharacterAppearance(name);
-            if (!appearance.spritePath.isEmpty()) {
-                loadCharacterSprite(name, appearance.spritePath);
-            }
-        }
     }
     
     // Initialize inventory system
@@ -324,9 +218,8 @@ void GLArenaWidget::paintGL()
         }
         
         // Update view matrix based on player position, rotation and pitch
-        updateViewMatrixFromPlayer(m_viewMatrix, m_playerController);
+        m_viewMatrix.setToIdentity();
         
-        // Store these for later use
         // Position camera at player's eye level based on stance
         float eyeHeight = playerPos.y() + 1.6f; // Default eye height
         
@@ -349,6 +242,10 @@ void GLArenaWidget::paintGL()
             horizontalDir.z() * cos(playerPitch)
         );
         
+        QVector3D lookAt = eyePos + lookDir;
+        
+        m_viewMatrix.lookAt(eyePos, lookAt, QVector3D(0.0f, 1.0f, 0.0f));
+        
         // Draw grid - disable depth test temporarily if needed
         if (m_gridVAO.isCreated() && m_gridVBO.isCreated()) {
             glLineWidth(1.0f);
@@ -370,8 +267,8 @@ void GLArenaWidget::paintGL()
             }
         }
         
-        // Draw floor - with enhanced safety checks
-        if (m_floorVAO.isCreated() && m_floorVBO.isCreated() && m_floorIBO.isCreated() && m_floorIndexCount > 0) {
+        // Draw floor
+        if (m_floorVAO.isCreated() && m_floorVBO.isCreated() && m_floorIBO.isCreated()) {
             // Bind shader
             if (m_billboardProgram && m_billboardProgram->bind()) {
                 // Set uniforms
@@ -380,78 +277,34 @@ void GLArenaWidget::paintGL()
                 
                 // Draw floor
                 m_floorVAO.bind();
-                
-                // Double-check VAO binding was successful
-                if (m_floorVAO.isCreated() && QOpenGLContext::currentContext() && QOpenGLContext::currentContext()->isValid()) {
-                    m_floorIBO.bind();
-                    
-                    // Double-check IBO binding was successful before drawing
-                    if (m_floorIBO.isCreated() && m_floorIBO.bufferId() != 0) {
-                        m_billboardProgram->setUniformValue("modelView", QMatrix4x4());
-                        m_billboardProgram->setUniformValue("color", QVector4D(0.2f, 0.6f, 0.2f, 1.0f));
-                        
-                        // Only draw if we have valid index count and buffers
-                        glDrawElements(GL_TRIANGLES, m_floorIndexCount, GL_UNSIGNED_INT, nullptr);
-                    } else {
-                        qWarning() << "Floor IBO not correctly bound for drawing";
-                    }
-                    
-                    // Release IBO even if binding failed
-                    m_floorIBO.release();
-                } else {
-                    qWarning() << "Floor VAO not correctly bound for drawing";
-                }
-                
-                // Release VAO even if binding failed
+                m_floorIBO.bind();
+                m_billboardProgram->setUniformValue("modelView", QMatrix4x4());
+                m_billboardProgram->setUniformValue("color", QVector4D(0.2f, 0.6f, 0.2f, 1.0f));
+                glDrawElements(GL_TRIANGLES, m_floorIndexCount, GL_UNSIGNED_INT, nullptr);
+                m_floorIBO.release();
                 m_floorVAO.release();
+                
                 m_billboardProgram->release();
             }
         }
         
-        // Draw walls - with enhanced safety checks
+        // Draw walls
         for (const auto& wall : m_walls) {
-            // First verify we have valid wall objects and a valid index count
-            if (wall.vao && wall.vao->isCreated() && 
-                wall.ibo && wall.ibo->isCreated() && 
-                wall.indexCount > 0) {
-                
-                // Bind shader with safety check
+            if (wall.vao && wall.vao->isCreated() && wall.ibo && wall.ibo->isCreated()) {
+                // Bind shader
                 if (m_billboardProgram && m_billboardProgram->bind()) {
                     // Set uniforms
                     m_billboardProgram->setUniformValue("view", m_viewMatrix);
                     m_billboardProgram->setUniformValue("projection", m_projectionMatrix);
                     
-                    // Draw wall with extra error checking
-                    if (wall.vao && wall.vao->isCreated()) {
-                        wall.vao->bind();
-                        
-                        // Verify VAO binding was successful
-                        if (QOpenGLContext::currentContext() && QOpenGLContext::currentContext()->isValid()) {
-                            // Verify IBO is valid and bind it
-                            if (wall.ibo && wall.ibo->isCreated()) {
-                                wall.ibo->bind();
-                                
-                                // Verify IBO binding was successful before drawing
-                                if (wall.ibo->bufferId() != 0) {
-                                    m_billboardProgram->setUniformValue("modelView", QMatrix4x4());
-                                    m_billboardProgram->setUniformValue("color", QVector4D(0.7f, 0.7f, 0.7f, 1.0f));
-                                    
-                                    // Only draw if valid
-                                    glDrawElements(GL_TRIANGLES, wall.indexCount, GL_UNSIGNED_INT, nullptr);
-                                } else {
-                                    qWarning() << "Wall IBO not correctly bound for drawing";
-                                }
-                                
-                                // Release IBO even if binding failed
-                                wall.ibo->release();
-                            }
-                        } else {
-                            qWarning() << "No valid OpenGL context during wall drawing";
-                        }
-                        
-                        // Release VAO even if binding failed
-                        wall.vao->release();
-                    }
+                    // Draw wall
+                    wall.vao->bind();
+                    wall.ibo->bind();
+                    m_billboardProgram->setUniformValue("modelView", QMatrix4x4());
+                    m_billboardProgram->setUniformValue("color", QVector4D(0.7f, 0.7f, 0.7f, 1.0f));
+                    glDrawElements(GL_TRIANGLES, wall.indexCount, GL_UNSIGNED_INT, nullptr);
+                    wall.ibo->release();
+                    wall.vao->release();
                     
                     m_billboardProgram->release();
                 }
@@ -625,6 +478,7 @@ QVector3D GLArenaWidget::worldToNDC(const QVector3D& worldPos) {
     return QVector3D(clipPos.x(), clipPos.y(), clipPos.z());
 }
 
+// Render inventory UI
 void GLArenaWidget::renderInventory() {
     if (!m_inventoryUI) {
         return;
