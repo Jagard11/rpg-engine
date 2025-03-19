@@ -3,6 +3,7 @@
 #include <QVector3D>
 #include <QSettings>
 #include <QDebug>
+#include <QTimeZone>
 
 // Forward declarations for simple position calculation functions
 QVector3D calculateSunPositionSimple(float skyboxRadius, const QDateTime& time);
@@ -52,6 +53,18 @@ namespace {
         
         return location;
     }
+    
+    // Convert local time to solar time
+    QDateTime convertToSolarTime(const QDateTime& localTime, double longitude) {
+        // Get the difference in hours from Greenwich
+        double hourDiff = longitude / 15.0;
+        
+        // Create a copy of the time adjusted for solar time
+        QDateTime solarTime = localTime;
+        solarTime = solarTime.addSecs(-static_cast<int>(hourDiff * 3600));
+        
+        return solarTime;
+    }
 }
 
 // Calculate sun position using declination and hour angle
@@ -63,19 +76,19 @@ QVector3D calculateSunPositionAstronomical(float skyboxRadius, const QDateTime& 
         return calculateSunPositionSimple(skyboxRadius, time);
     }
     
-    // Convert to UTC time
-    QDateTime utcTime = time.toUTC();
+    // Convert to local solar time based on longitude
+    // This is critical - we need solar time, not standard time zones
+    QDateTime solarTime = time;
     
-    // Get day of year and hour
-    int doy = SkyHelpers::dayOfYear(utcTime);
-    double hour = SkyHelpers::fractionalHour(utcTime);
+    // Get day of year and solar time hour
+    int doy = SkyHelpers::dayOfYear(solarTime);
     
     // Calculate solar declination (approximate formula)
     double declination = 23.45 * qSin(SkyHelpers::toRadians(360.0/365.0 * (doy - 81)));
     
-    // Calculate hour angle
-    double longitude = location.longitude;
-    double hourAngle = 15.0 * (hour - 12.0) + longitude;
+    // Calculate hour angle (15 degrees per hour from solar noon)
+    double hour = SkyHelpers::fractionalHour(solarTime);
+    double hourAngle = 15.0 * (hour - 12.0);
     
     // Convert to radians
     double lat = SkyHelpers::toRadians(location.latitude);
@@ -89,14 +102,15 @@ QVector3D calculateSunPositionAstronomical(float skyboxRadius, const QDateTime& 
     double cosAz = (qSin(decl) - qSin(lat) * sinAlt) / (qCos(lat) * qCos(altitude));
     double azimuth = qAcos(qBound(-1.0, cosAz, 1.0));
     
+    // Adjust azimuth for the correct quadrant
+    if (qSin(ha) > 0) {
+        azimuth = 2 * M_PI - azimuth;
+    }
+    
     // Convert altitude and azimuth to XYZ coordinates
     // X = distance * cos(altitude) * sin(azimuth)
     // Y = distance * sin(altitude)
     // Z = distance * cos(altitude) * cos(azimuth)
-    
-    if (qSin(ha) < 0) {
-        azimuth = 2 * M_PI - azimuth;
-    }
     
     double distance = skyboxRadius * 0.8;
     double x = distance * qCos(altitude) * qSin(azimuth);
@@ -105,7 +119,7 @@ QVector3D calculateSunPositionAstronomical(float skyboxRadius, const QDateTime& 
     
     // Debug output
     qDebug() << "Sun calculation:";
-    qDebug() << "  Date/Time:" << time.toString() << "UTC:" << utcTime.toString();
+    qDebug() << "  Date/Time:" << time.toString() << "UTC:" << time.toUTC().toString();
     qDebug() << "  Location:" << location.name << location.latitude << location.longitude;
     qDebug() << "  DOY:" << doy << "Hour:" << hour;
     qDebug() << "  Declination:" << declination << "degrees";
@@ -150,10 +164,14 @@ QVector3D calculateMoonPositionAstronomical(float skyboxRadius, const QDateTime&
     double phaseAngle = fmod(L0 - M, 2 * M_PI);
     double phase = 0.5 * (1 - qCos(phaseAngle));
     
-    // Hour angle calculation similar to sun
-    double hour = SkyHelpers::fractionalHour(time.toUTC());
-    double longitude = location.longitude;
-    double hourAngle = 15.0 * (hour - 12.0) + longitude + 180.0; // Opposite to sun
+    // Convert to local solar time based on longitude
+    QDateTime solarTime = time;
+    
+    // Get hour in solar time
+    double hour = SkyHelpers::fractionalHour(solarTime);
+    
+    // Hour angle calculation (moon is roughly opposite to sun)
+    double hourAngle = 15.0 * (hour - 12.0) + 180.0; // Opposite to sun
     
     // Convert to radians
     double lat = SkyHelpers::toRadians(location.latitude);
@@ -167,7 +185,7 @@ QVector3D calculateMoonPositionAstronomical(float skyboxRadius, const QDateTime&
     double cosAz = (qSin(decl) - qSin(lat) * sinAlt) / (qCos(lat) * qCos(altitude));
     double azimuth = qAcos(qBound(-1.0, cosAz, 1.0));
     
-    if (qSin(ha) < 0) {
+    if (qSin(ha) > 0) {
         azimuth = 2 * M_PI - azimuth;
     }
     
