@@ -1,4 +1,4 @@
-// include/ui/character_editor_ui.h
+// include/character/ui/character_editor_ui.h
 #ifndef CHARACTER_EDITOR_UI_H
 #define CHARACTER_EDITOR_UI_H
 
@@ -35,7 +35,7 @@
 #include <QPainter>
 #include <QDebug>
 
-#include "character_persistence.h"
+#include "../character_persistence.h"
 
 // Dialog to create or edit a character
 class CharacterEditorDialog : public QDialog {
