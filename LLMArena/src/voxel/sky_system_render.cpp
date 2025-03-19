@@ -42,19 +42,36 @@ void SkySystem::render(const QMatrix4x4& viewMatrix, const QMatrix4x4& projectio
                 glEnable(GL_BLEND);
                 glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
                 
-                QMatrix4x4 modelMatrix;
-                modelMatrix.setToIdentity();
-                modelMatrix.translate(m_sunPosition);
-                
                 // Get camera position from view matrix
                 QMatrix4x4 invView = viewMatrix.inverted();
                 QVector3D cameraPos = invView * QVector3D(0, 0, 0);
                 
-                // Always make celestial bodies face the camera (billboard effect)
-                modelMatrix.lookAt(QVector3D(0,0,0), cameraPos - m_sunPosition, QVector3D(0,1,0));
+                // Calculate billboard orientation (fixed to always face camera)
+                QMatrix4x4 modelMatrix;
+                modelMatrix.setToIdentity();
+                modelMatrix.translate(m_sunPosition);
                 
-                // Apply scaling
+                // Calculate the direction from the billboard to the camera
+                QVector3D dir = (cameraPos - m_sunPosition).normalized();
+                
+                // Create rotation matrix that aligns billboard to face camera
+                // Use camera up vector for more stable orientation
+                QVector3D up(0, 1, 0);
+                QVector3D right = QVector3D::crossProduct(dir, up).normalized();
+                up = QVector3D::crossProduct(right, dir).normalized();
+                
+                // Apply the camera-facing rotation
                 modelMatrix.scale(m_sunRadius * 2.0f);
+                
+                // Use billboarding matrix to always face camera
+                QMatrix4x4 billboardMatrix;
+                billboardMatrix.setToIdentity();
+                billboardMatrix.setColumn(0, QVector4D(right, 0.0f));
+                billboardMatrix.setColumn(1, QVector4D(up, 0.0f));
+                billboardMatrix.setColumn(2, QVector4D(-dir, 0.0f)); // Negative because we want it to face the camera
+                billboardMatrix.setColumn(3, QVector4D(0, 0, 0, 1.0f));
+                
+                modelMatrix = modelMatrix * billboardMatrix;
                 
                 // Set uniforms
                 m_celestialShader->setUniformValue("model", modelMatrix);
@@ -79,19 +96,36 @@ void SkySystem::render(const QMatrix4x4& viewMatrix, const QMatrix4x4& projectio
                 glEnable(GL_BLEND);
                 glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
                 
-                QMatrix4x4 modelMatrix;
-                modelMatrix.setToIdentity();
-                modelMatrix.translate(m_moonPosition);
-                
                 // Get camera position from view matrix
                 QMatrix4x4 invView = viewMatrix.inverted();
                 QVector3D cameraPos = invView * QVector3D(0, 0, 0);
                 
-                // Always make celestial bodies face the camera (billboard effect)
-                modelMatrix.lookAt(QVector3D(0,0,0), cameraPos - m_moonPosition, QVector3D(0,1,0));
+                // Calculate billboard orientation (fixed to always face camera)
+                QMatrix4x4 modelMatrix;
+                modelMatrix.setToIdentity();
+                modelMatrix.translate(m_moonPosition);
                 
-                // Apply scaling
+                // Calculate the direction from the billboard to the camera
+                QVector3D dir = (cameraPos - m_moonPosition).normalized();
+                
+                // Create rotation matrix that aligns billboard to face camera
+                // Use camera up vector for more stable orientation
+                QVector3D up(0, 1, 0);
+                QVector3D right = QVector3D::crossProduct(dir, up).normalized();
+                up = QVector3D::crossProduct(right, dir).normalized();
+                
+                // Apply the camera-facing rotation
                 modelMatrix.scale(m_moonRadius * 2.0f);
+                
+                // Use billboarding matrix to always face camera
+                QMatrix4x4 billboardMatrix;
+                billboardMatrix.setToIdentity();
+                billboardMatrix.setColumn(0, QVector4D(right, 0.0f));
+                billboardMatrix.setColumn(1, QVector4D(up, 0.0f));
+                billboardMatrix.setColumn(2, QVector4D(-dir, 0.0f)); // Negative because we want it to face the camera
+                billboardMatrix.setColumn(3, QVector4D(0, 0, 0, 1.0f));
+                
+                modelMatrix = modelMatrix * billboardMatrix;
                 
                 // Set uniforms
                 m_celestialShader->setUniformValue("model", modelMatrix);
