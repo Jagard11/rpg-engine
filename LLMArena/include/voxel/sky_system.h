@@ -85,9 +85,13 @@ private:
     void updateCelestialPositions();
     void calculateSkyColor();
     
-    // Calculate sun/moon position based on time
+    // Calculate sun/moon position based on time (simplified)
     QVector3D calculateSunPosition(const QDateTime& time);
     QVector3D calculateMoonPosition(const QDateTime& time);
+    
+    // Calculate sun/moon position based on time and location (astronomical)
+    QVector3D calculateSunPositionAstronomical(const QDateTime& time);
+    QVector3D calculateMoonPositionAstronomical(const QDateTime& time);
 };
 
 #endif // SKY_SYSTEM_H

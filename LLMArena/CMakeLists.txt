@@ -41,6 +41,7 @@ include_directories(
 # Explicitly list all header files that contain Q_OBJECT macro
 set(HEADERS
     include/ui/arena_view.h
+    include/ui/location_dialog.h  # Added this line
     include/character/manager/character_manager.h
     include/character/ui/character_editor.h
     include/llm/oobabooga_bridge.h
@@ -82,6 +83,7 @@ set(MEMORY_SOURCES
 # UI module
 set(UI_SOURCES
     src/ui/arena_view.cpp
+    src/ui/location_dialog.cpp
 )
 
 # LLM module
@@ -122,6 +124,11 @@ set(VOXEL_SOURCES
     src/voxel/voxel_world.cpp
     src/voxel/voxel_renderer.cpp
     src/voxel/sky_system.cpp
+    src/voxel/sky_system_shaders.cpp
+    src/voxel/sky_system_geometry.cpp
+    src/voxel/sky_system_render.cpp
+    src/voxel/sky_basic_calculations.cpp
+    src/voxel/sky_astronomical_calculations.cpp
     src/voxel/voxel_system_integration.cpp
 )
 

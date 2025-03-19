@@ -1,9 +1,16 @@
 // src/voxel/sky_system.cpp
 #include "../../include/voxel/sky_system.h"
+#include "../../include/voxel/sky_system_helpers.h"
 #include <QDebug>
 #include <QImage>
 #include <cmath>
 #include <stdexcept>
+
+// Forward declaration of astronomical calculation functions
+QVector3D calculateSunPositionSimple(float skyboxRadius, const QDateTime& time);
+QVector3D calculateMoonPositionSimple(float skyboxRadius, const QDateTime& time);
+QVector3D calculateSunPositionAstronomical(float skyboxRadius, const QDateTime& time);
+QVector3D calculateMoonPositionAstronomical(float skyboxRadius, const QDateTime& time);
 
 SkySystem::SkySystem(QObject* parent) 
     : QObject(parent),
@@ -149,165 +156,6 @@ void SkySystem::initialize() {
     }
 }
 
-void SkySystem::createShaders() {
-    // Create skybox shader program
-    m_skyboxShader = new QOpenGLShaderProgram();
-    
-    // Simple screen-space vertex shader
-    const char* skyboxVertexShaderSource = R"(
-        #version 330 core
-        layout(location = 0) in vec3 position;
-        
-        out vec2 vertPosition;
-        
-        void main() {
-            vertPosition = position.xy;
-            gl_Position = vec4(position, 1.0);
-        }
-    )";
-    
-    // Simple skybox fragment shader with constant color
-    const char* skyboxFragmentShaderSource = R"(
-        #version 330 core
-        in vec2 vertPosition;
-        
-        uniform vec3 skyColor;
-        
-        out vec4 fragColor;
-        
-        void main() {
-            // Simple gradient from skyColor to slightly lighter at horizon
-            float height = (vertPosition.y + 1.0) * 0.5; // Normalize y to 0-1
-            vec3 finalColor = mix(skyColor * 1.2, skyColor, height);
-            
-            fragColor = vec4(finalColor, 1.0);
-        }
-    )";
-    
-    // Celestial (sun/moon) vertex shader
-    const char* celestialVertexShaderSource = R"(
-        #version 330 core
-        layout(location = 0) in vec3 position;
-        layout(location = 1) in vec2 texCoord;
-        
-        uniform mat4 model;
-        uniform mat4 view;
-        uniform mat4 projection;
-        
-        out vec2 fragTexCoord;
-        
-        void main() {
-            gl_Position = projection * view * model * vec4(position, 1.0);
-            fragTexCoord = texCoord;
-        }
-    )";
-    
-    // Celestial fragment shader
-    const char* celestialFragmentShaderSource = R"(
-        #version 330 core
-        in vec2 fragTexCoord;
-        
-        uniform sampler2D textureSampler;
-        
-        out vec4 fragColor;
-        
-        void main() {
-            vec4 texColor = texture(textureSampler, fragTexCoord);
-            fragColor = texColor;
-        }
-    )";
-    
-    // Compile and link skybox shader
-    if (!m_skyboxShader->addShaderFromSourceCode(QOpenGLShader::Vertex, skyboxVertexShaderSource)) {
-        qCritical() << "Failed to compile skybox vertex shader:" << m_skyboxShader->log();
-    }
-    
-    if (!m_skyboxShader->addShaderFromSourceCode(QOpenGLShader::Fragment, skyboxFragmentShaderSource)) {
-        qCritical() << "Failed to compile skybox fragment shader:" << m_skyboxShader->log();
-    }
-    
-    if (!m_skyboxShader->link()) {
-        qCritical() << "Failed to link skybox shader program:" << m_skyboxShader->log();
-    }
-    
-    // Compile and link celestial shader
-    m_celestialShader = new QOpenGLShaderProgram();
-    
-    if (!m_celestialShader->addShaderFromSourceCode(QOpenGLShader::Vertex, celestialVertexShaderSource)) {
-        qCritical() << "Failed to compile celestial vertex shader:" << m_celestialShader->log();
-    }
-    
-    if (!m_celestialShader->addShaderFromSourceCode(QOpenGLShader::Fragment, celestialFragmentShaderSource)) {
-        qCritical() << "Failed to compile celestial fragment shader:" << m_celestialShader->log();
-    }
-    
-    if (!m_celestialShader->link()) {
-        qCritical() << "Failed to link celestial shader program:" << m_celestialShader->log();
-    }
-}
-
-void SkySystem::createSkyboxGeometry() {
-    // Use a much simpler approach - just create a simple quad for sky background
-    // This will reduce potential problems with complex geometry
-    
-    float vertices[] = {
-        // Position (screenspace quad)
-        -1.0f, -1.0f, 0.0f,
-         1.0f, -1.0f, 0.0f,
-         1.0f,  1.0f, 0.0f,
-        -1.0f,  1.0f, 0.0f
-    };
-    
-    // Create and bind VAO
-    m_skyboxVAO.create();
-    m_skyboxVAO.bind();
-    
-    // Create and bind VBO
-    m_skyboxVBO.create();
-    m_skyboxVBO.bind();
-    m_skyboxVBO.allocate(vertices, sizeof(vertices));
-    
-    // Set up vertex attributes
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), nullptr);
-    
-    // Unbind
-    m_skyboxVAO.release();
-    m_skyboxVBO.release();
-}
-
-void SkySystem::createCelestialGeometry() {
-    // Create a quad for billboard rendering of sun and moon
-    float celestialVertices[] = {
-        // Positions          // Texture Coords
-        -1.0f, -1.0f, 0.0f,   0.0f, 0.0f,
-         1.0f, -1.0f, 0.0f,   1.0f, 0.0f,
-         1.0f,  1.0f, 0.0f,   1.0f, 1.0f,
-        -1.0f,  1.0f, 0.0f,   0.0f, 1.0f
-    };
-    
-    // Create and bind VAO
-    m_celestialVAO.create();
-    m_celestialVAO.bind();
-    
-    // Create and bind VBO
-    m_celestialVBO.create();
-    m_celestialVBO.bind();
-    m_celestialVBO.allocate(celestialVertices, sizeof(celestialVertices));
-    
-    // Set up vertex attributes
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), nullptr);
-    
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), 
-                         reinterpret_cast<void*>(3 * sizeof(float)));
-    
-    // Unbind
-    m_celestialVAO.release();
-    m_celestialVBO.release();
-}
-
 void SkySystem::updateTime() {
     try {
         // Update current time
@@ -324,11 +172,9 @@ void SkySystem::updateTime() {
 }
 
 void SkySystem::updateCelestialPositions() {
-    // Calculate sun position
-    m_sunPosition = calculateSunPosition(m_currentTime);
-    
-    // Calculate moon position
-    m_moonPosition = calculateMoonPosition(m_currentTime);
+    // Call the external functions with our parameters
+    m_sunPosition = ::calculateSunPositionAstronomical(m_skyboxRadius, m_currentTime);
+    m_moonPosition = ::calculateMoonPositionAstronomical(m_skyboxRadius, m_currentTime);
     
     // Emit signals
     emit sunPositionChanged(m_sunPosition);
@@ -336,43 +182,19 @@ void SkySystem::updateCelestialPositions() {
 }
 
 QVector3D SkySystem::calculateSunPosition(const QDateTime& time) {
-    // Simplified sun position calculation based on time of day
-    // For more accurate calculations, you'd use astronomical algorithms
-    
-    // Extract hour and minute as decimal
-    int hour = time.time().hour();
-    int minute = time.time().minute();
-    float timeOfDay = hour + minute / 60.0f;
-    
-    // Calculate angle (0 at midnight, π at noon)
-    float angle = (timeOfDay / 24.0f) * 2.0f * M_PI;
-    
-    // Sun position on a circle
-    float x = m_skyboxRadius * 0.8f * cos(angle);
-    float y = m_skyboxRadius * 0.8f * sin(angle);
-    float z = 0.0f;
-    
-    // Adjust for more realistic path
-    if (y < 0) {
-        y *= 0.3f; // Flatten when sun is below horizon
-    }
-    
-    return QVector3D(x, y, z);
+    return ::calculateSunPositionSimple(m_skyboxRadius, time);
 }
 
 QVector3D SkySystem::calculateMoonPosition(const QDateTime& time) {
-    // Moon is roughly opposite to sun
-    QVector3D sunPos = calculateSunPosition(time);
-    
-    // Offset to avoid exact opposition
-    float angleOffset = 0.2f * M_PI;
-    
-    // Calculate moon position
-    float x = -sunPos.x() * 0.9f * cos(angleOffset);
-    float y = -sunPos.y() * 0.9f * sin(angleOffset);
-    float z = m_skyboxRadius * 0.1f * sin(angleOffset); // Slight z-offset
-    
-    return QVector3D(x, y, z);
+    return ::calculateMoonPositionSimple(m_skyboxRadius, time);
+}
+
+QVector3D SkySystem::calculateSunPositionAstronomical(const QDateTime& time) {
+    return ::calculateSunPositionAstronomical(m_skyboxRadius, time);
+}
+
+QVector3D SkySystem::calculateMoonPositionAstronomical(const QDateTime& time) {
+    return ::calculateMoonPositionAstronomical(m_skyboxRadius, time);
 }
 
 void SkySystem::calculateSkyColor() {
@@ -431,122 +253,6 @@ void SkySystem::update() {
         calculateSkyColor();
     } catch (...) {
         // Silent catch - just continue
-    }
-}
-
-void SkySystem::render(const QMatrix4x4& viewMatrix, const QMatrix4x4& projectionMatrix) {
-    // Check if necessary components exist
-    if (!m_skyboxShader || !m_celestialShader) {
-        return;
-    }
-    
-    // Check for valid VAOs
-    if (!m_skyboxVAO.isCreated() || !m_celestialVAO.isCreated()) {
-        return;
-    }
-    
-    try {
-        // Enable depth testing but disable depth writing for skybox
-        glDepthMask(GL_FALSE);
-        
-        // Render skybox
-        if (m_skyboxShader && m_skyboxShader->bind()) {
-            // Set sky color
-            QVector3D skyColorVec(m_skyColor.redF(), m_skyColor.greenF(), m_skyColor.blueF());
-            if (m_skyboxShader->uniformLocation("skyColor") != -1)
-                m_skyboxShader->setUniformValue("skyColor", skyColorVec);
-            
-            // Draw skybox as a screen-space quad
-            m_skyboxVAO.bind();
-            glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-            m_skyboxVAO.release();
-            
-            m_skyboxShader->release();
-        }
-        
-        // Re-enable depth writing
-        glDepthMask(GL_TRUE);
-        
-        // Render sun and moon as billboards
-        if (m_celestialShader && m_celestialShader->bind()) {
-            // Sun
-            if (m_sunPosition.y() > -m_skyboxRadius * 0.2f && m_sunTexture && m_sunTexture->isCreated()) {
-                glEnable(GL_BLEND);
-                glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-                
-                QMatrix4x4 modelMatrix;
-                modelMatrix.setToIdentity();
-                modelMatrix.translate(m_sunPosition);
-                
-                // Get camera position from view matrix
-                QMatrix4x4 invView = viewMatrix.inverted();
-                QVector3D cameraPos = invView * QVector3D(0, 0, 0);
-                
-                // Always make celestial bodies face the camera (billboard effect)
-                modelMatrix.lookAt(QVector3D(0,0,0), cameraPos - m_sunPosition, QVector3D(0,1,0));
-                
-                // Apply scaling
-                modelMatrix.scale(m_sunRadius * 2.0f);
-                
-                // Set uniforms
-                m_celestialShader->setUniformValue("model", modelMatrix);
-                m_celestialShader->setUniformValue("view", viewMatrix);
-                m_celestialShader->setUniformValue("projection", projectionMatrix);
-                m_celestialShader->setUniformValue("textureSampler", 0);
-                
-                // Bind texture
-                glActiveTexture(GL_TEXTURE0);
-                m_sunTexture->bind();
-                
-                // Draw sun
-                m_celestialVAO.bind();
-                glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-                m_celestialVAO.release();
-                
-                m_sunTexture->release();
-            }
-            
-            // Moon
-            if (m_moonPosition.y() > -m_skyboxRadius * 0.2f && m_moonTexture && m_moonTexture->isCreated()) {
-                glEnable(GL_BLEND);
-                glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-                
-                QMatrix4x4 modelMatrix;
-                modelMatrix.setToIdentity();
-                modelMatrix.translate(m_moonPosition);
-                
-                // Get camera position from view matrix
-                QMatrix4x4 invView = viewMatrix.inverted();
-                QVector3D cameraPos = invView * QVector3D(0, 0, 0);
-                
-                // Always make celestial bodies face the camera (billboard effect)
-                modelMatrix.lookAt(QVector3D(0,0,0), cameraPos - m_moonPosition, QVector3D(0,1,0));
-                
-                // Apply scaling
-                modelMatrix.scale(m_moonRadius * 2.0f);
-                
-                // Set uniforms
-                m_celestialShader->setUniformValue("model", modelMatrix);
-                m_celestialShader->setUniformValue("view", viewMatrix);
-                m_celestialShader->setUniformValue("projection", projectionMatrix);
-                m_celestialShader->setUniformValue("textureSampler", 0);
-                
-                // Bind texture
-                glActiveTexture(GL_TEXTURE0);
-                m_moonTexture->bind();
-                
-                // Draw moon
-                m_celestialVAO.bind();
-                glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-                m_celestialVAO.release();
-                
-                m_moonTexture->release();
-            }
-            
-            m_celestialShader->release();
-        }
-    } catch (...) {
-        // Silent exception handling
     }
 }
 

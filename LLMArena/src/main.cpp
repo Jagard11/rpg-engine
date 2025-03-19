@@ -17,6 +17,7 @@
 #include <QTimer>
 
 #include "ui/character_editor_ui.h"
+#include "ui/location_dialog.h"
 #include "character/character_persistence.h"
 #include "llm/oobabooga_bridge.h"
 #include "ui/arena_view.h"
@@ -168,6 +169,7 @@ int main(int argc, char *argv[])
     
     QPushButton* manageCharactersBtn = new QPushButton("Manage Characters", homeTab);
     QPushButton* configureAPIBtn = new QPushButton("Configure API Connection", homeTab);
+    QPushButton* configureLocationBtn = new QPushButton("Set Location", homeTab);
     QPushButton* aboutBtn = new QPushButton("About", homeTab);
     
     // Add buttons to home layout
@@ -176,6 +178,7 @@ int main(int argc, char *argv[])
     homeLayout->addStretch();
     homeLayout->addWidget(manageCharactersBtn);
     homeLayout->addWidget(configureAPIBtn);
+    homeLayout->addWidget(configureLocationBtn);
     homeLayout->addWidget(aboutBtn);
     homeLayout->addStretch();
     
@@ -292,6 +295,22 @@ int main(int argc, char *argv[])
         }
     });
     
+    // New connection for location configuration
+    QObject::connect(configureLocationBtn, &QPushButton::clicked, [&]() {
+        LocationDialog locationDialog(&mainWindow);
+        if (locationDialog.exec() == QDialog::Accepted) {
+            LocationData selectedLocation = locationDialog.getSelectedLocation();
+            locationDialog.saveLocation(selectedLocation);
+            
+            // Show confirmation
+            QMessageBox::information(&mainWindow, "Location Updated", 
+                QString("Location set to %1\nLatitude: %2\nLongitude: %3")
+                .arg(selectedLocation.name)
+                .arg(selectedLocation.latitude)
+                .arg(selectedLocation.longitude));
+        }
+    });
+    
     QObject::connect(aboutBtn, &QPushButton::clicked, [&]() {
         QMessageBox::about(&mainWindow, "About RPG Arena (OpenGL)",
                           "RPG Arena (OpenGL)\n\n"
@@ -331,7 +350,7 @@ int main(int argc, char *argv[])
     mainWindow.show();
     
     // Create ArenaView in a separate thread after a delay
-    QTimer::singleShot(1000, [&]() {
+    QTimer::singleShot(1000, [&mainWindow, &characterManager, tabWidget, arenaTabIndex]() {
         try {
             // Create an error tab for fallback
             QWidget* errorTab = new QWidget();
