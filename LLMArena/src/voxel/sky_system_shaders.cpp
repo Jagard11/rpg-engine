@@ -55,18 +55,20 @@ void SkySystem::createShaders() {
         }
     )";
     
-    // Celestial fragment shader
+    // Celestial fragment shader with opacity control
     const char* celestialFragmentShaderSource = R"(
         #version 330 core
         in vec2 fragTexCoord;
         
         uniform sampler2D textureSampler;
+        uniform float opacity = 1.0; // Default to fully opaque
         
         out vec4 fragColor;
         
         void main() {
             vec4 texColor = texture(textureSampler, fragTexCoord);
-            fragColor = texColor;
+            // Apply the opacity uniform to the texture's alpha channel
+            fragColor = vec4(texColor.rgb, texColor.a * opacity);
         }
     )";
     

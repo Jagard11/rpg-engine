@@ -37,14 +37,14 @@ void SkySystem::render(const QMatrix4x4& viewMatrix, const QMatrix4x4& projectio
         
         // Render sun and moon as billboards
         if (m_celestialShader && m_celestialShader->bind()) {
+            // Get camera position from view matrix
+            QMatrix4x4 invView = viewMatrix.inverted();
+            QVector3D cameraPos = invView * QVector3D(0, 0, 0);
+            
             // Sun
             if (m_sunPosition.y() > -m_skyboxRadius * 0.2f && m_sunTexture && m_sunTexture->isCreated()) {
                 glEnable(GL_BLEND);
                 glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-                
-                // Get camera position from view matrix
-                QMatrix4x4 invView = viewMatrix.inverted();
-                QVector3D cameraPos = invView * QVector3D(0, 0, 0);
                 
                 // Calculate billboard orientation (fixed to always face camera)
                 QMatrix4x4 modelMatrix;
@@ -91,25 +91,33 @@ void SkySystem::render(const QMatrix4x4& viewMatrix, const QMatrix4x4& projectio
                 m_sunTexture->release();
             }
             
-            // Moon
-            if (m_moonPosition.y() > -m_skyboxRadius * 0.2f && m_moonTexture && m_moonTexture->isCreated()) {
+            // Moon - Only render when sun is below or near horizon
+            // This makes the moon invisible or nearly invisible during daytime
+            float sunHeight = m_sunPosition.y() / m_skyboxRadius;
+            float moonOpacity = 1.0f;
+            
+            // Gradually fade out moon as sun rises
+            if (sunHeight > -0.1f) {
+                // Sun is above the deep horizon, start fading the moon
+                moonOpacity = qMax(0.0f, 0.3f - sunHeight);
+            }
+            
+            // Only render moon if it has some opacity and is above the horizon
+            if (moonOpacity > 0.01f && m_moonPosition.y() > -m_skyboxRadius * 0.2f && 
+                m_moonTexture && m_moonTexture->isCreated()) {
+                
                 glEnable(GL_BLEND);
                 glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
                 
-                // Get camera position from view matrix
-                QMatrix4x4 invView = viewMatrix.inverted();
-                QVector3D cameraPos = invView * QVector3D(0, 0, 0);
-                
-                // Calculate billboard orientation (fixed to always face camera)
+                // Calculate billboard orientation
                 QMatrix4x4 modelMatrix;
                 modelMatrix.setToIdentity();
                 modelMatrix.translate(m_moonPosition);
                 
-                // Calculate the direction from the billboard to the camera
+                // Calculate direction vector for billboard
                 QVector3D dir = (cameraPos - m_moonPosition).normalized();
                 
                 // Create rotation matrix that aligns billboard to face camera
-                // Use camera up vector for more stable orientation
                 QVector3D up(0, 1, 0);
                 QVector3D right = QVector3D::crossProduct(dir, up).normalized();
                 up = QVector3D::crossProduct(right, dir).normalized();
@@ -117,21 +125,22 @@ void SkySystem::render(const QMatrix4x4& viewMatrix, const QMatrix4x4& projectio
                 // Apply the camera-facing rotation
                 modelMatrix.scale(m_moonRadius * 2.0f);
                 
-                // Use billboarding matrix to always face camera
+                // Use billboarding matrix
                 QMatrix4x4 billboardMatrix;
                 billboardMatrix.setToIdentity();
                 billboardMatrix.setColumn(0, QVector4D(right, 0.0f));
                 billboardMatrix.setColumn(1, QVector4D(up, 0.0f));
-                billboardMatrix.setColumn(2, QVector4D(-dir, 0.0f)); // Negative because we want it to face the camera
+                billboardMatrix.setColumn(2, QVector4D(-dir, 0.0f));
                 billboardMatrix.setColumn(3, QVector4D(0, 0, 0, 1.0f));
                 
                 modelMatrix = modelMatrix * billboardMatrix;
                 
-                // Set uniforms
+                // Set uniforms, including opacity for daytime fading
                 m_celestialShader->setUniformValue("model", modelMatrix);
                 m_celestialShader->setUniformValue("view", viewMatrix);
                 m_celestialShader->setUniformValue("projection", projectionMatrix);
                 m_celestialShader->setUniformValue("textureSampler", 0);
+                m_celestialShader->setUniformValue("opacity", moonOpacity);
                 
                 // Bind texture
                 glActiveTexture(GL_TEXTURE0);
