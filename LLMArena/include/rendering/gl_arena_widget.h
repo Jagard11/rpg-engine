@@ -1,3 +1,4 @@
+// include/rendering/gl_arena_widget.h
 #ifndef GL_ARENA_WIDGET_H
 #define GL_ARENA_WIDGET_H
 
@@ -14,10 +15,12 @@
 #include <QKeyEvent>
 #include <memory>
 
-#include "character_persistence.h"
-#include "game_scene.h"
-#include "player_controller.h"
+#include "../character/character_persistence.h"
+#include "../game/game_scene.h"
+#include "../game/player_controller.h"
+#include "../game/inventory.h"
 #include "../voxel/voxel_system_integration.h"
+#include "../ui/inventory_ui.h"
 
 // Forward declarations
 class GLArenaWidget;
@@ -63,6 +66,9 @@ public:
     explicit GLArenaWidget(CharacterManager* charManager, QWidget* parent = nullptr);
     ~GLArenaWidget();
     
+    // Helper to manage cursor and mouse tracking state
+    void updateMouseTrackingState();
+
     // Initialize with arena parameters
     void initializeArena(double width, double height);
     
@@ -117,6 +123,17 @@ private:
     // Convert world coords to normalized device coords
     QVector3D worldToNDC(const QVector3D& worldPos);
     
+    // Voxel placement and highlighting
+    void raycastVoxels(const QVector3D& origin, const QVector3D& direction);
+    void renderVoxelHighlight();
+    void placeVoxel();
+    void removeVoxel();
+    
+    // Inventory system
+    void initializeInventory();
+    void renderInventory();
+    void onInventoryVisibilityChanged(bool visible);
+    
     // Create geometric objects for rendering
     void createFloor(double radius);
     void createArena(double radius, double wallHeight);
@@ -137,15 +154,17 @@ private:
     // Voxel system integration
     VoxelSystemIntegration* m_voxelSystem;
     
+    // Inventory system
+    Inventory* m_inventory = nullptr;
+    InventoryUI* m_inventoryUI = nullptr;
+    
+    // Voxel highlighting
+    QVector3D m_highlightedVoxelPos;
+    int m_highlightedVoxelFace = -1;
+    float m_maxPlacementDistance = 5.0f;
+    
     // Shader program for billboards
     QOpenGLShaderProgram* m_billboardProgram;
-    
-    // Camera/view matrices
-    QMatrix4x4 m_projectionMatrix;
-    QMatrix4x4 m_viewMatrix;
-    
-    // Character sprites
-    QMap<QString, CharacterSprite*> m_characterSprites;
     
     // Flag to indicate if OpenGL is properly initialized
     bool m_initialized;
@@ -159,6 +178,13 @@ private:
     QOpenGLVertexArrayObject m_gridVAO;
     QOpenGLBuffer m_gridVBO;
     int m_gridVertexCount;
+    
+    // Assets
+    QMap<QString, CharacterSprite*> m_characterSprites;
+    
+    // OpenGL matrices
+    QMatrix4x4 m_projectionMatrix;
+    QMatrix4x4 m_viewMatrix;
     
     // Arena parameters
     double m_arenaRadius;

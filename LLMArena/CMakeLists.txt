@@ -41,7 +41,8 @@ include_directories(
 # Explicitly list all header files that contain Q_OBJECT macro
 set(HEADERS
     include/ui/arena_view.h
-    include/ui/location_dialog.h  # Added this line
+    include/ui/location_dialog.h  
+    include/ui/inventory_ui.h
     include/character/manager/character_manager.h
     include/character/ui/character_editor.h
     include/llm/oobabooga_bridge.h
@@ -49,11 +50,13 @@ set(HEADERS
     include/game/player_controller.h
     include/rendering/arena_renderer.h
     include/rendering/gl_arena_widget.h
+    include/rendering/voxel_highlight_renderer.h
     include/voxel/voxel_world.h
     include/voxel/voxel_renderer.h
     include/voxel/sky_system.h
     include/voxel/voxel_system_integration.h
     include/utils/crash_handler.h
+    include/game/inventory.h
 )
 
 # Main source file
@@ -84,6 +87,7 @@ set(MEMORY_SOURCES
 set(UI_SOURCES
     src/ui/arena_view.cpp
     src/ui/location_dialog.cpp
+    src/ui/inventory_ui.cpp
 )
 
 # LLM module
@@ -91,7 +95,7 @@ set(LLM_SOURCES
     src/llm/oobabooga_bridge.cpp
 )
 
-# Rendering module - UPDATED: Remove stubs and use main implementations
+# Rendering module - UPDATED: Add new voxel highlighting files
 set(RENDERING_SOURCES
     # Modular GL Arena Widget
     src/rendering/gl_arena/gl_arena_widget_core.cpp
@@ -101,13 +105,17 @@ set(RENDERING_SOURCES
     src/rendering/gl_arena/gl_arena_widget_geometry.cpp
     src/rendering/gl_arena/gl_arena_widget_input.cpp
     src/rendering/gl_arena/gl_arena_widget_stub.cpp
-    src/rendering/gl_arena/gl_arena_direct_rendering.cpp # Add this line
+    src/rendering/gl_arena/gl_arena_direct_rendering.cpp
+    src/rendering/gl_arena_highlighting.cpp
     
     # Modular Arena Renderer - without stubs
     src/rendering/arena_renderer/arena_renderer_core.cpp
     src/rendering/arena_renderer/arena_renderer_webgl.cpp
     src/rendering/arena_renderer/arena_renderer_scene.cpp
     src/rendering/arena_renderer/arena_renderer_characters.cpp
+    
+    # Voxel Highlighting
+    src/rendering/voxel_highlight_renderer.cpp
 )
 
 # Game module
@@ -117,6 +125,7 @@ set(GAME_SOURCES
     src/game/player_controller_input.cpp
     src/game/player_controller_movement.cpp
     src/game/player_controller_stance.cpp
+    src/game/inventory.cpp
 )
 
 # Voxel module
@@ -186,6 +195,8 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/resources")
             <file>shaders/basic.frag</file>
             <file>shaders/billboard.vert</file>
             <file>shaders/billboard.frag</file>
+            <file>shaders/highlight.vert</file>
+            <file>shaders/highlight.frag</file>
             <file>resources/cobblestone.png</file>
             <file>resources/grass.png</file>
             <file>resources/dirt.png</file>
@@ -274,6 +285,27 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/resources")
         vec4 texColor = texture(textureSampler, fragTexCoord);
         if (texColor.a < 0.01) discard;
         fragColor = texColor;
+    }
+    ")
+    
+    # Add highlight shaders
+    file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/shaders/highlight.vert
+    "#version 330 core
+    layout(location = 0) in vec3 position;
+    uniform mat4 model;
+    uniform mat4 view;
+    uniform mat4 projection;
+    void main() {
+        gl_Position = projection * view * model * vec4(position, 1.0);
+    }
+    ")
+
+    file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/shaders/highlight.frag
+    "#version 330 core
+    uniform vec4 highlightColor;
+    out vec4 fragColor;
+    void main() {
+        fragColor = highlightColor;
     }
     ")
     

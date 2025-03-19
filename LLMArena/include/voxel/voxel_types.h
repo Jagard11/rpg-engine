@@ -5,6 +5,7 @@
 #include <QVector3D>
 #include <QColor>
 #include <QString>
+#include <cmath> // Include cmath for floor function
 
 // Expanded enum for voxel types
 enum class VoxelType {
@@ -39,6 +40,25 @@ struct VoxelPos {
     // Convert to world coordinates (for rendering)
     QVector3D toWorldPos() const {
         return QVector3D(x, y, z);
+    }
+    
+    // Convert to vector3D
+    QVector3D toVector3D() const {
+        return QVector3D(x, y, z);
+    }
+    
+    // Check if this is a valid position
+    bool isValid() const {
+        // Define sensible limits for voxel positions
+        const int MAX_COORD = 1000;
+        return (x >= -MAX_COORD && x <= MAX_COORD &&
+                y >= -MAX_COORD && y <= MAX_COORD &&
+                z >= -MAX_COORD && z <= MAX_COORD);
+    }
+    
+    // Create from QVector3D
+    static VoxelPos fromVector3D(const QVector3D& vec) {
+        return VoxelPos(floor(vec.x()), floor(vec.y()), floor(vec.z()));
     }
 };
 

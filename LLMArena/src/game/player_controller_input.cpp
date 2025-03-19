@@ -2,6 +2,7 @@
 #include "../include/game/player_controller.h"
 #include <QDebug>
 #include <QMutex>
+#include <QWidget>
 #include <cmath>
 
 // External reference to movement mutex
@@ -110,21 +111,15 @@ void PlayerController::handleMouseMove(QMouseEvent *event) {
     QMutexLocker locker(&playerMovementMutex);
     
     try {
-        // Calculate mouse movement delta
-        static QPoint lastPos;
-        QPoint currentPos = event->pos();
+        // Calculate mouse movement delta directly from parameters
+        int dx = event->x() - width()/2;
+        int dy = event->y() - height()/2;
         
-        // Skip first event to initialize lastPos
-        if (lastPos.isNull()) {
-            lastPos = currentPos;
-            return;
-        }
-        
-        // Calculate horizontal delta (dx) and update yaw rotation
-        int dx = currentPos.x() - lastPos.x();
+        // Only process if there's actual movement
         if (dx != 0) {
-            // Apply mouse sensitivity
-            rotation += dx * 0.01f;
+            // Apply mouse sensitivity - reduced for smoother control
+            float sensitivity = 0.003f;
+            rotation += dx * sensitivity;
             
             // Normalize rotation to 0-2π
             while (rotation < 0) rotation += 2 * M_PI;
@@ -134,14 +129,12 @@ void PlayerController::handleMouseMove(QMouseEvent *event) {
             emit rotationChanged(rotation);
         }
         
-        // Calculate vertical delta (dy) and update pitch rotation
-        int dy = currentPos.y() - lastPos.y();
         if (dy != 0) {
             // Apply mouse sensitivity (negative to make up = look up)
-            pitch -= dy * 0.01f;
+            float sensitivity = 0.003f;
+            pitch -= dy * sensitivity;
             
             // Clamp pitch to prevent looking too far up or down
-            // Limit to roughly -85 to +85 degrees (in radians)
             const float maxPitch = 1.48f; // ~85 degrees
             if (pitch > maxPitch) pitch = maxPitch;
             if (pitch < -maxPitch) pitch = -maxPitch;
@@ -149,10 +142,25 @@ void PlayerController::handleMouseMove(QMouseEvent *event) {
             // Emit pitch changed signal
             emit pitchChanged(pitch);
         }
-        
-        // Store current position for next time
-        lastPos = currentPos;
+    } catch (const std::exception& e) {
+        qWarning() << "Exception in handleMouseMove:" << e.what();
     } catch (...) {
-        qWarning() << "Exception in handleMouseMove";
+        qWarning() << "Unknown exception in handleMouseMove";
     }
+}
+
+// Get widget width for mouse centering
+int PlayerController::width() const {
+    if (parent() && parent()->isWidgetType()) {
+        return qobject_cast<QWidget*>(parent())->width();
+    }
+    return 800; // Default width if parent widget not available
+}
+
+// Get widget height for mouse centering
+int PlayerController::height() const {
+    if (parent() && parent()->isWidgetType()) {
+        return qobject_cast<QWidget*>(parent())->height();
+    }
+    return 600; // Default height if parent widget not available
 }

@@ -6,6 +6,7 @@
 #include "voxel_renderer.h"
 #include "sky_system.h"
 #include "../game/game_scene.h"
+#include "../rendering/voxel_highlight_renderer.h"
 
 #include <QObject>
 #include <QOpenGLFunctions>
@@ -25,10 +26,17 @@ public:
     void render(const QMatrix4x4& viewMatrix, const QMatrix4x4& projectionMatrix);
     
     // Get world for direct access
-    VoxelWorld* getWorld() const { return m_world; }
+    VoxelWorld* getWorld() const;
     
     // Create default world
     void createDefaultWorld();
+    
+    // Set voxel highlight
+    void setVoxelHighlight(const VoxelPos& pos, int face);
+    
+    // Get highlight information
+    VoxelPos getHighlightedVoxelPos() const;
+    int getHighlightedVoxelFace() const;
     
 public slots:
     // Update game scene to match voxel world
@@ -43,6 +51,11 @@ private:
     VoxelRenderer* m_renderer;
     SkySystem* m_sky;
     GameScene* m_gameScene;
+    VoxelHighlightRenderer* m_highlightRenderer;
+    
+    // Voxel highlight data
+    VoxelPos m_highlightedVoxelPos;
+    int m_highlightedVoxelFace;
     
     // Connect signals
     void connectSignals();

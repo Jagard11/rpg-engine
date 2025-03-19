@@ -132,7 +132,7 @@ void ArenaRenderer::handleLoadFinished(bool ok) {
         initializeWebGL();
         
         // Set arena parameters
-        setArenaParameters(10.0, 2.0);
+        setArenaParameters(20.0, 2.0);
         
         // Create the player entity
         playerController->createPlayerEntity();

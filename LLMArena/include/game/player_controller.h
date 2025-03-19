@@ -1,3 +1,4 @@
+// include/game/player_controller.h
 #ifndef PLAYER_CONTROLLER_H
 #define PLAYER_CONTROLLER_H
 
@@ -44,6 +45,9 @@ public:
     // Get player's eye height
     float getEyeHeight() const;
     
+    // Set player's eye height
+    void setEyeHeight(float height) { m_customEyeHeight = height; }
+    
     // Start movement updates
     void startUpdates();
     
@@ -61,6 +65,10 @@ public:
     
     // Create the player entity in the scene
     void createPlayerEntity();
+
+    // Helper methods for determining the size of the parent widget for mouse centering
+    int width() const;
+    int height() const;
 
 public slots:
     // Update player position based on current movement
@@ -114,6 +122,9 @@ private:
     // Jump physics
     float jumpVelocity;
     float gravity;
+    
+    // Custom eye height
+    float m_customEyeHeight;
     
     // Apply movement constraints (walls, etc.)
     QVector3D applyConstraints(const QVector3D &newPosition);

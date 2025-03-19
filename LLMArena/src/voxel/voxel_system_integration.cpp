@@ -11,55 +11,95 @@ VoxelSystemIntegration::VoxelSystemIntegration(GameScene* gameScene, QObject* pa
       m_world(nullptr),
       m_renderer(nullptr),
       m_sky(nullptr),
-      m_gameScene(gameScene) {
+      m_gameScene(gameScene),
+      m_highlightRenderer(nullptr) {
     
-    // Create components
+    qDebug() << "Creating VoxelSystemIntegration...";
+    
+    // Initialize components to null first
+    m_world = nullptr;
+    m_renderer = nullptr;
+    m_highlightRenderer = nullptr;
+    m_sky = nullptr;
+    
+    // Create components in order
     try {
+        qDebug() << "Creating VoxelWorld...";
         m_world = new VoxelWorld(this);
-        m_renderer = new VoxelRenderer();
+        
+        qDebug() << "Creating VoxelRenderer...";
+        m_renderer = new VoxelRenderer(this);
+        
+        qDebug() << "Creating VoxelHighlightRenderer...";
+        m_highlightRenderer = new VoxelHighlightRenderer(this);
         
         // Create sky system last
+        qDebug() << "Creating SkySystem...";
         m_sky = new SkySystem(this);
         
         // Connect signals
         connectSignals();
+        
+        qDebug() << "VoxelSystemIntegration created successfully";
     } catch (const std::exception& e) {
         qCritical() << "Failed to create voxel system components:" << e.what();
         // Clean up partially initialized components
-        delete m_renderer;
-        m_renderer = nullptr;
-        // m_world and m_sky have 'this' as parent, so they'll be cleaned up automatically
+        if (m_renderer) {
+            delete m_renderer;
+            m_renderer = nullptr;
+        }
+        if (m_highlightRenderer) {
+            delete m_highlightRenderer;
+            m_highlightRenderer = nullptr;
+        }
+        // Don't delete m_world and m_sky, they have 'this' as parent and will be cleaned up automatically
     }
 }
 
 VoxelSystemIntegration::~VoxelSystemIntegration() {
-    delete m_renderer; // m_renderer doesn't have a parent, so delete it explicitly
+    // m_renderer and m_highlightRenderer now have 'this' as parent
+    // so they'll be cleaned up automatically
 }
 
 void VoxelSystemIntegration::initialize() {
     // Check if components exist
     if (!m_world || !m_renderer) {
         qCritical() << "Cannot initialize voxel system: components not created";
-        throw std::runtime_error("Voxel system components not created");
+        return;
     }
     
+    // Wrap in try-catch to prevent crashes
     try {
+        qDebug() << "Initializing VoxelSystemIntegration...";
+        
         // Initialize OpenGL functions
         initializeOpenGLFunctions();
         
         // Initialize renderer
+        qDebug() << "Initializing VoxelRenderer...";
         m_renderer->initialize();
         m_renderer->setWorld(m_world);
         
+        // Initialize highlight renderer
+        if (m_highlightRenderer) {
+            qDebug() << "Initializing VoxelHighlightRenderer...";
+            m_highlightRenderer->initialize();
+        }
+        
         // Initialize sky system if it exists
         if (m_sky) {
+            qDebug() << "Initializing SkySystem...";
             m_sky->initialize();
         } else {
             qWarning() << "Sky system is null during initialization";
         }
+        
+        qDebug() << "VoxelSystemIntegration initialization complete";
     } catch (const std::exception& e) {
         qCritical() << "Failed to initialize voxel system:" << e.what();
-        throw; // Rethrow to notify caller
+        // Don't rethrow to avoid crashes
+    } catch (...) {
+        qCritical() << "Unknown exception in voxel system initialization";
     }
 }
 
@@ -95,6 +135,17 @@ void VoxelSystemIntegration::render(const QMatrix4x4& viewMatrix, const QMatrix4
         } catch (...) {
             // Silent catch - just continue
         }
+        
+        // Render voxel highlight if needed
+        if (m_highlightRenderer && m_highlightedVoxelPos.isValid() && m_highlightedVoxelFace >= 0) {
+            try {
+                m_highlightRenderer->render(viewMatrix, projectionMatrix, 
+                                          m_highlightedVoxelPos.toVector3D(), 
+                                          m_highlightedVoxelFace);
+            } catch (...) {
+                // Silent catch - just continue
+            }
+        }
     } catch (...) {
         // Silent catch - keep rendering flow intact
     }
@@ -107,11 +158,15 @@ void VoxelSystemIntegration::createDefaultWorld() {
     }
     
     try {
-        // Create room 20x20 with 3m height (safer value)
-        m_world->createRoomWithWalls(20, 20, 3);
+        qDebug() << "Creating default world...";
+        
+        // Create room 10x10 with 2m height (smaller values for safety)
+        m_world->createRoomWithWalls(10, 10, 2);
         
         // Update the game scene to match the voxel world
-        updateGameScene();
+        QTimer::singleShot(0, this, [this]() {
+            updateGameScene();
+        });
     } catch (const std::exception& e) {
         qCritical() << "Failed to create default world:" << e.what();
     }
@@ -121,6 +176,8 @@ void VoxelSystemIntegration::createDefaultWorld() {
 void VoxelSystemIntegration::connectSignals() {
     // Connect world changes to renderer if both exist
     if (m_world && m_renderer) {
+        qDebug() << "Connecting world signals to renderer...";
+        
         // Only update renderdata when world changes
         connect(m_world, &VoxelWorld::worldChanged, m_renderer, &VoxelRenderer::updateRenderData);
         
@@ -149,6 +206,8 @@ void VoxelSystemIntegration::updateGameScene() {
     isUpdating = true;
     
     try {
+        qDebug() << "Updating game scene from voxel world...";
+        
         // First, remove all existing voxel entities from game scene
         QVector<GameEntity> allEntities = m_gameScene->getAllEntities();
         for (const GameEntity& entity : allEntities) {
@@ -190,11 +249,7 @@ void VoxelSystemIntegration::updateGameScene() {
         }
         
         // Debug output
-        static bool first = true;
-        if (first) {
-            qDebug() << "Added" << processedVoxels.size() << "collision voxels";
-            first = false;
-        }
+        qDebug() << "Added" << processedVoxels.size() << "collision voxels";
         
         // Update celestial entities (sun and moon)
         if (m_sky) {
@@ -237,4 +292,25 @@ void VoxelSystemIntegration::updateGameScene() {
     }
     
     isUpdating = false;
+}
+
+// Set voxel highlight
+void VoxelSystemIntegration::setVoxelHighlight(const VoxelPos& pos, int face) {
+    m_highlightedVoxelPos = pos;
+    m_highlightedVoxelFace = face;
+}
+
+// Get highlight position
+VoxelPos VoxelSystemIntegration::getHighlightedVoxelPos() const {
+    return m_highlightedVoxelPos;
+}
+
+// Get highlight face
+int VoxelSystemIntegration::getHighlightedVoxelFace() const {
+    return m_highlightedVoxelFace;
+}
+
+// Get world reference
+VoxelWorld* VoxelSystemIntegration::getWorld() const {
+    return m_world;
 }

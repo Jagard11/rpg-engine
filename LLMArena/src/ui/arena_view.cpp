@@ -273,10 +273,13 @@ void ArenaView::onRendererInitialized() {
         });
     }
     
-    // Load the first character if any are available
-    if (characterSelector && characterSelector->count() > 1) {
-        characterSelector->setCurrentIndex(1); // Select first actual character
-    }
+    // Delay loading the first character to ensure everything is initialized
+    QTimer::singleShot(300, this, [this]() {
+        // Load the first character if any are available
+        if (characterSelector && characterSelector->count() > 1) {
+            characterSelector->setCurrentIndex(1); // Select first actual character
+        }
+    });
     
     // Make sure OpenGL widget has focus
     QTimer::singleShot(500, this, [this]() {
@@ -303,6 +306,7 @@ void ArenaView::loadCharacter(const QString &characterName) {
                 appearanceLoaded = true;
             } catch (const std::exception& e) {
                 qWarning() << "Error loading character appearance:" << e.what();
+                // Continue with default appearance
             }
         }
         
@@ -331,7 +335,9 @@ void ArenaView::loadCharacter(const QString &characterName) {
                         qWarning() << "Failed to create resources directory:" << resourceDir;
                         
                         // Just use empty path to trigger missing texture visualization
-                        glWidget->loadCharacterSprite(characterName, "");
+                        if (glWidget) {
+                            glWidget->loadCharacterSprite(characterName, "");
+                        }
                         return;
                     }
                 }
@@ -365,14 +371,18 @@ void ArenaView::loadCharacter(const QString &characterName) {
                     if (!image.save(appearance.spritePath)) {
                         qWarning() << "Failed to save default sprite image";
                         // Use empty path to trigger missing texture visualization
-                        glWidget->loadCharacterSprite(characterName, "");
+                        if (glWidget) {
+                            glWidget->loadCharacterSprite(characterName, "");
+                        }
                         return;
                     }
                 }
                 catch (const std::exception& e) {
                     qWarning() << "Exception creating default sprite:" << e.what();
                     // Use empty path to trigger missing texture visualization
-                    glWidget->loadCharacterSprite(characterName, "");
+                    if (glWidget) {
+                        glWidget->loadCharacterSprite(characterName, "");
+                    }
                     return;
                 }
             }
@@ -383,14 +393,28 @@ void ArenaView::loadCharacter(const QString &characterName) {
         if (!spriteFile.exists()) {
             qWarning() << "Sprite file does not exist at path:" << appearance.spritePath;
             // Use empty path to trigger missing texture visualization
-            glWidget->loadCharacterSprite(characterName, "");
+            if (glWidget) {
+                glWidget->loadCharacterSprite(characterName, "");
+            }
             return;
         }
         
         // Load character sprite using OpenGL widget
-        glWidget->loadCharacterSprite(characterName, appearance.spritePath);
+        if (glWidget) {
+            glWidget->loadCharacterSprite(characterName, appearance.spritePath);
+        }
     } catch (const std::exception& e) {
         qWarning() << "Failed to load character sprite:" << e.what();
+        // Still try to load with empty path for fallback
+        if (glWidget) {
+            glWidget->loadCharacterSprite(characterName, "");
+        }
+    } catch (...) {
+        qWarning() << "Unknown exception in loadCharacter";
+        // Still try to load with empty path for fallback
+        if (glWidget) {
+            glWidget->loadCharacterSprite(characterName, "");
+        }
     }
 }
 

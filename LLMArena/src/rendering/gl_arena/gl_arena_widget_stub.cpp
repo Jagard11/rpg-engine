@@ -26,31 +26,43 @@ void GLArenaWidget::loadCharacterSprite(const QString& characterName, const QStr
     }
     
     // Create a new character sprite
-    CharacterSprite* sprite = new CharacterSprite();
+    CharacterSprite* sprite = nullptr;
     
-    // Initialize it if we have a valid OpenGL context
-    QOpenGLContext* ctx = QOpenGLContext::currentContext();
-    if (ctx && ctx->isValid() && m_initialized) {
-        sprite->init(ctx, texturePath, 1.0, 2.0, 1.0);
-    }
-    
-    // Store the sprite
-    m_characterSprites[characterName] = sprite;
-    
-    // Make sure the character exists in the game scene
-    if (m_gameScene) {
-        GameEntity entity = m_gameScene->getEntity(characterName);
+    try {
+        sprite = new CharacterSprite();
         
-        if (entity.id.isEmpty()) {
-            GameEntity newEntity;
-            newEntity.id = characterName;
-            newEntity.type = "character";
-            newEntity.position = QVector3D(0.0f, 0.0f, 0.0f); // Default position
-            newEntity.dimensions = QVector3D(1.0f, 2.0f, 1.0f); // Default dimensions
-            newEntity.isStatic = false;
-            
-            m_gameScene->addEntity(newEntity);
+        // Initialize it if we have a valid OpenGL context
+        QOpenGLContext* ctx = QOpenGLContext::currentContext();
+        if (ctx && ctx->isValid() && m_initialized) {
+            sprite->init(ctx, texturePath, 1.0, 2.0, 1.0);
         }
+        
+        // Store the sprite
+        m_characterSprites[characterName] = sprite;
+        
+        // Make sure the character exists in the game scene
+        if (m_gameScene) {
+            GameEntity entity = m_gameScene->getEntity(characterName);
+            
+            if (entity.id.isEmpty()) {
+                GameEntity newEntity;
+                newEntity.id = characterName;
+                newEntity.type = "character";
+                newEntity.position = QVector3D(0.0f, 0.0f, 0.0f); // Default position
+                newEntity.dimensions = QVector3D(1.0f, 2.0f, 1.0f); // Default dimensions
+                newEntity.isStatic = false;
+                
+                m_gameScene->addEntity(newEntity);
+            }
+        }
+    } catch (const std::exception& e) {
+        qWarning() << "Error creating character sprite for" << characterName << ":" << e.what();
+        // Clean up if needed
+        delete sprite;
+    } catch (...) {
+        qWarning() << "Unknown error creating character sprite for" << characterName;
+        // Clean up if needed
+        delete sprite;
     }
 }
 
