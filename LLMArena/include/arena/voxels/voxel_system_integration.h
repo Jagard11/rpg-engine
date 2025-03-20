@@ -1,4 +1,4 @@
-// include/voxel/voxel_system_integration.h
+// include/arena/voxels/voxel_system_integration.h
 #ifndef VOXEL_SYSTEM_INTEGRATION_H
 #define VOXEL_SYSTEM_INTEGRATION_H
 

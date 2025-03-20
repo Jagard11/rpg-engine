@@ -1,4 +1,4 @@
-// include/llm/oobabooga_bridge.h
+// include/llm/api_core.h
 #ifndef OOBABOOGA_BRIDGE_H
 #define OOBABOOGA_BRIDGE_H
 

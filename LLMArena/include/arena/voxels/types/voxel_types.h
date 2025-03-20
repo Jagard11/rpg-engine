@@ -1,4 +1,4 @@
-// include/voxel/voxel_types.h
+// include/arena/voxels/types/voxel_types.h
 #ifndef VOXEL_TYPES_H
 #define VOXEL_TYPES_H
 

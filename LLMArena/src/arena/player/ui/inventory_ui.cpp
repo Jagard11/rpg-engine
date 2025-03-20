@@ -1,4 +1,4 @@
-// src/ui/inventory_ui.cpp
+// src/arena/player/ui/inventory_ui.cpp
 #include "../../include/ui/inventory_ui.h"
 #include <QDebug>
 #include <QImage>

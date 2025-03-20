@@ -1,4 +1,4 @@
-// src/voxel/sky_system.cpp
+// src/arena/skybox/skybox_core.cpp
 #include "../../include/voxel/sky_system.h"
 #include "../../include/voxel/sky_system_helpers.h"
 #include <QDebug>

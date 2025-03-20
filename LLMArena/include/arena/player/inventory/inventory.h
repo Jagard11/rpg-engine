@@ -1,4 +1,4 @@
-// include/game/inventory.h
+// include/arena/player/inventory/inventory.h
 #ifndef INVENTORY_H
 #define INVENTORY_H
 

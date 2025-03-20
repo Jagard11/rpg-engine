@@ -1,4 +1,4 @@
-// src/character/ui/character_editor_basic.cpp
+// src/character/editor/basic_info_page.cpp
 #include "../../../include/character/ui/character_editor.h"
 
 #include <QVBoxLayout>

@@ -1,4 +1,4 @@
-// include/game/player_controller.h
+// include/arena/player/player_core.h
 #ifndef PLAYER_CONTROLLER_H
 #define PLAYER_CONTROLLER_H
 

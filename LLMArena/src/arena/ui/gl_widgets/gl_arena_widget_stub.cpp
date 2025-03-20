@@ -1,4 +1,4 @@
-// src/rendering/gl_arena/gl_arena_widget_stub.cpp
+// src/arena/ui/gl_widgets/gl_arena_widget_stub.cpp
 #include "../../../include/rendering/gl_arena_widget.h"
 
 // Set active character

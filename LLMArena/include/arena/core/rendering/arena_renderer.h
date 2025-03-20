@@ -1,4 +1,4 @@
-// include/rendering/arena_renderer.h
+// include/arena/core/rendering/arena_renderer.h
 #ifndef ARENA_RENDERER_H
 #define ARENA_RENDERER_H
 

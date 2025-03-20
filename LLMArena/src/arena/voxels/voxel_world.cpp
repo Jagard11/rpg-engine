@@ -1,4 +1,4 @@
-// src/voxel/voxel_world.cpp
+// src/arena/voxels/voxel_world.cpp
 #include "../../include/voxel/voxel_world.h"
 #include <QDebug>
 #include <QDateTime>

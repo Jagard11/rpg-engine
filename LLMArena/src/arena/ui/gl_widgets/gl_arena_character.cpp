@@ -1,4 +1,4 @@
-// src/rendering/gl_arena/gl_arena_character.cpp
+// src/arena/ui/gl_widgets/gl_arena_character.cpp
 #include "../../include/rendering/gl_arena_widget.h"
 #include <QImage>
 #include <QDebug>

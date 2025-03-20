@@ -1,4 +1,4 @@
-// include/ui/inventory_ui.h
+// include/arena/player/ui/player_ui.h
 #ifndef INVENTORY_UI_H
 #define INVENTORY_UI_H
 

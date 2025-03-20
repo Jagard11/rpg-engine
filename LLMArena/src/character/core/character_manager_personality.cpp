@@ -1,4 +1,4 @@
-// src/character/manager/character_manager_personality.cpp
+// src/character/core/character_manager_personality.cpp
 #include "../../../include/character/manager/character_manager.h"
 
 #include <QFile>

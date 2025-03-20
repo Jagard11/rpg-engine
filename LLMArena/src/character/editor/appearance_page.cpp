@@ -1,4 +1,4 @@
-// src/character/ui/character_editor_appearance.cpp
+// src/character/editor/appearance_page.cpp
 #include "../../../include/character/ui/character_editor.h"
 
 #include <QFormLayout>

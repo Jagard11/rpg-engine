@@ -1,4 +1,4 @@
-// include/utils/crash_handler.h
+// include/utils/error/error_handling.h
 #ifndef CRASH_HANDLER_H
 #define CRASH_HANDLER_H
 

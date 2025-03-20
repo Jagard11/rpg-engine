@@ -1,4 +1,4 @@
-// include/rendering/voxel_highlight_renderer.h
+// include/arena/ui/voxel_highlight_renderer.h
 #ifndef VOXEL_HIGHLIGHT_RENDERER_H
 #define VOXEL_HIGHLIGHT_RENDERER_H
 

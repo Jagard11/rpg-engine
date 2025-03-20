@@ -1,4 +1,4 @@
-// src/rendering/arena_renderer/arena_renderer_core.cpp
+// src/arena/core/arena_render.cpp
 #include "../../include/rendering/arena_renderer.h"
 #include "../../include/game/game_scene.h"
 #include "../../include/game/player_controller.h"

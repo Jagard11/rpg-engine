@@ -1,4 +1,4 @@
-// include/ui/location_dialog.h
+// include/splash/ui/location_dialog.h
 #ifndef LOCATION_DIALOG_H
 #define LOCATION_DIALOG_H
 

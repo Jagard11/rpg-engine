@@ -1,4 +1,4 @@
-// include/voxel/voxel_renderer.h
+// include/arena/voxels/voxel_renderer.h
 #ifndef VOXEL_RENDERER_H
 #define VOXEL_RENDERER_H
 

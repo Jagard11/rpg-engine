@@ -1,4 +1,4 @@
-// src/game/inventory.cpp
+// src/arena/game/inventory.cpp
 #include "../../include/game/inventory.h"
 #include <QDir>
 #include <QDebug>

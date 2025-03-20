@@ -1,4 +1,4 @@
-// src/character/ui/character_editor_memory.cpp
+// src/character/editor/memories_page.cpp
 #include "../../../include/character/ui/character_editor.h"
 
 #include <QVBoxLayout>

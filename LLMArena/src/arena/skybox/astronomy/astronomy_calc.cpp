@@ -1,4 +1,4 @@
-// src/voxel/sky_astronomical_calculations.cpp
+// src/arena/skybox/astronomy/astronomy_calc.cpp
 #include "../../include/voxel/sky_system_helpers.h"
 #include <QVector3D>
 #include <QSettings>

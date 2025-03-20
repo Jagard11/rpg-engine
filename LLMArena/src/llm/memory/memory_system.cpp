@@ -1,4 +1,4 @@
-// src/memory/memory_system.cpp
+// src/llm/memory/memory_system.cpp
 // Implementations of non-CharacterManager memory system functions
 #include "../include/memory/memory_system.h"
 #include <QDir>

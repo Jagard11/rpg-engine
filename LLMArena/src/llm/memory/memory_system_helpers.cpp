@@ -1,4 +1,4 @@
-// src/memory/memory_system_helpers.cpp
+// src/llm/memory/memory_system_helpers.cpp
 // This file contains only the helper functions needed to resolve linking errors
 #include "../include/memory/memory_system.h"
 #include "../include/character/character_persistence.h"

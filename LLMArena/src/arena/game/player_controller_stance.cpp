@@ -1,4 +1,4 @@
-// src/game/player_controller_stance.cpp
+// src/arena/game/player_controller_stance.cpp
 #include "../include/game/player_controller.h"
 #include <QDebug>
 #include <QMutex>

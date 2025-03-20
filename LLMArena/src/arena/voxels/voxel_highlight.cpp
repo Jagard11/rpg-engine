@@ -1,4 +1,4 @@
-// src/rendering/voxel_highlight_renderer.cpp
+// src/arena/voxels/voxel_highlight.cpp
 #include "../../include/rendering/voxel_highlight_renderer.h"
 #include <QOpenGLContext>
 #include <QDebug>

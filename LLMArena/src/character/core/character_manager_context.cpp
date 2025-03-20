@@ -1,4 +1,4 @@
-// src/character/manager/character_manager_context.cpp
+// src/character/core/character_manager_context.cpp
 #include "../../../include/character/manager/character_manager.h"
 #include "../../../include/memory/memory_system.h"
 

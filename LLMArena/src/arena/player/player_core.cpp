@@ -1,4 +1,4 @@
-// src/game/player_controller_core.cpp
+// src/arena/player/player_core.cpp
 #include "../include/game/player_controller.h"
 #include "../include/game/game_scene.h"
 #include <QDebug>

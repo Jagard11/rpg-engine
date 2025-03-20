@@ -1,4 +1,4 @@
-// src/rendering/arena_renderer/arena_renderer_webgl.cpp
+// src/arena/core/rendering/arena_renderer_webgl.cpp
 #include "../../include/rendering/arena_renderer.h"
 #include <QOffscreenSurface>
 #include <QOpenGLContext>

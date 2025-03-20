@@ -1,4 +1,4 @@
-// include/voxel/sky_system.h
+// include/arena/skybox/skybox_core.h
 #ifndef SKY_SYSTEM_H
 #define SKY_SYSTEM_H
 

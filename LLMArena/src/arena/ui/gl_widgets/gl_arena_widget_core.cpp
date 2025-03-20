@@ -1,4 +1,4 @@
-// src/rendering/gl_arena/gl_arena_widget_core.cpp
+// src/arena/ui/gl_widgets/gl_arena_widget_core.cpp
 #include "../../include/rendering/gl_arena_widget.h"
 #include "../../include/game/game_scene.h"
 #include "../../include/game/player_controller.h"

@@ -1,4 +1,4 @@
-// include/debug/opengl_debug.h
+// include/utils/opengl_debug.h
 #ifndef OPENGL_DEBUG_H
 #define OPENGL_DEBUG_H
 

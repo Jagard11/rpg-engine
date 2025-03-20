@@ -1,4 +1,4 @@
-// src/ui/arena_view.cpp
+// src/arena/ui/views/arena_view.cpp
 #include "../include/ui/arena_view.h"
 #include "../include/rendering/gl_arena_widget.h"
 #include <QDebug>

@@ -1,4 +1,4 @@
-// src/voxel/voxel_renderer.cpp
+// src/arena/voxels/voxel_render.cpp
 #include "../../include/voxel/voxel_renderer.h"
 #include <QDebug>
 #include <QDir>

@@ -1,4 +1,4 @@
-// include/rendering/gl_arena_widget.h
+// include/arena/ui/gl_widgets/gl_arena_widget.h
 #ifndef GL_ARENA_WIDGET_H
 #define GL_ARENA_WIDGET_H
 

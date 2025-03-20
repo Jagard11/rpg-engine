@@ -1,4 +1,4 @@
-// src/rendering/arena_renderer/arena_renderer_characters.cpp
+// src/arena/core/rendering/arena_renderer_characters.cpp
 #include "../../include/rendering/arena_renderer.h"
 #include <QFile>
 #include <QFileInfo>

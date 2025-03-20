@@ -1,4 +1,4 @@
-// src/game/game_scene.cpp
+// src/arena/game/game_scene.cpp
 #include "../include/game/game_scene.h"
 #include <QDebug>
 #include <QDateTime>

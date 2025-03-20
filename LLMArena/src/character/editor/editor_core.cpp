@@ -1,4 +1,4 @@
-// src/character/ui/character_editor.cpp
+// src/character/editor/editor_core.cpp
 #include "../../../include/character/ui/character_editor.h"
 #include <QRandomGenerator>
 #include <QVBoxLayout>

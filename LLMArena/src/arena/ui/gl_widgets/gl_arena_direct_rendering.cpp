@@ -1,4 +1,4 @@
-// src/rendering/gl_arena/gl_arena_direct_rendering.cpp
+// src/arena/ui/gl_widgets/gl_arena_direct_rendering.cpp
 #include "../../include/rendering/gl_arena_widget.h"
 #include <QDebug>
 #include <QOpenGLFramebufferObject>

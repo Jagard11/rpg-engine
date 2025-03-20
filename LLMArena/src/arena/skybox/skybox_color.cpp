@@ -1,4 +1,4 @@
-// src/voxel/sky_basic_calculations.cpp
+// src/arena/skybox/skybox_color.cpp
 #include "../../include/voxel/sky_system_helpers.h"
 #include <QVector3D>
 #include <cmath>

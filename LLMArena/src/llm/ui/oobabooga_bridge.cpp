@@ -1,4 +1,4 @@
-// src/llm/oobabooga_bridge.cpp
+// src/llm/ui/oobabooga_bridge.cpp
 #include "../include/llm/oobabooga_bridge.h"
 #include "../include/character/character_persistence.h"
 #include "../include/memory/memory_system.h"

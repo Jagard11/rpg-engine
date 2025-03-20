@@ -1,4 +1,4 @@
-// src/voxel/sky_astronomical.cpp
+// src/arena/skybox/astronomy/sun_position.cpp
 #include "../../include/voxel/sky_system.h"
 #include "../../include/ui/location_dialog.h"
 #include <QSettings>

@@ -1,4 +1,4 @@
-// src/rendering/gl_arena/gl_arena_inventory.cpp
+// src/arena/ui/gl_widgets/gl_arena_inventory.cpp
 #include "../../include/rendering/gl_arena_widget.h"
 #include "../../include/ui/inventory_ui.h"
 #include "../../include/game/inventory.h"

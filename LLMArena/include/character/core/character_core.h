@@ -1,4 +1,4 @@
-// include/character/manager/character_manager.h
+// include/character/core/character_core.h
 #ifndef CHARACTER_MANAGER_H
 #define CHARACTER_MANAGER_H
 

@@ -1,4 +1,4 @@
-// include/voxel/sky_system_helpers.h
+// include/arena/skybox/astronomy/astronomy.h
 #ifndef SKY_SYSTEM_HELPERS_H
 #define SKY_SYSTEM_HELPERS_H
 
