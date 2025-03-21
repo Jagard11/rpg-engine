@@ -1,5 +1,5 @@
 // src/arena/ui/gl_widgets/gl_arena_widget_stub.cpp
-#include "../../../include/rendering/gl_arena_widget.h"
+#include "../../../include/arena/ui/gl_widgets/gl_arena_widget.h"
 
 // Set active character
 void GLArenaWidget::setActiveCharacter(const QString& name) {

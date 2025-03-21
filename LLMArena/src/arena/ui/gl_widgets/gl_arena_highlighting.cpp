@@ -1,5 +1,5 @@
 // src/arena/ui/gl_widgets/gl_arena_highlighting.cpp
-#include "../../include/rendering/gl_arena_widget.h"
+#include "../../include/arena/ui/gl_widgets/gl_arena_widget.h"
 #include <QDebug>
 #include <cmath>
 

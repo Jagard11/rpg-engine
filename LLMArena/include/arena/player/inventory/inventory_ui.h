@@ -1,4 +1,4 @@
-// include/arena/ui/inventory_ui.h
+// include/arena/player/inventory/inventory_ui.h
 #ifndef INVENTORY_UI_H
 #define INVENTORY_UI_H
 
@@ -14,7 +14,7 @@
 #include <QMatrix4x4>
 #include <QMap>
 
-#include "../game/inventory.h"
+#include "inventory.h"
 
 // Class to render inventory UI
 class InventoryUI : public QObject, protected QOpenGLFunctions {

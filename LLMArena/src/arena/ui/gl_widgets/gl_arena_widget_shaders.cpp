@@ -1,5 +1,5 @@
 // src/arena/ui/gl_widgets/gl_arena_widget_shaders.cpp
-#include "../../include/rendering/gl_arena_widget.h"
+#include "../../include/arena/ui/gl_widgets/gl_arena_widget.h"
 #include <QDebug>
 
 // Ultra simple shader that just draws textured quads - using the simplest possible GLSL

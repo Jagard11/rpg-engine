@@ -6,7 +6,7 @@
 #include <QVector>
 #include <QString>
 #include <QMap>
-#include "../voxel/voxel_types.h"
+#include "../voxels/types/voxel_types.h"
 
 // Class to represent an inventory item
 class InventoryItem {

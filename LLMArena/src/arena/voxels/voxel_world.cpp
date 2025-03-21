@@ -1,5 +1,5 @@
 // src/arena/voxels/voxel_world.cpp
-#include "../../include/voxel/voxel_world.h"
+#include "../../include/arena/voxels/voxel_world.h"
 #include <QDebug>
 #include <QDateTime>
 #include <QDir>

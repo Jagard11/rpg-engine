@@ -1,7 +1,7 @@
 // src/arena/core/rendering/arena_renderer_scene.cpp
-#include "../../include/rendering/arena_renderer.h"
-#include "../../include/game/game_scene.h"
-#include "../../include/game/player_controller.h"
+#include "../../include/arena/core/rendering/arena_renderer.h"
+#include "../../include/arena/game/game_scene.h"
+#include "../../include/arena/game/player_controller.h"
 #include <QDebug>
 
 void ArenaRenderer::setArenaParameters(double radius, double wallHeight) {

@@ -1,5 +1,5 @@
 // src/character/editor/appearance_page.cpp
-#include "../../../include/character/ui/character_editor.h"
+#include "../../../include/character/editor/character_editor.h"
 
 #include <QFormLayout>
 #include <QFileDialog>

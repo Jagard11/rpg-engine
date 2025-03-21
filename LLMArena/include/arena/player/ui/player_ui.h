@@ -14,7 +14,7 @@
 #include <QMatrix4x4>
 #include <QMap>
 
-#include "../game/inventory.h"
+#include "../player/inventory/inventory.h"
 
 // Class to render inventory UI
 class InventoryUI : public QObject, protected QOpenGLFunctions {

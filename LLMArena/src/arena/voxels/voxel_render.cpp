@@ -1,5 +1,5 @@
 // src/arena/voxels/voxel_render.cpp
-#include "../../include/voxel/voxel_renderer.h"
+#include "../../include/arena/voxels/voxel_renderer.h"
 #include <QDebug>
 #include <QDir>
 #include <QMap>

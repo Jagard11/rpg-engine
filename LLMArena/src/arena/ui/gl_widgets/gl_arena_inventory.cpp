@@ -1,7 +1,7 @@
 // src/arena/ui/gl_widgets/gl_arena_inventory.cpp
-#include "../../include/rendering/gl_arena_widget.h"
-#include "../../include/ui/inventory_ui.h"
-#include "../../include/game/inventory.h"
+#include "../../include/arena/ui/gl_widgets/gl_arena_widget.h"
+#include "../../include/arena/player/inventory/inventory_ui.h"
+#include "../../include/arena/player/inventory/inventory.h"
 #include <QCursor>
 #include <QDebug>
 

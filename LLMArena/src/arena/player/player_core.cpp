@@ -1,6 +1,6 @@
 // src/arena/player/player_core.cpp
-#include "../include/game/player_controller.h"
-#include "../include/game/game_scene.h"
+#include "../include/arena/game/player_controller.h"
+#include "../include/arena/game/game_scene.h"
 #include <QDebug>
 #include <QDateTime>
 #include <QMutex>

@@ -16,11 +16,11 @@
 #include <QOpenGLFunctions>
 #include <QTimer>
 
-#include "ui/character_editor_ui.h"
+#include "../include/character/ui/character_editor_ui.h"
 #include "ui/location_dialog.h"
-#include "character/character_persistence.h"
+#include "include/character/core/character_persistence.h"
 #include "llm/oobabooga_bridge.h"
-#include "ui/arena_view.h"
+#include "include/arena/ui/views/arena_view.h"
 #include "utils/crash_handler.h"
 
 // Global crash handler to display errors and prevent immediate exit

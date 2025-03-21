@@ -1,7 +1,7 @@
 // src/arena/ui/gl_widgets/gl_arena_widget_core.cpp
-#include "../../include/rendering/gl_arena_widget.h"
-#include "../../include/game/game_scene.h"
-#include "../../include/game/player_controller.h"
+#include "../../include/arena/ui/gl_widgets/gl_arena_widget.h"
+#include "../../include/arena/game/game_scene.h"
+#include "../../include/arena/game/player_controller.h"
 #include <QWebEngineSettings>
 #include <QWebEngineScript>
 #include <QWebEnginePage>

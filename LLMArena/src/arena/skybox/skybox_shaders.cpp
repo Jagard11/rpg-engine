@@ -1,5 +1,5 @@
 // src/arena/skybox/skybox_shaders.cpp
-#include "../../include/voxel/sky_system.h"
+#include "../../include/arena/skybox/sky_system.h"
 #include <QDebug>
 
 void SkySystem::createShaders() {

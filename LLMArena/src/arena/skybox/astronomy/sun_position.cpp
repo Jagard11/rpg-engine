@@ -1,6 +1,6 @@
 // src/arena/skybox/astronomy/sun_position.cpp
-#include "../../include/voxel/sky_system.h"
-#include "../../include/ui/location_dialog.h"
+#include "../../include/arena/skybox/sky_system.h"
+#include "../../include/splash/ui/location_dialog.h"
 #include <QSettings>
 #include <QtMath>
 #include <QDebug>

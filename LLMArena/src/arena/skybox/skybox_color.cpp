@@ -1,5 +1,5 @@
 // src/arena/skybox/skybox_color.cpp
-#include "../../include/voxel/sky_system_helpers.h"
+#include "../../include/arena/skybox/sky_system_helpers.h"
 #include <QVector3D>
 #include <cmath>
 

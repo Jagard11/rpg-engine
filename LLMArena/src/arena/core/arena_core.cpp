@@ -1,5 +1,5 @@
 // src/arena/core/arena_core.cpp
-#include "../include/game/game_scene.h"
+#include "../include/arena/game/game_scene.h"
 #include <QDebug>
 #include <QDateTime>
 #include <cmath>

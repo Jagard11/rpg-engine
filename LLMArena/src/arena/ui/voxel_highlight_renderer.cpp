@@ -1,5 +1,5 @@
 // src/arena/ui/voxel_highlight_renderer.cpp
-#include "../../include/rendering/voxel_highlight_renderer.h"
+#include "../../include/arena/ui/voxel_highlight_renderer.h"
 #include <QOpenGLContext>
 #include <QDebug>
 

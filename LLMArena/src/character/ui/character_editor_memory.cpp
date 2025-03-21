@@ -1,5 +1,5 @@
 // src/character/ui/character_editor_memory.cpp
-#include "../../../include/character/ui/character_editor.h"
+#include "../../../include/character/editor/character_editor.h"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>

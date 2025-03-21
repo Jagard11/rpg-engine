@@ -6,7 +6,7 @@
 #include "voxel_renderer.h"
 #include "sky_system.h"
 #include "../game/game_scene.h"
-#include "../rendering/voxel_highlight_renderer.h"
+#include "../ui/voxel_highlight_renderer.h"
 
 #include <QObject>
 #include <QOpenGLFunctions>
