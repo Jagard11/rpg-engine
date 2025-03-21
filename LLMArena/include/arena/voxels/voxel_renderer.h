@@ -12,6 +12,10 @@
 #include <QMatrix4x4>
 #include <QVector>
 #include <QMap>
+#include <memory>
+
+// Forward declarations
+class ViewFrustum;
 
 // Class to render voxels using OpenGL
 class VoxelRenderer : public QObject, protected QOpenGLFunctions {
@@ -29,12 +33,30 @@ public:
     // Render the voxel world
     void render(const QMatrix4x4& viewMatrix, const QMatrix4x4& projectionMatrix);
     
+    // Performance settings
+    void setMaxVisibleChunks(int maxChunks);
+    void setFrustumCullingEnabled(bool enabled);
+    void setBackfaceCullingEnabled(bool enabled);
+    
+    // Current settings
+    int getMaxVisibleChunks() const { return m_maxVisibleChunks; }
+    bool isFrustumCullingEnabled() const { return m_frustumCullingEnabled; }
+    bool isBackfaceCullingEnabled() const { return m_backfaceCullingEnabled; }
+    
 public slots:
     // Update rendering data when world changes
     void updateRenderData();
     
 private:
     VoxelWorld* m_world;
+    
+    // Performance settings
+    int m_maxVisibleChunks;
+    bool m_frustumCullingEnabled;
+    bool m_backfaceCullingEnabled;
+    
+    // View frustum for culling
+    std::unique_ptr<ViewFrustum> m_viewFrustum;
     
     // OpenGL resources
     QOpenGLBuffer m_vertexBuffer;

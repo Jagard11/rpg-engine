@@ -180,4 +180,4 @@ private:
     void setupSignalConnections();
 };
 
-#endif // VOXEL_WORLD_SYSTEM_H
+#endif // VOXEL_WORLD_SYSTEM_Hwww
