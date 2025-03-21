@@ -17,11 +17,11 @@
 #include <QTimer>
 
 #include "../include/character/ui/character_editor_ui.h"
-#include "ui/location_dialog.h"
-#include "include/character/core/character_persistence.h"
-#include "llm/oobabooga_bridge.h"
-#include "include/arena/ui/views/arena_view.h"
-#include "utils/crash_handler.h"
+#include "../include/splash/ui/location_dialog.h"
+#include "../include/character/core/character_persistence.h"
+#include "../include/llm/oobabooga_bridge.h"
+#include "../include/arena/ui/views/arena_view.h"
+#include "../include/utils/crash_handler.h"
 
 // Global crash handler to display errors and prevent immediate exit
 void globalCrashHandler() {

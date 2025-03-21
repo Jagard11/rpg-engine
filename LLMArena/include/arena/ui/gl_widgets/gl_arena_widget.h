@@ -15,14 +15,14 @@
 #include <QKeyEvent>
 #include <memory>
 
-#include "../character/core/character_persistence.h"
+#include "../../../character/core/character_persistence.h"
 
-#include "../game/game_scene.h"
-#include "../game/player_controller.h"
+#include "../../core/arena_core.h"
+#include "../../game/player_controller.h"
 
-#include "../player/inventory/inventory.h"
-#include "../voxels/voxel_system_integration.h"
-#include "../player/inventory/inventory_ui.h"
+#include "../../player/inventory/inventory.h"
+#include "../../voxels/voxel_system_integration.h"
+#include "../../player/inventory/inventory_ui.h"
 
 // Forward declarations
 class GLArenaWidget;

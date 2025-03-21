@@ -1,4 +1,4 @@
-# CMakeLists.txt - Modular Arena Renderer Structure
+# CMakeLists.txt - Oobabooga RPG Arena Project
 cmake_minimum_required(VERSION 3.14)
 project(OobaboogaRPGArena LANGUAGES CXX)
 
@@ -26,159 +26,226 @@ find_package(Qt5 COMPONENTS
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/character
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/character/core
     ${CMAKE_CURRENT_SOURCE_DIR}/include/character/models
     ${CMAKE_CURRENT_SOURCE_DIR}/include/character/manager
     ${CMAKE_CURRENT_SOURCE_DIR}/include/character/ui
     ${CMAKE_CURRENT_SOURCE_DIR}/include/llm
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/game
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/rendering
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/memory
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/voxel
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/arena/game
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/arena/core
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/arena/player
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/arena/skybox
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/arena/ui
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/arena/voxels
     ${CMAKE_CURRENT_SOURCE_DIR}/include/utils
 )
 
-# List all header files that contain Q_OBJECT macro
-set(HEADERS
-    # Character Module
-    include/character/manager/character_manager.h
-    include/character/ui/character_editor.h
-    include/character/ui/character_editor_ui.h
-    
-    # LLM Module
-    include/llm/oobabooga_bridge.h
-    
-    # Game Module
-    include/game/game_scene.h
-    include/game/player_controller.h
-    include/game/inventory.h
-    
-    # Rendering Module
-    include/rendering/arena_renderer.h
-    include/rendering/gl_arena_widget.h
-    include/rendering/voxel_highlight_renderer.h
-    
-    # UI Module
-    include/ui/arena_view.h
-    include/ui/location_dialog.h
-    include/ui/inventory_ui.h
-    
-    # Voxel Module
-    include/voxel/voxel_world.h
-    include/voxel/voxel_renderer.h
-    include/voxel/sky_system.h
-    include/voxel/voxel_system_integration.h
-    
-    # Utils Module
-    include/utils/crash_handler.h
-    include/utils/opengl_debug.h
+# Find OpenGL
+find_package(OpenGL REQUIRED)
+
+# Define the main source file
+set(MAIN_SOURCE src/main.cpp)
+
+# Arena Module Sources and Headers
+set(ARENA_CORE_SOURCES
+    src/arena/core/arena_core.cpp
+    src/arena/core/arena_render.cpp
+    src/arena/core/rendering/arena_renderer_characters.cpp
+    src/arena/core/rendering/arena_renderer_scene.cpp
+    src/arena/core/rendering/arena_renderer_stubs.cpp
+    src/arena/core/rendering/arena_renderer_webgl.cpp
 )
 
-# Main source file
-set(SOURCES
-    src/main.cpp
+set(ARENA_GAME_SOURCES
+    src/arena/game/game_scene.cpp
+    src/arena/game/inventory.cpp
+    src/arena/game/player_controller_core.cpp
+    src/arena/game/player_controller_input.cpp
+    src/arena/game/player_controller_movement.cpp
+    src/arena/game/player_controller_stance.cpp
 )
 
-# Character Module sources
-set(CHARACTER_SOURCES
-    # Manager
-    src/character/manager/character_manager_core.cpp
+set(ARENA_PLAYER_SOURCES
+    src/arena/player/controls/camera.cpp
+    src/arena/player/controls/crouching.cpp
+    src/arena/player/controls/movement.cpp
+    src/arena/player/inventory/inventory_core.cpp
+    src/arena/player/player_core.cpp
+    src/arena/player/ui/inventory_ui.cpp
+)
+
+set(ARENA_SKYBOX_SOURCES
+    src/arena/skybox/astronomy/astronomy_calc.cpp
+    src/arena/skybox/astronomy/sun_position.cpp
+    src/arena/skybox/skybox_color.cpp
+    src/arena/skybox/skybox_core.cpp
+    src/arena/skybox/skybox_geometry.cpp
+    src/arena/skybox/skybox_render.cpp
+    src/arena/skybox/skybox_shaders.cpp
+)
+
+set(ARENA_UI_SOURCES
+    src/arena/ui/gl_widgets/gl_arena_character.cpp
+    src/arena/ui/gl_widgets/gl_arena_direct_rendering.cpp
+    src/arena/ui/gl_widgets/gl_arena_highlighting.cpp
+    src/arena/ui/gl_widgets/gl_arena_inventory.cpp
+    src/arena/ui/gl_widgets/gl_arena_widget_core.cpp
+    src/arena/ui/gl_widgets/gl_arena_widget_geometry.cpp
+    src/arena/ui/gl_widgets/gl_arena_widget_input.cpp
+    src/arena/ui/gl_widgets/gl_arena_widget_rendering.cpp
+    src/arena/ui/gl_widgets/gl_arena_widget_shaders.cpp
+    src/arena/ui/gl_widgets/gl_arena_widget_stub.cpp
+    src/arena/ui/views/arena_view.cpp
+    src/arena/ui/voxel_highlight_renderer.cpp
+)
+
+set(ARENA_VOXELS_SOURCES
+    src/arena/voxels/voxel_highlight.cpp
+    src/arena/voxels/voxel_render.cpp
+    src/arena/voxels/voxel_system_integration.cpp
+    src/arena/voxels/voxel_world.cpp
+)
+
+# Character Module Sources and Headers
+set(CHARACTER_CORE_SOURCES
+    src/character/core/character_core.cpp
+    src/character/core/character_manager_context.cpp
+    src/character/core/character_manager_memory.cpp
+    src/character/core/character_manager_personality.cpp
+)
+
+set(CHARACTER_EDITOR_SOURCES
+    src/character/editor/appearance_page.cpp
+    src/character/editor/basic_info_page.cpp
+    src/character/editor/editor_core.cpp
+    src/character/editor/memories_page.cpp
+    src/character/editor/personality_page.cpp
+)
+
+set(CHARACTER_MANAGER_SOURCES
     src/character/manager/character_manager_appearance.cpp
-    src/character/manager/character_manager_personality.cpp
-    src/character/manager/character_manager_memory.cpp
-    src/character/manager/character_manager_context.cpp
-    
-    # UI - Keep all files for now but use --allow-multiple-definition
+    src/character/manager/character_manager_core.cpp
+)
+
+set(CHARACTER_MEMORY_SOURCES
+    src/character/memory/memory_core.cpp
+    src/character/memory/memory_retrieval.cpp
+)
+
+set(CHARACTER_UI_SOURCES
     src/character/ui/character_editor.cpp
-    src/character/ui/character_editor_basic.cpp
     src/character/ui/character_editor_appearance.cpp
-    src/character/ui/character_editor_personality.cpp
+    src/character/ui/character_editor_basic.cpp
     src/character/ui/character_editor_memory.cpp
+    src/character/ui/character_editor_personality.cpp
     src/character/ui/character_manager_dialog.cpp
 )
 
-# Memory Module sources
-set(MEMORY_SOURCES
-    src/memory/memory_system.cpp
-    src/memory/memory_system_helpers.cpp
-)
-
-# UI Module sources
-set(UI_SOURCES
-    src/ui/arena_view.cpp
-    src/ui/location_dialog.cpp
-    src/ui/inventory_ui.cpp
-)
-
-# LLM Module sources
+# LLM Module Sources and Headers
 set(LLM_SOURCES
-    src/llm/oobabooga_bridge.cpp
+    src/llm/api/api_caller.cpp
+    src/llm/memory/memory_system.cpp
+    src/llm/memory/memory_system_helpers.cpp
+    src/llm/ui/oobabooga_bridge.cpp
 )
 
-# Rendering Module sources
-set(RENDERING_SOURCES
-    # GL Arena Widget
-    src/rendering/gl_arena/gl_arena_widget_core.cpp
-    src/rendering/gl_arena/gl_arena_character.cpp
-    src/rendering/gl_arena/gl_arena_widget_rendering.cpp
-    src/rendering/gl_arena/gl_arena_widget_shaders.cpp
-    src/rendering/gl_arena/gl_arena_widget_geometry.cpp
-    src/rendering/gl_arena/gl_arena_widget_input.cpp
-    src/rendering/gl_arena/gl_arena_widget_stub.cpp
-    src/rendering/gl_arena/gl_arena_direct_rendering.cpp
-    src/rendering/gl_arena/gl_arena_highlighting.cpp
-    src/rendering/gl_arena/gl_arena_inventory.cpp
-    
-    # Arena Renderer
-    src/rendering/arena_renderer/arena_renderer_core.cpp
-    src/rendering/arena_renderer/arena_renderer_webgl.cpp
-    src/rendering/arena_renderer/arena_renderer_scene.cpp
-    src/rendering/arena_renderer/arena_renderer_characters.cpp
-    src/rendering/arena_renderer/arena_renderer_stubs.cpp
-    
-    # Voxel Highlighting
-    src/rendering/voxel_highlight_renderer.cpp
+# Splash Module Sources and Headers
+set(SPLASH_SOURCES
+    src/splash/dialogs/location_dialog.cpp
 )
 
-# Game Module sources
-set(GAME_SOURCES
-    src/game/game_scene.cpp
-    src/game/player_controller_core.cpp
-    src/game/player_controller_input.cpp
-    src/game/player_controller_movement.cpp
-    src/game/player_controller_stance.cpp
-    src/game/inventory.cpp
-)
-
-# Voxel Module sources
-set(VOXEL_SOURCES
-    src/voxel/voxel_world.cpp
-    src/voxel/voxel_renderer.cpp
-    src/voxel/sky_system.cpp
-    src/voxel/sky_system_shaders.cpp
-    src/voxel/sky_system_geometry.cpp
-    src/voxel/sky_system_render.cpp
-    src/voxel/sky_basic_calculations.cpp
-    src/voxel/sky_astronomical.cpp
-    src/voxel/sky_astronomical_calculations.cpp
-    src/voxel/voxel_system_integration.cpp
-)
-
-# Utils Module sources
+# Utils Module Sources and Headers
 set(UTILS_SOURCES
-    src/utils/opengl_debug.cpp
+    src/utils/opengl/opengl_debug.cpp
+)
+
+# Manually select only non-duplicate headers
+set(SELECTED_HEADERS
+    # Arena Core
+    include/arena/core/rendering/arena_renderer.h
+    
+    # Arena Game - excluded duplicates
+    # include/arena/game/game_scene.h  
+    # include/arena/game/player_controller.h
+    
+    # Arena Player
+    include/arena/player/inventory/inventory.h
+    include/arena/player/inventory/inventory_ui.h
+    # include/arena/player/player_core.h  # Duplicate
+    # include/arena/player/ui/player_ui.h # Duplicate
+    
+    # Arena Skybox
+    include/arena/skybox/astronomy/astronomy.h
+    # include/arena/skybox/sky_system.h   # Duplicate
+    include/arena/skybox/sky_system_helpers.h
+    # include/arena/skybox/skybox_core.h  # Duplicate
+    
+    # Arena UI
+    include/arena/ui/gl_widgets/gl_arena_widget.h
+    include/arena/ui/views/arena_view.h
+    include/arena/ui/voxel_highlight_renderer.h
+    
+    # Arena Voxels
+    include/arena/voxels/types/voxel_types.h
+    # include/arena/voxels/voxel_core.h   # Duplicate
+    include/arena/voxels/voxel_renderer.h
+    include/arena/voxels/voxel_system_integration.h
+    # include/arena/voxels/voxel_world.h  # Duplicate
+    # include/arena/voxels/voxel_placement.h # Duplicate
+    
+    # Character Core
+    # include/character/core/character_core.h # Duplicate
+    include/character/core/character_persistence.h
+    
+    # Character Editor
+    include/character/editor/character_editor.h
+    
+    # Character Manager - excluded duplicates
+    # include/character/manager/character_manager.h
+    
+    # Character Memory
+    include/character/memory/memory_system.h
+    
+    # Character Models
+    include/character/models/all_models.h
+    include/character/models/appearance.h
+    include/character/models/memory.h
+    include/character/models/personality.h
+    include/character/models/stats.h
+    
+    # Character UI
+    include/character/ui/character_editor_ui.h
+    
+    # LLM Module
+    # include/llm/api_core.h  # Duplicate
+    include/llm/oobabooga_bridge.h
+    
+    # Splash Module
+    include/splash/ui/location_dialog.h
+    
+    # Utils Module
+    include/utils/crash_handler.h
+    include/utils/error/error_handling.h
+    include/utils/opengl/opengl_utils.h
+    include/utils/opengl_debug.h
 )
 
 # Combine all sources
-list(APPEND SOURCES 
-    ${CHARACTER_SOURCES}
-    ${MEMORY_SOURCES}
-    ${UI_SOURCES}
+set(ALL_SOURCES 
+    ${MAIN_SOURCE}
+    ${ARENA_CORE_SOURCES}
+    ${ARENA_GAME_SOURCES}
+    ${ARENA_PLAYER_SOURCES}
+    ${ARENA_SKYBOX_SOURCES}
+    ${ARENA_UI_SOURCES}
+    ${ARENA_VOXELS_SOURCES}
+    ${CHARACTER_CORE_SOURCES}
+    ${CHARACTER_EDITOR_SOURCES}
+    ${CHARACTER_MANAGER_SOURCES}
+    ${CHARACTER_MEMORY_SOURCES}
+    ${CHARACTER_UI_SOURCES}
     ${LLM_SOURCES}
-    ${RENDERING_SOURCES}
-    ${GAME_SOURCES}
-    ${VOXEL_SOURCES}
+    ${SPLASH_SOURCES}
     ${UTILS_SOURCES}
 )
 
@@ -332,18 +399,15 @@ void main() {
 
 # Create the executable with resources
 add_executable(${PROJECT_NAME} 
-    ${HEADERS}
-    ${SOURCES}
+    ${SELECTED_HEADERS}
+    ${ALL_SOURCES}
     ${CMAKE_CURRENT_BINARY_DIR}/resources.qrc
 )
 
-# Allow duplicate symbols for now (temporary fix)
+# Allow duplicate symbols for now (temporary fix for function redefinition issues during refactoring)
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--allow-multiple-definition")
 endif()
-
-# Find OpenGL
-find_package(OpenGL REQUIRED)
 
 # Link Qt and OpenGL libraries
 target_link_libraries(${PROJECT_NAME} PRIVATE

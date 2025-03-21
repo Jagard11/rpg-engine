@@ -1,8 +1,9 @@
 // include/arena/voxels/voxel_world.h
+// include/arena/voxels/types/voxel_types.h
 #ifndef VOXEL_WORLD_H
 #define VOXEL_WORLD_H
 
-#include "voxel_types.h"
+#include "types/voxel_types.h"
 #include <QObject>
 #include <QHash>
 #include <QVector>

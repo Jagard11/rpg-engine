@@ -1,6 +1,6 @@
 // src/arena/core/arena_render.cpp
 #include "../../include/arena/core/rendering/arena_renderer.h"
-#include "../../include/arena/game/game_scene.h"
+#include "../include/arena/core/arena_core.h"
 #include "../../include/arena/game/player_controller.h"
 #include <QWebEngineSettings>
 #include <QWebEngineScript>

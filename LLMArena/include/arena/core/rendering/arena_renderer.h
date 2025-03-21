@@ -6,7 +6,7 @@
 #include <QString>
 #include <QWebEngineView>
 #include <QWebChannel>
-#include "character_persistence.h"
+#include "character/core/character_persistence.h"
 
 // Forward declarations
 class GameScene;

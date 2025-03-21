@@ -1,5 +1,5 @@
 // src/arena/skybox/skybox_render.cpp
-#include "../../include/arena/skybox/sky_system.h"
+#include "../../include/arena/skybox/skybox_core.h"
 #include <QDebug>
 
 void SkySystem::render(const QMatrix4x4& viewMatrix, const QMatrix4x4& projectionMatrix) {

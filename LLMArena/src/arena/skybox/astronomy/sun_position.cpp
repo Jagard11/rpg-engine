@@ -1,5 +1,5 @@
 // src/arena/skybox/astronomy/sun_position.cpp
-#include "../../include/arena/skybox/sky_system.h"
+#include "../../include/arena/skybox/skybox_core.h"
 #include "../../include/splash/ui/location_dialog.h"
 #include <QSettings>
 #include <QtMath>

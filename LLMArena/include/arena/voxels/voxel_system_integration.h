@@ -1,11 +1,12 @@
 // include/arena/voxels/voxel_system_integration.h
+// include/arena/core/arena_core.h
 #ifndef VOXEL_SYSTEM_INTEGRATION_H
 #define VOXEL_SYSTEM_INTEGRATION_H
 
 #include "voxel_world.h"
 #include "voxel_renderer.h"
-#include "sky_system.h"
-#include "../game/game_scene.h"
+#include "../skybox/skybox_core.h"
+#include "../core/arena_core.h"
 #include "../ui/voxel_highlight_renderer.h"
 
 #include <QObject>

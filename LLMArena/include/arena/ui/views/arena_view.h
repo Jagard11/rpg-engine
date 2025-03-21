@@ -11,9 +11,7 @@
 #include <QKeyEvent>
 #include <QFocusEvent>
 
-#include "character_persistence.h"
-
-#include "../character/core/character_persistence.h"
+#include "../../../character/core/character_persistence.h"
 #include "../gl_widgets/gl_arena_widget.h"  // Include the full header instead of forward declaration
 
 // Main widget for the 3D arena view
