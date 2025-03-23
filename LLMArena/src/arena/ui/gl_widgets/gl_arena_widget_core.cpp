@@ -2,6 +2,13 @@
 #include "../../../../include/arena/ui/gl_widgets/gl_arena_widget.h"
 #include "../../../../include/arena/core/arena_core.h"
 #include "../../../../include/arena/game/player_controller.h"
+
+// Existing includes...
+#include "../../../include/arena/player/inventory/inventory_ui.h"
+// Add this new include below
+#include "../../../include/arena/debug/debug_system.h"
+
+
 #include <QWebEngineSettings>
 #include <QWebEngineScript>
 #include <QWebEnginePage>
@@ -15,20 +22,23 @@
 // Forward declaration of static cleanup function
 void cleanupStaticGLResources();
 
-GLArenaWidget::GLArenaWidget(CharacterManager* charManager, QWidget* parent) 
-    : QOpenGLWidget(parent), 
-      m_characterManager(charManager), 
+GLArenaWidget::GLArenaWidget(CharacterManager* charManager, QWidget* parent)
+    : QOpenGLWidget(parent),
+      m_characterManager(charManager),
       m_gameScene(nullptr),
       m_playerController(nullptr),
-      m_initialized(false),
-      m_billboardProgram(nullptr),
       m_voxelSystem(nullptr),
       m_inventory(nullptr),
       m_inventoryUI(nullptr),
-      m_highlightedVoxelFace(-1),
-      m_arenaRadius(10.0),
-      m_wallHeight(2.0)
+      m_debugSystem(nullptr),
+      m_billboardProgram(nullptr),
+      m_initialized(false),
+      m_floorIndexCount(0),
+      m_gridVertexCount(0),
+      m_arenaRadius(0),
+      m_wallHeight(0)
 {
+    // Rest of constructor...
     setFocusPolicy(Qt::StrongFocus);
     
     // Create game scene with proper parent

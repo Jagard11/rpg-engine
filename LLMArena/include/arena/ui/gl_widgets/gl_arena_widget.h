@@ -24,6 +24,10 @@
 #include "../../voxels/voxel_system_integration.h"
 #include "../../player/inventory/inventory_ui.h"
 
+
+// Forward declarations for debug system
+class DebugSystem;
+
 // Forward declarations
 class GLArenaWidget;
 
@@ -159,6 +163,9 @@ private:
     // Inventory system
     Inventory* m_inventory = nullptr;
     InventoryUI* m_inventoryUI = nullptr;
+    
+    // Debug system
+    std::unique_ptr<DebugSystem> m_debugSystem;
     
     // Voxel highlighting
     QVector3D m_highlightedVoxelPos;

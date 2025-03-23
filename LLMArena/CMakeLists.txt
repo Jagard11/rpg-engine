@@ -57,6 +57,7 @@ collect_sources(CHARACTER_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/character")
 collect_sources(LLM_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/llm")
 collect_sources(SPLASH_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/splash")
 collect_sources(UTILS_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/utils")
+collect_sources(DEBUG_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/arena/debug")
 
 # Collect headers by module (only for IDE integration)
 collect_headers(ARENA_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/include/arena")
@@ -64,6 +65,7 @@ collect_headers(CHARACTER_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/include/character
 collect_headers(LLM_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/include/llm")
 collect_headers(SPLASH_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/include/splash")
 collect_headers(UTILS_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/include/utils")
+collect_headers(DEBUG_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/include/arena/debug")
 
 # Combine all sources
 set(ALL_SOURCES 
@@ -73,6 +75,7 @@ set(ALL_SOURCES
     ${LLM_SOURCES}
     ${SPLASH_SOURCES}
     ${UTILS_SOURCES}
+    ${DEBUG_SOURCES}
 )
 
 # For IDE organization, add headers to a separate source group
@@ -81,6 +84,7 @@ source_group("Character Headers" FILES ${CHARACTER_HEADERS})
 source_group("LLM Headers" FILES ${LLM_HEADERS})
 source_group("Splash Headers" FILES ${SPLASH_HEADERS})
 source_group("Utils Headers" FILES ${UTILS_HEADERS})
+source_group("Debug Headers" FILES ${DEBUG_HEADERS})
 
 # Create resources directory if it doesn't exist
 if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/resources")
@@ -122,9 +126,16 @@ file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/resources.qrc
         <file>resources/cobblestone.png</file>
         <file>resources/grass.png</file>
         <file>resources/dirt.png</file>
+        <file>fonts/consolas.ttf</file>
     </qresource>
 </RCC>
 ")
+
+# Create font directory
+file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/fonts)
+
+# Generate consolas.ttf placeholder (this should be replaced with a real font)
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/fonts/consolas.ttf "placeholder")
 
 # Create shader directory
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/shaders)
@@ -244,6 +255,7 @@ add_executable(${PROJECT_NAME}
     ${LLM_HEADERS}
     ${SPLASH_HEADERS}
     ${UTILS_HEADERS}
+    ${DEBUG_HEADERS}
     ${CMAKE_CURRENT_BINARY_DIR}/resources.qrc
 )
 
