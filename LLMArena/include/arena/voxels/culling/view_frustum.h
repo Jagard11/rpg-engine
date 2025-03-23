@@ -67,9 +67,9 @@ public:
      */
     bool isChunkInside(const ChunkCoordinate& coordinate) const;
     
-private:
-    // Frustum planes in form ax + by + cz + d = 0
-    // where normal = (a, b, c), d = distance
+    /**
+     * @brief Defines a plane in 3D space with normal and distance from origin
+     */
     struct Plane {
         QVector3D normal;
         float distance;
@@ -86,11 +86,23 @@ private:
         }
     };
     
+    /**
+     * @brief Get the planes that define the frustum
+     * @return Array of 6 planes
+     */
+    const std::array<Plane, PlaneCount>& getPlanes() const { return m_planes; }
+    
+private:
     // Array of 6 planes (left, right, bottom, top, near, far)
     std::array<Plane, PlaneCount> m_planes;
     
     // Normalized device coordinates corners (for AABB tests)
     std::array<QVector3D, 8> m_corners;
 };
+
+// Create an alias in the culling namespace for compatibility
+namespace culling {
+    typedef ViewFrustum ViewFrustum;
+}
 
 #endif // VIEW_FRUSTUM_H

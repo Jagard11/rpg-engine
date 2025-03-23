@@ -14,8 +14,9 @@
 #include <QMap>
 #include <memory>
 
-// Forward declaration - full definition will be included in the cpp file
+// Forward declarations - full definition will be included in the cpp file
 class ViewFrustum;
+class PlayerEntity;
 
 // Class to render voxels using OpenGL
 class VoxelRenderer : public QObject, protected QOpenGLFunctions {
@@ -30,8 +31,14 @@ public:
     // Set world reference
     void setWorld(VoxelWorld* world);
     
+    // Set player entity reference
+    void setPlayerEntity(PlayerEntity* playerEntity);
+    
     // Render the voxel world
     void render(const QMatrix4x4& viewMatrix, const QMatrix4x4& projectionMatrix);
+    
+    // Render the voxel world using player entity for culling
+    void renderWithPlayer(const QMatrix4x4& viewMatrix, const QMatrix4x4& projectionMatrix, PlayerEntity* playerEntity);
     
     // Performance settings
     void setMaxVisibleChunks(int maxChunks);
@@ -49,6 +56,7 @@ public slots:
     
 private:
     VoxelWorld* m_world;
+    PlayerEntity* m_playerEntity;
     
     // Performance settings
     int m_maxVisibleChunks;

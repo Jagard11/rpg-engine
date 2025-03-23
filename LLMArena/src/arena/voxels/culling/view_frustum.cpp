@@ -12,7 +12,7 @@ ViewFrustum::ViewFrustum() {
 
 void ViewFrustum::update(const QMatrix4x4& viewProjection) {
     // Extract frustum planes from the view-projection matrix
-    // Method from: http://www8.cs.umu.se/kurser/5DV051/HT12/lab/plane_extraction.pdf
+    // This is a more robust and reliable method for extracting planes
     
     // Left plane
     m_planes[Left].normal.setX(viewProjection(0, 3) + viewProjection(0, 0));
@@ -85,16 +85,18 @@ bool ViewFrustum::isSphereInside(const QVector3D& center, float radius) const {
 bool ViewFrustum::isBoxInside(const QVector3D& min, const QVector3D& max) const {
     // Check each plane
     for (int i = 0; i < PlaneCount; ++i) {
-        // Check if box is completely outside this plane
-        // by finding the point furthest in the direction of the plane normal
-        QVector3D positiveVertex(
-            m_planes[i].normal.x() >= 0 ? max.x() : min.x(),
-            m_planes[i].normal.y() >= 0 ? max.y() : min.y(),
-            m_planes[i].normal.z() >= 0 ? max.z() : min.z()
-        );
+        // Find the points of the box with the minimum and maximum distances to the plane
+        QVector3D positiveVertex;
+        QVector3D negativeVertex;
         
+        // Determine which corner of the box is facing the plane normal (max distance point)
+        positiveVertex.setX(m_planes[i].normal.x() >= 0 ? max.x() : min.x());
+        positiveVertex.setY(m_planes[i].normal.y() >= 0 ? max.y() : min.y());
+        positiveVertex.setZ(m_planes[i].normal.z() >= 0 ? max.z() : min.z());
+        
+        // If the positive vertex is outside, the box is outside
         if (m_planes[i].distanceToPoint(positiveVertex) < 0) {
-            return false;  // Box is completely outside this plane
+            return false;
         }
     }
     

@@ -1,25 +1,26 @@
-// src/arena/voxels/voxel_renderer_optimized.cpp
+// src/arena/voxels/voxel_renderer_with_player.cpp
 #include "../../../include/arena/voxels/voxel_renderer.h"
-#include "../../../include/arena/voxels/culling/view_frustum.h"
+#include "../../../include/arena/player/player_entity.h"
 #include <QOpenGLContext>
 #include <QDebug>
 #include <algorithm>
 
-// This is an optimized version of the voxel renderer that adds:
-// 1. Batched rendering of voxels by material type to minimize state changes
-// 2. Sorting by distance for better z-buffer utilization
-// 3. More efficient frustum culling
+/**
+ * Modified version of the VoxelRenderer that specifically uses the PlayerEntity
+ * for frustum culling
+ */
 
-void VoxelRenderer::render(const QMatrix4x4& viewMatrix, const QMatrix4x4& projectionMatrix) {
-    if (!m_world || !m_shaderProgram) return;
-    
-    // Combine view and projection matrices (for frustum extraction)
-    QMatrix4x4 viewProjection = projectionMatrix * viewMatrix;
-    
-    // Update view frustum for culling
-    if (m_frustumCullingEnabled) {
-        m_viewFrustum->update(viewProjection);
-    }
+// Add a private member to VoxelRenderer
+// PlayerEntity* m_playerEntity = nullptr;
+
+// Add setter method to VoxelRenderer
+// void VoxelRenderer::setPlayerEntity(PlayerEntity* playerEntity) {
+//     m_playerEntity = playerEntity;
+// }
+
+// Modified render method that uses the player entity for culling
+void VoxelRenderer::renderWithPlayer(const QMatrix4x4& viewMatrix, const QMatrix4x4& projectionMatrix, PlayerEntity* playerEntity) {
+    if (!m_world || !m_shaderProgram || !playerEntity) return;
     
     // Enable or disable backface culling
     if (m_backfaceCullingEnabled) {
@@ -39,13 +40,12 @@ void VoxelRenderer::render(const QMatrix4x4& viewMatrix, const QMatrix4x4& proje
     m_shaderProgram->setUniformValue("view", viewMatrix);
     m_shaderProgram->setUniformValue("projection", projectionMatrix);
     
-    // Extract camera position from view matrix (inverse view matrix * origin)
-    QMatrix4x4 invView = viewMatrix.inverted();
-    QVector3D camPos = invView * QVector3D(0, 0, 0);
+    // Extract camera position from player
+    QVector3D camPos = playerEntity->getPosition();
     m_shaderProgram->setUniformValue("viewPos", camPos);
     
-    // Setup lighting (simplified for performance)
-    QVector3D lightPos(0.0f, 1000.0f, 0.0f); // Light from above
+    // Setup lighting
+    QVector3D lightPos(0.0f, 100.0f, 0.0f); // Light from above
     QVector3D lightColor(1.0f, 1.0f, 0.95f); // Slightly warm light
     m_shaderProgram->setUniformValue("lightPos", lightPos);
     m_shaderProgram->setUniformValue("lightColor", lightColor);
@@ -61,7 +61,7 @@ void VoxelRenderer::render(const QMatrix4x4& viewMatrix, const QMatrix4x4& proje
     // Track current bound texture to avoid redundant binds
     GLuint currentTexture = 0;
     
-    // Keep count of drawn chunks and voxels for debugging
+    // Keep count of drawn and culled voxels for debugging
     int drawnVoxels = 0;
     int culledVoxels = 0;
     
@@ -81,11 +81,11 @@ void VoxelRenderer::render(const QMatrix4x4& viewMatrix, const QMatrix4x4& proje
         
         // Perform frustum culling if enabled
         if (m_frustumCullingEnabled) {
-            // Create a bounding sphere for the voxel (more efficient than point test)
+            // Create a bounding sphere for the voxel
             float radius = 0.866f; // Radius of bounding sphere for a unit cube (sqrt(3)/2)
             
-            // Check if voxel is inside the view frustum using sphere test
-            if (!m_viewFrustum->isSphereInside(worldPos, radius)) {
+            // Use the player entity's camera for culling
+            if (!playerEntity->isSphereVisible(worldPos, radius)) {
                 culledVoxels++;
                 continue; // Skip this voxel if it's outside the frustum
             }
@@ -109,6 +109,11 @@ void VoxelRenderer::render(const QMatrix4x4& viewMatrix, const QMatrix4x4& proje
     // Now render batches in material type order to minimize texture switches
     for (auto& batch : batches) {
         VoxelType type = batch.first;
+        
+        // Skip empty batches
+        if (batch.second.empty()) {
+            continue;
+        }
         
         // Select texture based on voxel type
         QOpenGLTexture* texture = nullptr;
