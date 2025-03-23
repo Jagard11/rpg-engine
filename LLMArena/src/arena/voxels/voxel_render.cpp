@@ -1,6 +1,7 @@
 // src/arena/voxels/voxel_render.cpp
-#include "../../include/arena/voxels/voxel_renderer.h"
-#include "../../include/arena/voxels/culling/view_frustum.h" // Include full definition before unique_ptr is used
+// include/arena/voxels/voxel_renderer.h
+#include "../../../include/arena/voxels/voxel_renderer.h"
+#include "../../../include/arena/voxels/culling/view_frustum.h" // Include full definition before unique_ptr is used
 #include <QOpenGLContext>
 #include <QDebug>
 #include <QPainter>
@@ -549,8 +550,6 @@ void VoxelRenderer::createCubeGeometry(float size) {
     glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), 
                          reinterpret_cast<void*>(6 * sizeof(float)));
     
-
-    
     // Cube indices (6 faces, 2 triangles per face, 3 vertices per triangle)
     unsigned int indices[] = {
         0, 1, 2, 2, 3, 0,       // Front face
@@ -561,33 +560,6 @@ void VoxelRenderer::createCubeGeometry(float size) {
         20, 21, 22, 22, 23, 20  // Top face
     };
 
-
-    // Bind index buffer
-    m_indexBuffer.bind();
-    // Make sure we're using the properly defined indices array
-    m_indexBuffer.allocate(indices, sizeof(indices));
-    
-    // Unbind VAO and buffers
-    m_vao.release();
-    m_vertexBuffer.release();
-    m_indexBuffer.release();
-    
-    // Bind vertex buffer
-    m_vertexBuffer.bind();
-    m_vertexBuffer.allocate(vertices, sizeof(vertices));
-    
-    // Setup vertex attributes
-    glEnableVertexAttribArray(0); // Position
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), nullptr);
-    
-    glEnableVertexAttribArray(1); // Normal
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), 
-                         reinterpret_cast<void*>(3 * sizeof(float)));
-    
-    glEnableVertexAttribArray(2); // Texture coordinates
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), 
-                         reinterpret_cast<void*>(6 * sizeof(float)));
-    
     // Bind index buffer
     m_indexBuffer.bind();
     m_indexBuffer.allocate(indices, sizeof(indices));
@@ -596,132 +568,4 @@ void VoxelRenderer::createCubeGeometry(float size) {
     m_vao.release();
     m_vertexBuffer.release();
     m_indexBuffer.release();
-}
-
-void VoxelRenderer::render(const QMatrix4x4& viewMatrix, const QMatrix4x4& projectionMatrix) {
-    if (!m_world || !m_shaderProgram) return;
-    
-    // Combine view and projection matrices (for frustum extraction)
-    QMatrix4x4 viewProjection = projectionMatrix * viewMatrix;
-    
-    // Update view frustum for culling
-    if (m_frustumCullingEnabled) {
-        m_viewFrustum->update(viewProjection);
-    }
-    
-    // Enable or disable backface culling
-    if (m_backfaceCullingEnabled) {
-        glEnable(GL_CULL_FACE);
-        glCullFace(GL_BACK);
-    } else {
-        glDisable(GL_CULL_FACE);
-    }
-    
-    // Bind shader
-    if (!m_shaderProgram->bind()) {
-        qCritical() << "Failed to bind shader program";
-        return;
-    }
-    
-    // Set common uniforms
-    m_shaderProgram->setUniformValue("view", viewMatrix);
-    m_shaderProgram->setUniformValue("projection", projectionMatrix);
-    
-    // Setup lighting
-    QVector3D lightPos(0.0f, 10.0f, 0.0f); // Light above center
-    m_shaderProgram->setUniformValue("lightPos", lightPos);
-    
-    // Extract camera position from view matrix (inverse view matrix * origin)
-    QMatrix4x4 invView = viewMatrix.inverted();
-    QVector3D camPos = invView * QVector3D(0, 0, 0);
-    m_shaderProgram->setUniformValue("viewPos", camPos);
-    
-    // Bind VAO
-    m_vao.bind();
-    
-    // Enable texture unit 0
-    glActiveTexture(GL_TEXTURE0);
-    m_shaderProgram->setUniformValue("textureSampler", 0);
-    
-    // Track current bound texture to avoid redundant binds
-    GLuint currentTexture = 0;
-    
-    // Draw each visible voxel
-    for (const RenderVoxel& voxel : m_visibleVoxels) {
-        // Skip voxels outside the view frustum
-        if (m_frustumCullingEnabled) {
-            QVector3D worldPos = voxel.pos.toWorldPos();
-            if (!m_viewFrustum->isPointInside(worldPos)) {
-                continue;
-            }
-        }
-        
-        // Set voxel-specific uniforms
-        m_shaderProgram->setUniformValue("voxelPosition", voxel.pos.toWorldPos());
-        m_shaderProgram->setUniformValue("voxelColor", QVector4D(
-            voxel.color.redF(), voxel.color.greenF(), voxel.color.blueF(), voxel.color.alphaF()));
-        
-        // Select texture based on voxel type
-        QOpenGLTexture* texture = nullptr;
-        bool useTexture = true;
-        
-        switch (voxel.type) {
-            case VoxelType::Cobblestone:
-                texture = m_textures["cobblestone"];
-                break;
-            case VoxelType::Grass:
-                texture = m_textures["grass"];
-                break;
-            case VoxelType::Dirt:
-                texture = m_textures["dirt"];
-                break;
-            case VoxelType::Solid:
-            default:
-                texture = m_textures["default"];
-                useTexture = false; // Use color only for generic solids
-                break;
-        }
-        
-        // Bind texture if available and different from current
-        if (texture && texture->isCreated()) {
-            // Only rebind if it's a different texture
-            if (texture->textureId() != currentTexture) {
-                texture->bind();
-                currentTexture = texture->textureId();
-            }
-            m_shaderProgram->setUniformValue("useTexture", useTexture);
-        } else {
-            // If no valid texture, use default color
-            m_shaderProgram->setUniformValue("useTexture", false);
-        }
-        
-        // Draw cube
-        glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, nullptr);
-    }
-    
-    // Unbind any bound texture
-    if (currentTexture != 0) {
-        glBindTexture(GL_TEXTURE_2D, 0);
-    }
-    
-    // Unbind VAO and shader
-    m_vao.release();
-    m_shaderProgram->release();
-    
-    // Disable culling when done
-    if (m_backfaceCullingEnabled) {
-        glDisable(GL_CULL_FACE);
-    }
-}
-
-void VoxelRenderer::setMaxVisibleChunks(int maxChunks) {
-    m_maxVisibleChunks = maxChunks;
-}
-
-void VoxelRenderer::setFrustumCullingEnabled(bool enabled) {
-    m_frustumCullingEnabled = enabled;
-}
-
-void VoxelRenderer::setBackfaceCullingEnabled(bool enabled) {
-    m_backfaceCullingEnabled = enabled;
 }

@@ -1,8 +1,9 @@
 // include/character/memory/memory_system.h
+// include/character/core/character_persistence.h
 #ifndef MEMORY_SYSTEM_H
 #define MEMORY_SYSTEM_H
 
-#include "character_persistence.h"
+#include "../core/character_persistence.h"
 
 // Forward declarations
 class QJsonObject;

@@ -1,5 +1,4 @@
 // include/arena/voxels/voxel_world.h
-// include/arena/voxels/types/voxel_types.h
 #ifndef VOXEL_WORLD_H
 #define VOXEL_WORLD_H
 

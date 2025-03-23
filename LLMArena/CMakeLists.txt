@@ -22,22 +22,10 @@ find_package(Qt5 COMPONENTS
     REQUIRED
 )
 
-# Include directories for header files
+# Include directories for header files - organized by module
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/character/core
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/character/models
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/character/manager
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/character/ui
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/llm
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/arena/game
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/arena/core
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/arena/player
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/arena/skybox
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/arena/ui
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/arena/voxels
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/utils
 )
 
 # Find OpenGL
@@ -46,208 +34,53 @@ find_package(OpenGL REQUIRED)
 # Define the main source file
 set(MAIN_SOURCE src/main.cpp)
 
-# Arena Module Sources and Headers
-set(ARENA_CORE_SOURCES
-    src/arena/core/arena_core.cpp
-    src/arena/core/arena_render.cpp
-    src/arena/core/rendering/arena_renderer_characters.cpp
-    src/arena/core/rendering/arena_renderer_scene.cpp
-    src/arena/core/rendering/arena_renderer_stubs.cpp
-    src/arena/core/rendering/arena_renderer_webgl.cpp
-)
+# Function to collect source files from directory with exclusions
+function(collect_sources VAR DIR)
+    file(GLOB_RECURSE SOURCES "${DIR}/*.cpp")
+    # Filter out duplicate implementation files
+    list(FILTER SOURCES EXCLUDE REGEX "player_core\\.cpp$")
+    set(${VAR} ${SOURCES} PARENT_SCOPE)
+endfunction()
 
-set(ARENA_GAME_SOURCES
-    src/arena/game/game_scene.cpp
-    src/arena/game/inventory.cpp
-    src/arena/game/player_controller_core.cpp
-    src/arena/game/player_controller_input.cpp
-    src/arena/game/player_controller_movement.cpp
-    src/arena/game/player_controller_stance.cpp
-)
+# Function to collect header files from directory with exclusions
+function(collect_headers VAR DIR)
+    file(GLOB_RECURSE HEADERS "${DIR}/*.h")
+    # Filter out duplicate header files that cause MOC conflicts
+    list(FILTER HEADERS EXCLUDE REGEX "player_core\\.h$")
+    list(FILTER HEADERS EXCLUDE REGEX "character_core\\.h$")
+    set(${VAR} ${HEADERS} PARENT_SCOPE)
+endfunction()
 
-set(ARENA_PLAYER_SOURCES
-    src/arena/player/controls/camera.cpp
-    src/arena/player/controls/crouching.cpp
-    src/arena/player/controls/movement.cpp
-    src/arena/player/inventory/inventory_core.cpp
-    src/arena/player/player_core.cpp
-    src/arena/player/ui/inventory_ui.cpp
-)
+# Collect sources by module
+collect_sources(ARENA_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/arena")
+collect_sources(CHARACTER_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/character")
+collect_sources(LLM_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/llm")
+collect_sources(SPLASH_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/splash")
+collect_sources(UTILS_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/utils")
 
-set(ARENA_SKYBOX_SOURCES
-    src/arena/skybox/astronomy/astronomy_calc.cpp
-    src/arena/skybox/astronomy/sun_position.cpp
-    src/arena/skybox/skybox_color.cpp
-    src/arena/skybox/skybox_core.cpp
-    src/arena/skybox/skybox_geometry.cpp
-    src/arena/skybox/skybox_render.cpp
-    src/arena/skybox/skybox_shaders.cpp
-)
-
-set(ARENA_UI_SOURCES
-    src/arena/ui/gl_widgets/gl_arena_character.cpp
-    src/arena/ui/gl_widgets/gl_arena_direct_rendering.cpp
-    src/arena/ui/gl_widgets/gl_arena_highlighting.cpp
-    src/arena/ui/gl_widgets/gl_arena_inventory.cpp
-    src/arena/ui/gl_widgets/gl_arena_widget_core.cpp
-    src/arena/ui/gl_widgets/gl_arena_widget_geometry.cpp
-    src/arena/ui/gl_widgets/gl_arena_widget_input.cpp
-    src/arena/ui/gl_widgets/gl_arena_widget_rendering.cpp
-    src/arena/ui/gl_widgets/gl_arena_widget_shaders.cpp
-    src/arena/ui/gl_widgets/gl_arena_widget_stub.cpp
-    src/arena/ui/views/arena_view.cpp
-    src/arena/ui/voxel_highlight_renderer.cpp
-)
-
-set(ARENA_VOXELS_SOURCES
-    src/arena/voxels/voxel_highlight.cpp
-    src/arena/voxels/voxel_render.cpp
-    src/arena/voxels/voxel_system_integration.cpp
-    src/arena/voxels/voxel_world.cpp
-)
-
-# Character Module Sources and Headers
-set(CHARACTER_CORE_SOURCES
-    src/character/core/character_core.cpp
-    src/character/core/character_manager_context.cpp
-    src/character/core/character_manager_memory.cpp
-    src/character/core/character_manager_personality.cpp
-)
-
-set(CHARACTER_EDITOR_SOURCES
-    src/character/editor/appearance_page.cpp
-    src/character/editor/basic_info_page.cpp
-    src/character/editor/editor_core.cpp
-    src/character/editor/memories_page.cpp
-    src/character/editor/personality_page.cpp
-)
-
-set(CHARACTER_MANAGER_SOURCES
-    src/character/manager/character_manager_appearance.cpp
-    src/character/manager/character_manager_core.cpp
-)
-
-set(CHARACTER_MEMORY_SOURCES
-    src/character/memory/memory_core.cpp
-    src/character/memory/memory_retrieval.cpp
-)
-
-set(CHARACTER_UI_SOURCES
-    src/character/ui/character_editor.cpp
-    src/character/ui/character_editor_appearance.cpp
-    src/character/ui/character_editor_basic.cpp
-    src/character/ui/character_editor_memory.cpp
-    src/character/ui/character_editor_personality.cpp
-    src/character/ui/character_manager_dialog.cpp
-)
-
-# LLM Module Sources and Headers
-set(LLM_SOURCES
-    src/llm/api/api_caller.cpp
-    src/llm/memory/memory_system.cpp
-    src/llm/memory/memory_system_helpers.cpp
-    src/llm/ui/oobabooga_bridge.cpp
-)
-
-# Splash Module Sources and Headers
-set(SPLASH_SOURCES
-    src/splash/dialogs/location_dialog.cpp
-)
-
-# Utils Module Sources and Headers
-set(UTILS_SOURCES
-    src/utils/opengl/opengl_debug.cpp
-)
-
-# Manually select only non-duplicate headers
-set(SELECTED_HEADERS
-    # Arena Core
-    include/arena/core/rendering/arena_renderer.h
-    
-    # Arena Game - excluded duplicates
-    # include/arena/game/game_scene.h  
-    # include/arena/game/player_controller.h
-    
-    # Arena Player
-    include/arena/player/inventory/inventory.h
-    include/arena/player/inventory/inventory_ui.h
-    # include/arena/player/player_core.h  # Duplicate
-    # include/arena/player/ui/player_ui.h # Duplicate
-    
-    # Arena Skybox
-    include/arena/skybox/astronomy/astronomy.h
-    # include/arena/skybox/sky_system.h   # Duplicate
-    include/arena/skybox/sky_system_helpers.h
-    # include/arena/skybox/skybox_core.h  # Duplicate
-    
-    # Arena UI
-    include/arena/ui/gl_widgets/gl_arena_widget.h
-    include/arena/ui/views/arena_view.h
-    include/arena/ui/voxel_highlight_renderer.h
-    
-    # Arena Voxels
-    include/arena/voxels/types/voxel_types.h
-    # include/arena/voxels/voxel_core.h   # Duplicate
-    include/arena/voxels/voxel_renderer.h
-    include/arena/voxels/voxel_system_integration.h
-    # include/arena/voxels/voxel_world.h  # Duplicate
-    # include/arena/voxels/voxel_placement.h # Duplicate
-    
-    # Character Core
-    # include/character/core/character_core.h # Duplicate
-    include/character/core/character_persistence.h
-    
-    # Character Editor
-    include/character/editor/character_editor.h
-    
-    # Character Manager - excluded duplicates
-    # include/character/manager/character_manager.h
-    
-    # Character Memory
-    include/character/memory/memory_system.h
-    
-    # Character Models
-    include/character/models/all_models.h
-    include/character/models/appearance.h
-    include/character/models/memory.h
-    include/character/models/personality.h
-    include/character/models/stats.h
-    
-    # Character UI
-    include/character/ui/character_editor_ui.h
-    
-    # LLM Module
-    # include/llm/api_core.h  # Duplicate
-    include/llm/oobabooga_bridge.h
-    
-    # Splash Module
-    include/splash/ui/location_dialog.h
-    
-    # Utils Module
-    include/utils/crash_handler.h
-    include/utils/error/error_handling.h
-    include/utils/opengl/opengl_utils.h
-    include/utils/opengl_debug.h
-)
+# Collect headers by module (only for IDE integration)
+collect_headers(ARENA_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/include/arena")
+collect_headers(CHARACTER_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/include/character")
+collect_headers(LLM_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/include/llm")
+collect_headers(SPLASH_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/include/splash")
+collect_headers(UTILS_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/include/utils")
 
 # Combine all sources
 set(ALL_SOURCES 
     ${MAIN_SOURCE}
-    ${ARENA_CORE_SOURCES}
-    ${ARENA_GAME_SOURCES}
-    ${ARENA_PLAYER_SOURCES}
-    ${ARENA_SKYBOX_SOURCES}
-    ${ARENA_UI_SOURCES}
-    ${ARENA_VOXELS_SOURCES}
-    ${CHARACTER_CORE_SOURCES}
-    ${CHARACTER_EDITOR_SOURCES}
-    ${CHARACTER_MANAGER_SOURCES}
-    ${CHARACTER_MEMORY_SOURCES}
-    ${CHARACTER_UI_SOURCES}
+    ${ARENA_SOURCES}
+    ${CHARACTER_SOURCES}
     ${LLM_SOURCES}
     ${SPLASH_SOURCES}
     ${UTILS_SOURCES}
 )
+
+# For IDE organization, add headers to a separate source group
+source_group("Arena Headers" FILES ${ARENA_HEADERS})
+source_group("Character Headers" FILES ${CHARACTER_HEADERS})
+source_group("LLM Headers" FILES ${LLM_HEADERS})
+source_group("Splash Headers" FILES ${SPLASH_HEADERS})
+source_group("Utils Headers" FILES ${UTILS_HEADERS})
 
 # Create resources directory if it doesn't exist
 if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/resources")
@@ -397,17 +230,37 @@ void main() {
 }
 ")
 
+# Define specific exclusion patterns for AUTOMOC processing
+set(EXCLUDED_MOC_FILES
+    "include/arena/player/player_core.h"
+    "include/character/core/character_core.h"
+)
+
 # Create the executable with resources
 add_executable(${PROJECT_NAME} 
-    ${SELECTED_HEADERS}
     ${ALL_SOURCES}
+    ${ARENA_HEADERS}
+    ${CHARACTER_HEADERS}
+    ${LLM_HEADERS}
+    ${SPLASH_HEADERS}
+    ${UTILS_HEADERS}
     ${CMAKE_CURRENT_BINARY_DIR}/resources.qrc
 )
 
-# Allow duplicate symbols for now (temporary fix for function redefinition issues during refactoring)
+# Set specific files to be excluded from AUTOMOC
+foreach(FILE ${EXCLUDED_MOC_FILES})
+    set_property(SOURCE ${FILE} PROPERTY SKIP_AUTOMOC ON)
+endforeach()
+
+# Handle duplicate definitions - we need to be more aggressive
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    # Allow duplicate symbols for linker
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--allow-multiple-definition")
 endif()
+
+# Force exclude problem files from MOC processing
+set_property(GLOBAL PROPERTY AUTOMOC_SOURCE_GROUP FALSE)
+set(CMAKE_AUTOMOC_MACRO_NAMES "Q_OBJECT" "Q_GADGET" "Q_NAMESPACE")
 
 # Link Qt and OpenGL libraries
 target_link_libraries(${PROJECT_NAME} PRIVATE

@@ -1,8 +1,8 @@
 // src/arena/voxels/voxel_system_integration.cpp
 #include "../../../include/arena/voxels/voxel_system_integration.h"
-#include "voxel_world.h"
-#include "voxel_renderer.h"
-#include "culling/view_frustum.h"
+#include "../../../include/arena/voxels/voxel_world.h"
+#include "../../../include/arena/voxels/voxel_renderer.h"
+#include "../../../include/arena/voxels/culling/view_frustum.h"
 #include <QDebug>
 #include <QDateTime>
 #include <QTimer>
@@ -175,6 +175,28 @@ void VoxelSystemIntegration::createDefaultWorld() {
     }
 }
 
+void VoxelSystemIntegration::createSphericalPlanet(float radius, float terrainHeight, unsigned int seed) {
+    if (!m_worldSystem) {
+        qCritical() << "Cannot create spherical planet: world system not initialized";
+        return;
+    }
+    
+    try {
+        // Initialize the world system with spherical planet settings
+        m_worldSystem->initialize(VoxelWorldSystem::WorldType::Spherical, seed);
+        
+        // Set the planet parameters on the generator if needed
+        // (This would need additional implementation if not handled in initialize)
+        
+        // Update the game scene to match the voxel world
+        QTimer::singleShot(0, this, [this]() {
+            updateGameScene();
+        });
+    } catch (const std::exception& e) {
+        qCritical() << "Failed to create spherical planet:" << e.what();
+    }
+}
+
 // Connect signals
 void VoxelSystemIntegration::connectSignals() {
     // Connect world changes to renderer if both exist
@@ -297,6 +319,21 @@ void VoxelSystemIntegration::updateGameScene() {
     isUpdating = false;
 }
 
+// The missing function implementation
+void VoxelSystemIntegration::streamChunksAroundPlayer(const QVector3D& playerPosition) {
+    if (!m_worldSystem) {
+        qWarning() << "Cannot stream chunks: World system not initialized";
+        return;
+    }
+    
+    try {
+        // Update chunks around the player's position
+        m_worldSystem->updateAroundViewer(playerPosition);
+    } catch (const std::exception& e) {
+        qCritical() << "Exception in streamChunksAroundPlayer:" << e.what();
+    }
+}
+
 // Set voxel highlight
 void VoxelSystemIntegration::setVoxelHighlight(const VoxelPos& pos, int face) {
     m_highlightedVoxelPos = pos;
@@ -316,4 +353,112 @@ int VoxelSystemIntegration::getHighlightedVoxelFace() const {
 // Get world reference
 VoxelWorld* VoxelSystemIntegration::getWorld() const {
     return m_world;
+}
+
+// Raycast from point in direction
+bool VoxelSystemIntegration::raycast(const QVector3D& origin, const QVector3D& direction, float maxDistance,
+                QVector3D& outHitPos, QVector3D& outHitNormal, Voxel& outVoxel) {
+    if (m_worldSystem) {
+        // Use world system for raycasting if available
+        ChunkCoordinate hitChunk;
+        return m_worldSystem->raycast(origin, direction, maxDistance, 
+                                    outHitPos, outHitNormal, outVoxel, hitChunk);
+    }
+    
+    // Fallback to simple raycasting if world system isn't available
+    // This is a simplified version and won't work for large worlds
+    float distance = 0.0f;
+    
+    // Voxel position we're examining
+    int x = std::floor(origin.x());
+    int y = std::floor(origin.y());
+    int z = std::floor(origin.z());
+    
+    // Direction of movement for each axis
+    int stepX = (direction.x() >= 0) ? 1 : -1;
+    int stepY = (direction.y() >= 0) ? 1 : -1;
+    int stepZ = (direction.z() >= 0) ? 1 : -1;
+    
+    // Distance to next boundary
+    float nextBoundaryX = (stepX > 0) ? (x + 1) : x;
+    float nextBoundaryY = (stepY > 0) ? (y + 1) : y;
+    float nextBoundaryZ = (stepZ > 0) ? (z + 1) : z;
+    
+    // Parameter values for next boundaries
+    float tMaxX = (direction.x() != 0) ? (nextBoundaryX - origin.x()) / direction.x() : std::numeric_limits<float>::max();
+    float tMaxY = (direction.y() != 0) ? (nextBoundaryY - origin.y()) / direction.y() : std::numeric_limits<float>::max();
+    float tMaxZ = (direction.z() != 0) ? (nextBoundaryZ - origin.z()) / direction.z() : std::numeric_limits<float>::max();
+    
+    // Parameter increments
+    float tDeltaX = (direction.x() != 0) ? stepX / direction.x() : std::numeric_limits<float>::max();
+    float tDeltaY = (direction.y() != 0) ? stepY / direction.y() : std::numeric_limits<float>::max();
+    float tDeltaZ = (direction.z() != 0) ? stepZ / direction.z() : std::numeric_limits<float>::max();
+    
+    // Face index for collision
+    int face = -1;
+    
+    // Loop until we hit something or exceed max distance
+    while (distance < maxDistance) {
+        // Check current voxel
+        outVoxel = m_world->getVoxel(x, y, z);
+        
+        // If not air, we hit something
+        if (outVoxel.type != VoxelType::Air) {
+            // Calculate exact hit point
+            outHitPos = origin + direction * distance;
+            
+            // Set normal based on face
+            switch (face) {
+                case 0: outHitNormal = QVector3D(1, 0, 0); break;  // +X
+                case 1: outHitNormal = QVector3D(-1, 0, 0); break; // -X
+                case 2: outHitNormal = QVector3D(0, 1, 0); break;  // +Y
+                case 3: outHitNormal = QVector3D(0, -1, 0); break; // -Y
+                case 4: outHitNormal = QVector3D(0, 0, 1); break;  // +Z
+                case 5: outHitNormal = QVector3D(0, 0, -1); break; // -Z
+            }
+            
+            return true;
+        }
+        
+        // Move to next voxel
+        if (tMaxX < tMaxY && tMaxX < tMaxZ) {
+            // X axis crossing
+            distance = tMaxX;
+            tMaxX += tDeltaX;
+            x += stepX;
+            face = (stepX > 0) ? 1 : 0; // -X or +X face
+        } else if (tMaxY < tMaxZ) {
+            // Y axis crossing
+            distance = tMaxY;
+            tMaxY += tDeltaY;
+            y += stepY;
+            face = (stepY > 0) ? 3 : 2; // -Y or +Y face
+        } else {
+            // Z axis crossing
+            distance = tMaxZ;
+            tMaxZ += tDeltaZ;
+            z += stepZ;
+            face = (stepZ > 0) ? 5 : 4; // -Z or +Z face
+        }
+    }
+    
+    // No hit
+    return false;
+}
+
+// Place voxel at hit position offset by normal
+bool VoxelSystemIntegration::placeVoxel(const QVector3D& hitPos, const QVector3D& normal, const Voxel& voxel) {
+    // Calculate position for new voxel
+    QVector3D newPos = hitPos + normal;
+    
+    // Place voxel (void return type, so we just call it and return true)
+    m_world->setVoxel(newPos.x(), newPos.y(), newPos.z(), voxel);
+    return true;
+}
+
+// Remove voxel at hit position
+bool VoxelSystemIntegration::removeVoxel(const QVector3D& hitPos) {
+    // Remove voxel by setting it to air
+    m_world->setVoxel(hitPos.x(), hitPos.y(), hitPos.z(), Voxel());
+    return true;
 }
