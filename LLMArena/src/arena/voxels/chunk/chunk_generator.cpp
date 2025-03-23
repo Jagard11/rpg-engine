@@ -1,5 +1,5 @@
 // src/arena/voxels/chunk/chunk_generator.cpp
-#include "../../../include/arena/voxels/chunk/chunk_generator.h"
+#include "../../../../include/arena/voxels/chunk/chunk_generator.h"
 #include <QDebug>
 #include <cmath>
 

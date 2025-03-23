@@ -1,5 +1,5 @@
 // src/splash/dialogs/location_dialog.cpp
-#include "../../include/splash/ui/location_dialog.h"
+#include "../../../include/splash/ui/location_dialog.h"
 #include <QGroupBox>
 #include <QRadioButton>
 #include <QDebug>

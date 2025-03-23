@@ -1,5 +1,5 @@
 // src/arena/voxels/chunk/chunk_coordinate.cpp
-#include "../../../include/arena/voxels/chunk/chunk_coordinate.h"
+#include "../../../../include/arena/voxels/chunk/chunk_coordinate.h"
 #include <cmath>
 
 ChunkCoordinate ChunkCoordinate::fromWorldPosition(const QVector3D& worldPosition) {

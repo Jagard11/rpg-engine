@@ -1,6 +1,6 @@
 // src/arena/skybox/skybox_core.cpp
-#include "../../include/arena/skybox/skybox_core.h"
-#include "../../include/arena/skybox/sky_system_helpers.h"
+#include "../../../include/arena/skybox/skybox_core.h"
+#include "../../../include/arena/skybox/sky_system_helpers.h"
 #include <QDebug>
 #include <QImage>
 #include <cmath>

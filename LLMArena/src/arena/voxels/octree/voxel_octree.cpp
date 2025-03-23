@@ -1,5 +1,5 @@
 // src/arena/voxels/octree/voxel_octree.cpp
-#include "../../../include/arena/voxels/octree/voxel_octree.h"
+#include "../../../../include/arena/voxels/octree/voxel_octree.h"
 #include <queue>
 #include <stack>
 

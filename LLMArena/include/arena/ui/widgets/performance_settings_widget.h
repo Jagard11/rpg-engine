@@ -12,6 +12,7 @@
 #include <QHBoxLayout>
 #include <QGroupBox>
 #include <QTimer>
+#include <QElapsedTimer>
 
 #include "../../system/performance_settings.h"
 

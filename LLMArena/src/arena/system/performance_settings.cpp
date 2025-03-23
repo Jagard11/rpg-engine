@@ -1,5 +1,5 @@
 // src/arena/system/performance_settings.cpp
-#include "../../include/arena/system/performance_settings.h"
+#include "../../../include/arena/system/performance_settings.h"
 #include <QVariant>
 #include <QDebug>
 

@@ -1,7 +1,7 @@
 // src/character/memory/memory_retrieval.cpp
 // This file contains only the helper functions needed to resolve linking errors
-#include "../include/character/memory/memory_system.h"
-#include "../include/character/core/character_persistence.h"
+#include "../../../include/character/memory/memory_system.h"
+#include "../../../include/character/core/character_persistence.h"
 
 #include <QRegExp>
 #include <QSet>

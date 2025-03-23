@@ -1,5 +1,5 @@
 // src/utils/opengl/opengl_debug.cpp
-#include "../../include/utils/opengl_debug.h"
+#include "../../../include/utils/opengl_debug.h"
 #include <QDir>
 #include <QThread>
 

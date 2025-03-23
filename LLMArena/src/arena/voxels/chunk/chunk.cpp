@@ -1,5 +1,5 @@
 // src/arena/voxels/chunk/chunk.cpp
-#include "../../../include/arena/voxels/chunk/chunk.h"
+#include "../../../../include/arena/voxels/chunk/chunk.h"
 #include <QDebug>
 
 Chunk::Chunk(const ChunkCoordinate& coordinate)

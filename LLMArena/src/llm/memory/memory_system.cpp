@@ -1,6 +1,6 @@
 // src/llm/memory/memory_system.cpp
 // Implementations of non-CharacterManager memory system functions
-#include "../include/character/memory/memory_system.h"
+#include "../../../include/character/memory/memory_system.h"
 #include <QDir>
 #include <QFileInfo>
 #include <QJsonDocument>

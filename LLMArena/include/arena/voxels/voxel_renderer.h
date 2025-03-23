@@ -14,7 +14,7 @@
 #include <QMap>
 #include <memory>
 
-// Forward declarations
+// Forward declaration - full definition will be included in the cpp file
 class ViewFrustum;
 
 // Class to render voxels using OpenGL
@@ -55,7 +55,7 @@ private:
     bool m_frustumCullingEnabled;
     bool m_backfaceCullingEnabled;
     
-    // View frustum for culling
+    // View frustum for culling - using pimpl idiom to avoid incomplete type issues
     std::unique_ptr<ViewFrustum> m_viewFrustum;
     
     // OpenGL resources

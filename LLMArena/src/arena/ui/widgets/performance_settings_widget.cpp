@@ -1,5 +1,5 @@
 // src/arena/ui/widgets/performance_settings_widget.cpp
-#include "../../../include/arena/ui/widgets/performance_settings_widget.h"
+#include "../../../../include/arena/ui/widgets/performance_settings_widget.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QGroupBox>

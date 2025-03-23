@@ -1,5 +1,5 @@
 // src/arena/voxels/chunk/chunk_manager.cpp
-#include "../../../include/arena/voxels/chunk/chunk_manager.h"
+#include "../../../../include/arena/voxels/chunk/chunk_manager.h"
 #include <QDebug>
 #include <algorithm>
 #include <chrono>

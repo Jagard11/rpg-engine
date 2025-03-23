@@ -1,5 +1,5 @@
 // src/arena/player/inventory/inventory_core.cpp
-#include "../../include/arena/player/inventory/inventory.h"
+#include "../../../../include/arena/player/inventory/inventory.h"
 #include <QDir>
 #include <QDebug>
 #include <QPainter>

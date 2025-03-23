@@ -1,5 +1,5 @@
 // src/arena/voxels/world/voxel_world_system.cpp
-#include "../../../include/arena/voxels/world/voxel_world_system.h"
+#include "../../../../include/arena/voxels/world/voxel_world_system.h"
 #include <QDebug>
 
 VoxelWorldSystem::VoxelWorldSystem(QObject* parent)

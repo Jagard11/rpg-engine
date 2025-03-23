@@ -1,6 +1,6 @@
 // src/arena/ui/views/arena_view.cpp
-#include "../include/arena/ui/views/arena_view.h"
-#include "../include/arena/ui/gl_widgets/gl_arena_widget.h"
+#include "../../../../include/arena/ui/views/arena_view.h"
+#include "../../../../include/arena/ui/gl_widgets/gl_arena_widget.h"
 #include <QDebug>
 #include <QMessageBox>
 #include <QTimer>

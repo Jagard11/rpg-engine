@@ -1,5 +1,8 @@
 // src/arena/voxels/voxel_system_integration.cpp
-#include "../../include/arena/voxels/voxel_system_integration.h"
+#include "../../../include/arena/voxels/voxel_system_integration.h"
+#include "voxel_world.h"
+#include "voxel_renderer.h"
+#include "culling/view_frustum.h"
 #include <QDebug>
 #include <QDateTime>
 #include <QTimer>

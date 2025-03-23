@@ -1,5 +1,5 @@
 // src/arena/ui/gl_widgets/gl_arena_widget_rendering.cpp
-#include "../../include/arena/ui/gl_widgets/gl_arena_widget.h"
+#include "../../../../include/arena/ui/gl_widgets/gl_arena_widget.h"
 #include <QDebug>
 #include <QMutex>
 #include <stdexcept>

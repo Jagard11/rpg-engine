@@ -66,6 +66,10 @@ public:
     void setLacunarity(float lacunarity) { m_lacunarity = lacunarity; }
     void setPersistence(float persistence) { m_persistence = persistence; }
     
+    // Noise generation methods - making them public so they can be used by other generators
+    float getNoise(float x, float y) const;
+    float getFractalNoise(float x, float y) const;
+    
 private:
     unsigned int m_seed;
     std::mt19937 m_random;
@@ -76,10 +80,6 @@ private:
     int m_octaves;
     float m_lacunarity;
     float m_persistence;
-    
-    // Helper methods
-    float getNoise(float x, float y) const;
-    float getFractalNoise(float x, float y) const;
 };
 
 /**

@@ -1,5 +1,5 @@
 // src/arena/skybox/skybox_shaders.cpp
-#include "../../include/arena/skybox/skybox_core.h"
+#include "../../../include/arena/skybox/skybox_core.h"
 #include <QDebug>
 
 void SkySystem::createShaders() {

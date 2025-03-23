@@ -1,5 +1,5 @@
 // src/arena/player/ui/inventory_ui.cpp
-#include "../../include/arena/player/inventory/inventory_ui.h"
+#include "../../../../include/arena/player/inventory/inventory_ui.h"
 #include <QDebug>
 #include <QImage>
 #include <QPainter>
