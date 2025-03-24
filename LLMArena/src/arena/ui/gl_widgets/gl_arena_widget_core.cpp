@@ -1,63 +1,85 @@
 // src/arena/ui/gl_widgets/gl_arena_widget_core.cpp
 #include "../../../include/arena/ui/gl_widgets/gl_arena_widget.h"
+#include "../../../include/arena/debug/debug_system.h" // Add include for DebugSystem definition
 #include <QDebug>
-#include <QMouseEvent>
-#include <QMatrix4x4>
-#include <QtMath>
 #include <QCursor>
+#include <QApplication>
 
 GLArenaWidget::GLArenaWidget(CharacterManager* charManager, QWidget* parent)
     : QOpenGLWidget(parent),
-      m_characterManager(charManager),
-      m_gameScene(nullptr),
-      m_playerController(nullptr),
-      m_voxelSystem(nullptr),
-      m_billboardProgram(nullptr),
-      m_initialized(false),
-      m_floorIndexCount(0),
-      m_gridVertexCount(0),
-      m_arenaRadius(10.0),
-      m_wallHeight(3.0),
-      m_highlightedVoxelFace(-1)
+    m_characterManager(charManager),
+    m_billboardProgram(nullptr),
+    m_initialized(false),
+    m_gameScene(nullptr),
+    m_playerController(nullptr),
+    m_voxelSystem(nullptr),
+    m_inventory(nullptr),
+    m_inventoryUI(nullptr),
+    m_arenaRadius(10.0),
+    m_wallHeight(3.0)
 {
     // Set focus policy to accept keyboard input
     setFocusPolicy(Qt::StrongFocus);
-    
-    // Enable mouse tracking for continuous updates
     setMouseTracking(true);
     
-    // Create game scene
+    // Create game scene for entity tracking
     m_gameScene = new GameScene(this);
     
     // Create player controller
     m_playerController = new PlayerController(m_gameScene, this);
     
-    // Connect player signals for camera updates
+    // Connect player controller signals
     connect(m_playerController, &PlayerController::positionChanged,
             this, &GLArenaWidget::onPlayerPositionChanged);
-            
     connect(m_playerController, &PlayerController::rotationChanged,
             this, &GLArenaWidget::onPlayerRotationChanged);
-            
     connect(m_playerController, &PlayerController::pitchChanged,
             this, &GLArenaWidget::onPlayerPitchChanged);
-    
-    // Set default eye height
-    m_playerController->setEyeHeight(1.7f);
 }
 
 GLArenaWidget::~GLArenaWidget()
 {
-    // Resources will be cleaned up automatically when context is destroyed
+    // The context must be made current for cleanup to work correctly
+    makeCurrent();
     
-    // Clean up character sprites
+    // Clean up character sprites first
     for (auto it = m_characterSprites.begin(); it != m_characterSprites.end(); ++it) {
         delete it.value();
     }
     m_characterSprites.clear();
     
-    // Clean up shader programs
+    // Clean up inventory UI
+    delete m_inventoryUI;
+    
+    // Clean up inventory system
+    delete m_inventory;
+    
+    // Clean up voxel system
+    delete m_voxelSystem;
+    
+    // Clean up OpenGL buffers
+    m_floorVBO.destroy();
+    m_floorIBO.destroy();
+    m_floorVAO.destroy();
+    
+    m_gridVBO.destroy();
+    m_gridVAO.destroy();
+    
+    for (auto& wall : m_walls) {
+        if (wall.vbo) wall.vbo->destroy();
+        if (wall.ibo) wall.ibo->destroy();
+        if (wall.vao) wall.vao->destroy();
+    }
+    m_walls.clear();
+    
+    // Clean up shaders
     delete m_billboardProgram;
+    
+    // Clean up game entities
+    delete m_playerController;
+    delete m_gameScene;
+    
+    doneCurrent();
 }
 
 void GLArenaWidget::initializeGL()
@@ -65,36 +87,42 @@ void GLArenaWidget::initializeGL()
     // Initialize OpenGL functions
     initializeOpenGLFunctions();
     
-    // Set clear color (sky blue)
-    glClearColor(0.53f, 0.81f, 0.92f, 1.0f);
-    
-    // Enable depth testing
+    // Set up OpenGL state
+    glClearColor(0.1f, 0.1f, 0.3f, 1.0f);
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     
-    // Create shaders
-    bool shadersOk = initShaders();
-    if (!shadersOk) {
-        qWarning() << "Failed to initialize shaders";
+    // Initialize shaders
+    if (!initShaders()) {
+        qCritical() << "Failed to initialize shaders";
+        return;
     }
     
-    // Create floor grid
-    createFloor(m_arenaRadius);
-    createGrid(m_arenaRadius * 2, 20);
+    // Set up view and projection matrices
+    m_projectionMatrix.setToIdentity();
+    m_projectionMatrix.perspective(60.0f, float(width()) / height(), 0.1f, 100.0f);
     
-    // Create initial arena walls
+    m_viewMatrix.setToIdentity();
+    m_viewMatrix.lookAt(QVector3D(0, 2, 10), QVector3D(0, 0, 0), QVector3D(0, 1, 0));
+    
+    // Create initial geometry
+    createFloor(20.0); // Large floor
+    createGrid(20.0, 20); // 20x20 grid
     createArena(m_arenaRadius, m_wallHeight);
     
-    // Initialize inventory system
-    initializeInventory();
+    // Create player entity
+    m_playerController->createPlayerEntity();
+    m_playerController->startUpdates();
     
     // Initialize voxel system
     m_voxelSystem = new VoxelSystemIntegration(m_gameScene, this);
     m_voxelSystem->initialize();
     m_voxelSystem->createDefaultWorld();
     
-    // Create player entity
-    m_playerController->createPlayerEntity();
-    m_playerController->startUpdates();
+    // Initialize inventory system
+    initializeInventory();
     
     // Initialize debug system
     initializeDebugSystem();
@@ -102,327 +130,127 @@ void GLArenaWidget::initializeGL()
     // Mark initialization as complete
     m_initialized = true;
     
-    // Signal that rendering is initialized
+    // Start the player controller updates
+    m_playerController->startUpdates();
+    
+    // Center cursor and setup mouse tracking
+    updateMouseTrackingState();
+    
+    // Emit signal that rendering is initialized
     emit renderingInitialized();
 }
 
 void GLArenaWidget::resizeGL(int w, int h)
 {
     // Update projection matrix for new aspect ratio
-    float aspect = static_cast<float>(w) / static_cast<float>(h ? h : 1);
-    
-    // Create perspective projection matrix
     m_projectionMatrix.setToIdentity();
-    m_projectionMatrix.perspective(70.0f, aspect, 0.1f, 1000.0f);
+    m_projectionMatrix.perspective(60.0f, float(w) / h, 0.1f, 100.0f);
     
-    // Update screen dimensions for mouse handling
-    m_playerController->setScreenSize(w, h);
+    // Update viewport
+    glViewport(0, 0, w, h);
+    
+    // Update screen dimensions for player controller
+    // We'll use updateMouseTrackingState() since it handles the screen dimensions implicitly
+    updateMouseTrackingState();
 }
 
 void GLArenaWidget::paintGL()
 {
-    // Clear the screen
+    // Clear screen
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
-    // Check if fully initialized
-    if (!m_initialized || !m_billboardProgram || !m_playerController) {
+    // Skip if not fully initialized
+    if (!m_initialized || !m_playerController) {
         return;
     }
     
-    // Update view matrix based on player position and rotation
+    // Update view matrix from player controller
     m_viewMatrix.setToIdentity();
     
-    // Apply player rotation (pitch and yaw)
-    QVector3D playerPos = m_playerController->getPosition();
-    float playerRotation = m_playerController->getRotation();
-    float playerPitch = m_playerController->getPitch();
+    QVector3D position = m_playerController->getPosition();
+    float yaw = m_playerController->getRotation();
+    float pitch = m_playerController->getPitch();
     
-    // Apply player pitch rotation around X axis
-    m_viewMatrix.rotate(playerPitch * 180.0f / M_PI, 1, 0, 0);
+    // Calculate view matrix from player position and rotation
+    QVector3D forwardVector(cos(yaw) * cos(pitch), sin(pitch), sin(yaw) * cos(pitch));
+    QVector3D upVector(0.0f, 1.0f, 0.0f);
     
-    // Apply player yaw rotation around Y axis
-    m_viewMatrix.rotate(playerRotation * 180.0f / M_PI, 0, 1, 0);
+    m_viewMatrix.lookAt(position, position + forwardVector, upVector);
     
-    // Apply player translation (negated for camera)
-    m_viewMatrix.translate(-playerPos);
-    
-    // Try to render voxel world if initialized
-    if (m_voxelSystem) {
-        try {
-            m_voxelSystem->render(m_viewMatrix, m_projectionMatrix);
-        } catch (...) {
-            // Ignore errors and continue rendering other elements
-        }
-    }
-    
-    // Render floor, grid, and walls
+    // Render floor and grid
     renderFloor();
     renderGrid();
+    
+    // Render arena walls
     renderWalls();
     
-    // Render characters
-    try {
-        renderCharacters();
-    } catch (...) {
-        // Fall back to simpler rendering method if there are errors
-        try {
-            renderCharactersFallback();
-        } catch (...) {
-            // Ignore if even fallback fails
-        }
+    // Render voxels if system is initialized
+    if (m_voxelSystem) {
+        m_voxelSystem->render(m_viewMatrix, m_projectionMatrix);
     }
     
-    // Render inventory UI if initialized
+    // Raycast for voxel placement/removal
+    if (m_voxelSystem && !m_inventoryUI->isVisible()) {
+        QVector3D forwardDirection(cos(yaw) * cos(pitch), sin(pitch), sin(yaw) * cos(pitch));
+        raycastVoxels(position, forwardDirection);
+        renderVoxelHighlight();
+    }
+    
+    // Render characters
+    if (m_billboardProgram && m_billboardProgram->isLinked()) {
+        renderCharacters();
+    } else {
+        // Try simpler methods if shader program isn't ready
+        renderCharactersSimple();
+    }
+    
+    // Render inventory UI
     if (m_inventoryUI) {
         m_inventoryUI->render(width(), height());
     }
     
-    // Render voxel highlight
-    try {
-        renderVoxelHighlight();
-    } catch (...) {
-        // Ignore errors in highlight rendering
-    }
-    
-    // Render debug visualizations last (on top of everything else)
-    renderDebugSystem();
-    
-    // Request another update to keep animation smooth
-    update();
-}
-
-void GLArenaWidget::keyPressEvent(QKeyEvent* event)
-{
-    if (!event) {
-        return;
-    }
-    
-    // Try to process through debug system first
-    if (processDebugKeyEvent(event)) {
-        // Debug system handled the key, don't pass to other systems
-        event->accept();
-        return;
-    }
-    
-    // Process inventory UI key events if inventory is visible
-    if (m_inventoryUI && m_inventoryUI->isVisible()) {
-        m_inventoryUI->handleKeyPress(event->key());
-        event->accept();
-        return;
-    }
-    
-    // Handle inventory toggle with 'I' key
-    if (event->key() == Qt::Key_I && m_inventoryUI) {
-        m_inventoryUI->setVisible(!m_inventoryUI->isVisible());
-        updateMouseTrackingState();
-        event->accept();
-        return;
-    }
-    
-    // Handle voxel placement with mouse buttons
-    if (event->key() == Qt::Key_E) {
-        placeVoxel();
-        event->accept();
-        return;
-    }
-    
-    if (event->key() == Qt::Key_Q) {
-        removeVoxel();
-        event->accept();
-        return;
-    }
-    
-    // Check for F3 key (debug menu toggle)
-    if (event->key() == Qt::Key_F3) {
-        toggleDebugConsole();
-        event->accept();
-        return;
-    }
-    
-    // Check for F4 key (frustum visualization toggle)
-    if (event->key() == Qt::Key_F4) {
-        toggleFrustumVisualization();
-        event->accept();
-        return;
-    }
-    
-    // Pass event to player controller for movement
-    m_playerController->handleKeyPress(event);
-    
-    // Special handling for Escape key
-    if (event->key() == Qt::Key_Escape) {
-        // If debug console is visible, hide it
-        if (isDebugConsoleVisible()) {
-            toggleDebugConsole();
-            event->accept();
-            return;
-        }
-        
-        // If inventory is visible, hide it
-        if (m_inventoryUI && m_inventoryUI->isVisible()) {
-            m_inventoryUI->setVisible(false);
-            updateMouseTrackingState();
-            event->accept();
-            return;
-        }
-    }
-}
-
-void GLArenaWidget::keyReleaseEvent(QKeyEvent* event)
-{
-    if (!event) {
-        return;
-    }
-    
-    // Pass key release to player controller
-    m_playerController->handleKeyRelease(event);
-}
-
-void GLArenaWidget::mouseMoveEvent(QMouseEvent* event)
-{
-    if (!event) {
-        return;
-    }
-    
-    // Check if inventory is visible
-    if (m_inventoryUI && m_inventoryUI->isVisible()) {
-        m_inventoryUI->handleMouseMove(event->x(), event->y());
-        event->accept();
-        return;
-    }
-    
-    // Check if debug console is visible
-    if (isDebugConsoleVisible()) {
-        // Don't process mouse movement when console is open
-        event->accept();
-        return;
-    }
-    
-    // Pass event to player controller
-    m_playerController->handleMouseMove(event);
-    
-    // Reset cursor position to center of widget for continuous rotation
-    QCursor::setPos(mapToGlobal(QPoint(width() / 2, height() / 2)));
-    
-    // Raycast for voxel highlighting
-    QVector3D playerPos = m_playerController->getPosition();
-    
-    // Calculate view direction from rotation
-    float rotation = m_playerController->getRotation();
-    float pitch = m_playerController->getPitch();
-    
-    QVector3D viewDir(
-        cos(pitch) * cos(rotation),
-        sin(pitch),
-        cos(pitch) * sin(rotation)
-    );
-    
-    raycastVoxels(playerPos, viewDir);
-}
-
-void GLArenaWidget::mousePressEvent(QMouseEvent* event)
-{
-    if (!event) {
-        return;
-    }
-    
-    // Check if inventory is visible
-    if (m_inventoryUI && m_inventoryUI->isVisible()) {
-        m_inventoryUI->handleMousePress(event->x(), event->y(), event->button());
-        event->accept();
-        return;
-    }
-    
-    // Left click to place voxel
-    if (event->button() == Qt::LeftButton) {
-        placeVoxel();
-    }
-    // Right click to remove voxel
-    else if (event->button() == Qt::RightButton) {
-        removeVoxel();
-    }
-}
-
-void GLArenaWidget::mouseReleaseEvent(QMouseEvent* event)
-{
-    if (!event) {
-        return;
-    }
-    
-    // Check if inventory is visible
-    if (m_inventoryUI && m_inventoryUI->isVisible()) {
-        m_inventoryUI->handleMouseRelease(event->x(), event->y(), event->button());
-        event->accept();
-        return;
+    // Render debug system last (on top of everything else)
+    if (m_debugSystem) {
+        renderDebugSystem();
     }
 }
 
 void GLArenaWidget::updateMouseTrackingState()
 {
-    // Check if inventory UI is visible
-    bool inventoryVisible = m_inventoryUI && m_inventoryUI->isVisible();
-    
-    // Check if debug console is visible
-    bool consoleVisible = isDebugConsoleVisible();
-    
-    if (inventoryVisible || consoleVisible) {
-        // Show cursor for UI interaction
-        setCursor(Qt::ArrowCursor);
-        setMouseTracking(true);
-    } else {
-        // Hide cursor for FPS camera control
+    if (hasFocus() && isActiveWindow() && !m_inventoryUI->isVisible()) {
+        // Hide cursor and enable mouse tracking
         setCursor(Qt::BlankCursor);
-        setMouseTracking(true);
         
-        // Reset cursor to center of screen
+        // Center cursor position
         QCursor::setPos(mapToGlobal(QPoint(width() / 2, height() / 2)));
+    } else {
+        // Show cursor
+        setCursor(Qt::ArrowCursor);
     }
 }
 
-void GLArenaWidget::initializeArena(double radius, double wallHeight)
-{
-    // Update arena parameters
-    m_arenaRadius = radius;
-    m_wallHeight = wallHeight;
-    
-    // Create arena in game scene
-    if (m_gameScene) {
-        m_gameScene->createRectangularArena(radius, wallHeight);
-    }
-    
-    // Update arena geometry
-    if (isValid() && context()->isValid()) {
-        makeCurrent();
-        
-        // Re-create floor and grid with new radius
-        createFloor(radius);
-        createGrid(radius * 2, 20);
-        
-        // Re-create walls with new dimensions
-        createArena(radius, wallHeight);
-        
-        doneCurrent();
-    }
-}
-
-// Player controller getter
 PlayerController* GLArenaWidget::getPlayerController() const
 {
     return m_playerController;
 }
 
-// Player position change handler
+void GLArenaWidget::setActiveCharacter(const QString& name) 
+{
+    m_activeCharacter = name;
+    qDebug() << "Set active character to:" << name;
+}
+
 void GLArenaWidget::onPlayerPositionChanged(const QVector3D& position)
 {
-    // Update player entity in game scene
+    // Update player position in game scene
     if (m_gameScene) {
         m_gameScene->updateEntityPosition("player", position);
     }
     
-    // Signal position update
+    // Emit signal for player position change
     emit playerPositionUpdated(position.x(), position.y(), position.z());
     
-    // Update voxel chunks around player if voxel system is enabled
+    // Update voxel streaming around player
     if (m_voxelSystem) {
         m_voxelSystem->streamChunksAroundPlayer(position);
     }
@@ -431,16 +259,14 @@ void GLArenaWidget::onPlayerPositionChanged(const QVector3D& position)
     update();
 }
 
-// Player rotation change handler
 void GLArenaWidget::onPlayerRotationChanged(float rotation)
 {
-    // Request redraw
+    // Update view based on new rotation
     update();
 }
 
-// Player pitch change handler
 void GLArenaWidget::onPlayerPitchChanged(float pitch)
 {
-    // Request redraw
+    // Update view based on new pitch
     update();
 }

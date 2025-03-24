@@ -69,6 +69,9 @@ public:
     // Helper methods for determining the size of the parent widget for mouse centering
     int width() const;
     int height() const;
+    
+    // Set screen dimensions (needed for GLArenaWidget integration)
+    void setScreenDimensions(int width, int height);
 
 public slots:
     // Update player position based on current movement
