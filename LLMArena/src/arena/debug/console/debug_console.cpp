@@ -9,6 +9,10 @@
 #include <QDateTime>
 #include <QKeyEvent>
 #include <QFontDatabase>
+#include <QWidget>  // Include the full QWidget header
+
+// Register quintptr as a metatype for QVariant usage
+Q_DECLARE_METATYPE(quintptr)
 
 DebugConsole::DebugConsole(GameScene* scene, PlayerController* player, QObject* parent)
     : QObject(parent),
@@ -115,26 +119,13 @@ void DebugConsole::render(int screenWidth, int screenHeight) {
     m_quadVAO.release();
     m_consoleShader->release();
     
-    // Draw console text using QPainter
-    QPainter painter(this->parent()->property("qpainter_target").value<QPaintDevice*>());
-    if (painter.isActive()) {
-        painter.setFont(m_consoleFont);
-        
-        // Draw output lines
-        int lineHeight = 20;
-        int outputY = consoleHeight - 60; // Start above input line
-        
-        for (int i = m_outputLines.size() - 1; i >= 0 && outputY > 0; --i) {
-            painter.setPen(Qt::white);
-            painter.drawText(10, outputY, m_outputLines[i]);
-            outputY -= lineHeight;
-        }
-        
-        // Draw input line
-        painter.setPen(Qt::green);
-        painter.drawText(10, consoleHeight - 30, "> " + m_inputText + "_");
-        
-        painter.end();
+    // Get the rendering target widget using a safer approach
+    quintptr widgetPtr = this->property("render_widget").value<quintptr>();
+    QWidget* widget = reinterpret_cast<QWidget*>(widgetPtr);
+    
+    // Draw console text using the drawConsoleText helper
+    if (widget) {
+        drawConsoleText(screenWidth, screenHeight, consoleHeight);
     }
     
     // Restore OpenGL state

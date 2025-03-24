@@ -1,12 +1,12 @@
 // src/arena/debug/debug_system.cpp
-#include "../../include/arena/debug/debug_system.h"
-#include "../../include/arena/debug/console/debug_console.h"
-#include "../../include/arena/debug/commands/location_command.h"
-#include "../../include/arena/debug/commands/teleport_command.h"
-#include "../../include/arena/debug/commands/frustum_cull_command.h"
-#include "../../include/arena/debug/visualizers/frustum_visualizer.h"
-#include "../../include/arena/game/player_controller.h"
-#include "../../include/arena/core/arena_core.h"
+#include "../../../include/arena/debug/debug_system.h"
+#include "../../../include/arena/debug/console/debug_console.h"
+#include "../../../include/arena/debug/commands/location_command.h"
+#include "../../../include/arena/debug/commands/teleport_command.h"
+#include "../../../include/arena/debug/commands/frustum_cull_command.h"
+#include "../../../include/arena/debug/visualizers/frustum_visualizer.h"
+#include "../../../include/arena/game/player_controller.h"
+#include "../../../include/arena/core/arena_core.h"
 #include <QApplication>
 #include <QDebug>
 

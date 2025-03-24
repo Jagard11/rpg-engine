@@ -17,6 +17,7 @@
 class DebugCommand;
 class GameScene;
 class PlayerController;
+class QPaintDevice;
 
 /**
  * @brief Debug console for in-game commands and debugging
@@ -134,9 +135,9 @@ private:
     
     // Create quad geometry for console background
     void createQuadGeometry();
-
-    // Include rendering-related methods
-    #include "debug_console_render.h"
+    
+    // Helper method to draw console text with QPainter
+    void drawConsoleText(int screenWidth, int screenHeight, float consoleHeight);
 };
 
 #endif // DEBUG_CONSOLE_H
