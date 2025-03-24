@@ -1,290 +1,278 @@
 // src/arena/ui/gl_widgets/gl_arena_widget_renderer.cpp
 #include "../../../../include/arena/ui/gl_widgets/gl_arena_widget.h"
 #include <QDebug>
-#include <QOpenGLBuffer>
-#include <QOpenGLVertexArrayObject>
 #include <QOpenGLShaderProgram>
 #include <QOpenGLTexture>
 #include <QMatrix4x4>
 #include <QVector3D>
+#include <QPainter>
 #include <cmath>
 
-// Rendering methods for GLArenaWidget
-
 void GLArenaWidget::createFloor(double radius) {
-    // Create floor VAO and buffer
-    m_floorVAO.create();
+    // Cleanup previous geometry if it exists
+    if (m_floorVAO.isCreated()) {
+        m_floorVAO.destroy();
+    }
+    
+    if (m_floorVBO.isCreated()) {
+        m_floorVBO.destroy();
+    }
+    
+    if (m_floorIBO.isCreated()) {
+        m_floorIBO.destroy();
+    }
+    
+    // Create VAO
+    if (!m_floorVAO.create()) {
+        qWarning() << "Failed to create floor VAO";
+        return;
+    }
+    
     m_floorVAO.bind();
     
-    // Create vertex buffer
-    m_floorVBO.create();
+    // Create VBO
+    if (!m_floorVBO.create()) {
+        qWarning() << "Failed to create floor VBO";
+        m_floorVAO.release();
+        return;
+    }
+    
     m_floorVBO.bind();
     
-    // Simple floor: just a quad centered at the origin at y=0
+    // Simple square for the floor
+    const float floorY = 0.0f;  // At ground level
     float vertices[] = {
-        // Position (x,y,z), Normal (nx,ny,nz), Color (r,g,b), TexCoord (u,v)
-        -radius, 0.0, -radius,  0.0, 1.0, 0.0,  0.5, 0.5, 0.5,  0.0, 0.0,
-         radius, 0.0, -radius,  0.0, 1.0, 0.0,  0.5, 0.5, 0.5,  1.0, 0.0,
-         radius, 0.0,  radius,  0.0, 1.0, 0.0,  0.5, 0.5, 0.5,  1.0, 1.0,
-        -radius, 0.0,  radius,  0.0, 1.0, 0.0,  0.5, 0.5, 0.5,  0.0, 1.0
+        // Position (x, y, z)    // Normal     // TexCoord (u, v)
+        -radius, floorY, -radius, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
+        radius, floorY, -radius, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f,
+        radius, floorY, radius, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f,
+        -radius, floorY, radius, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f
     };
     
-    // Upload vertex data
     m_floorVBO.allocate(vertices, sizeof(vertices));
     
-    // Create index buffer
-    m_floorIBO.create();
+    // Set up vertex attributes
+    glEnableVertexAttribArray(0);  // Position
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), nullptr);
+    
+    glEnableVertexAttribArray(1);  // Normal
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), 
+                        reinterpret_cast<void*>(3 * sizeof(float)));
+    
+    glEnableVertexAttribArray(2);  // Texture coordinates
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), 
+                        reinterpret_cast<void*>(6 * sizeof(float)));
+    
+    // Create IBO
+    if (!m_floorIBO.create()) {
+        qWarning() << "Failed to create floor IBO";
+        m_floorVBO.release();
+        m_floorVAO.release();
+        return;
+    }
+    
     m_floorIBO.bind();
     
-    // Simple quad indices
-    GLuint indices[] = {
-        0, 1, 2,
-        2, 3, 0
+    // Indices for 2 triangles forming a quad
+    unsigned int indices[] = {
+        0, 1, 2,   // First triangle
+        0, 2, 3    // Second triangle
     };
     
-    // Upload index data
     m_floorIBO.allocate(indices, sizeof(indices));
-    m_floorIndexCount = 6;
+    m_floorIndexCount = 6;  // 6 indices, 2 triangles
     
-    // Set up vertex attributes
-    // Position
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 11 * sizeof(float), nullptr);
-    
-    // Normal
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 11 * sizeof(float), 
-                         reinterpret_cast<void*>(3 * sizeof(float)));
-    
-    // Color
-    glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 11 * sizeof(float), 
-                         reinterpret_cast<void*>(6 * sizeof(float)));
-    
-    // Texture Coordinates
-    glEnableVertexAttribArray(3);
-    glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, 11 * sizeof(float), 
-                         reinterpret_cast<void*>(9 * sizeof(float)));
-    
-    // Unbind buffers in reverse order
+    // Release bindings
     m_floorIBO.release();
     m_floorVBO.release();
     m_floorVAO.release();
     
-    // Log success
     qDebug() << "Floor geometry created successfully: radius =" << radius 
-             << "VAO =" << m_floorVAO.isCreated() 
-             << "VBO =" << m_floorVBO.isCreated() 
-             << "IBO =" << m_floorIBO.isCreated()
-             << "Indices =" << m_floorIndexCount;
-}
-
-void GLArenaWidget::createGrid(double size, int divisions) {
-    // Create grid VAO and buffer
-    m_gridVAO.create();
-    m_gridVAO.bind();
-    
-    // Create vertex buffer
-    m_gridVBO.create();
-    m_gridVBO.bind();
-    
-    // Calculate number of lines in each direction
-    int lineCount = (divisions + 1) * 2;
-    
-    // Calculate spacing between lines
-    float spacing = size / divisions;
-    
-    // Create an array to hold all the grid line vertices
-    // Each line has 2 vertices, each vertex has position (x,y,z) and color (r,g,b)
-    std::vector<float> vertices;
-    vertices.reserve(lineCount * 2 * 6); // 2 vertices per line, 6 floats per vertex
-    
-    // Create grid lines along X axis
-    for (int i = 0; i <= divisions; ++i) {
-        float pos = -size/2 + i * spacing;
-        
-        // First endpoint
-        vertices.push_back(-size/2);  // x
-        vertices.push_back(0.01f);    // y (slightly above ground to avoid z-fighting)
-        vertices.push_back(pos);      // z
-        vertices.push_back(0.3f);     // r
-        vertices.push_back(0.3f);     // g
-        vertices.push_back(0.3f);     // b
-        
-        // Second endpoint
-        vertices.push_back(size/2);   // x
-        vertices.push_back(0.01f);    // y
-        vertices.push_back(pos);      // z
-        vertices.push_back(0.3f);     // r
-        vertices.push_back(0.3f);     // g
-        vertices.push_back(0.3f);     // b
-    }
-    
-    // Create grid lines along Z axis
-    for (int i = 0; i <= divisions; ++i) {
-        float pos = -size/2 + i * spacing;
-        
-        // First endpoint
-        vertices.push_back(pos);      // x
-        vertices.push_back(0.01f);    // y
-        vertices.push_back(-size/2);  // z
-        vertices.push_back(0.3f);     // r
-        vertices.push_back(0.3f);     // g
-        vertices.push_back(0.3f);     // b
-        
-        // Second endpoint
-        vertices.push_back(pos);      // x
-        vertices.push_back(0.01f);    // y
-        vertices.push_back(size/2);   // z
-        vertices.push_back(0.3f);     // r
-        vertices.push_back(0.3f);     // g
-        vertices.push_back(0.3f);     // b
-    }
-    
-    // Upload vertex data
-    m_gridVBO.allocate(vertices.data(), vertices.size() * sizeof(float));
-    m_gridVertexCount = vertices.size() / 6; // 6 floats per vertex
-    
-    // Set up vertex attributes
-    // Position
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), nullptr);
-    
-    // Color
-    glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), 
-                         reinterpret_cast<void*>(3 * sizeof(float)));
-    
-    // Unbind VBO and VAO
-    m_gridVBO.release();
-    m_gridVAO.release();
-    
-    // Log success
-    qDebug() << "Grid created with" << m_gridVertexCount << "vertices"
-             << "VAO =" << m_gridVAO.isCreated() 
-             << "VBO =" << m_gridVBO.isCreated();
+            << "VAO =" << m_floorVAO.isCreated() 
+            << "VBO =" << m_floorVBO.isCreated() 
+            << "IBO =" << m_floorIBO.isCreated()
+            << "Indices =" << m_floorIndexCount;
 }
 
 void GLArenaWidget::renderFloor() {
-    // Safety check
-    if (!m_billboardProgram || !m_billboardProgram->isLinked() || !m_floorVAO.isCreated()) {
-        qWarning() << "Cannot render floor: shader or VAO not initialized";
-        return;
-    }
-    
-    // Bind shader
-    m_billboardProgram->bind();
-    
-    // Set up model view matrix (identity - floor is at origin)
-    QMatrix4x4 modelView;
-    modelView.setToIdentity();
-    m_billboardProgram->setUniformValue("modelView", modelView);
-    
-    // Set up projection matrix
-    m_billboardProgram->setUniformValue("projection", m_projectionMatrix);
-    
-    // Set lighting
-    m_billboardProgram->setUniformValue("lightPos", QVector3D(0, 20, 0));
-    m_billboardProgram->setUniformValue("useTexture", false);
-    
-    // Bind floor VAO
-    m_floorVAO.bind();
-    
-    // Make sure the index buffer is bound
-    m_floorIBO.bind();
-    
-    // Draw triangles with indices
-    glDrawElements(GL_TRIANGLES, m_floorIndexCount, GL_UNSIGNED_INT, nullptr);
-    
-    // Unbind buffers
-    m_floorIBO.release();
-    m_floorVAO.release();
-    
-    // Unbind shader
-    m_billboardProgram->release();
-}
-
-void GLArenaWidget::renderGrid() {
-    // Safety check
-    if (!m_billboardProgram || !m_billboardProgram->isLinked() || !m_gridVAO.isCreated()) {
-        return;
-    }
-    
-    // Bind shader
-    m_billboardProgram->bind();
-    
-    // Set up model view matrix (identity - grid is at origin)
-    QMatrix4x4 modelView;
-    modelView.setToIdentity();
-    m_billboardProgram->setUniformValue("modelView", modelView);
-    
-    // Set up projection matrix
-    m_billboardProgram->setUniformValue("projection", m_projectionMatrix);
-    
-    // Turn off lighting for grid
-    m_billboardProgram->setUniformValue("useTexture", false);
-    m_billboardProgram->setUniformValue("useColor", true);
-    
-    // Bind grid VAO
-    m_gridVAO.bind();
-    
-    // Draw lines
-    glDrawArrays(GL_LINES, 0, m_gridVertexCount);
-    
-    // Unbind VAO
-    m_gridVAO.release();
-    
-    // Unbind shader
-    m_billboardProgram->release();
-}
-
-void GLArenaWidget::renderWalls() {
-    // Safety check
+    // Skip if shader is not available
     if (!m_billboardProgram || !m_billboardProgram->isLinked()) {
         return;
     }
     
+    // Skip if any required buffer isn't available
+    if (!m_floorVAO.isCreated() || !m_floorVBO.isCreated() || !m_floorIBO.isCreated()) {
+        qWarning() << "Floor geometry not properly initialized for rendering";
+        return;
+    }
+    
     // Bind shader
     m_billboardProgram->bind();
     
-    // Set lighting
-    m_billboardProgram->setUniformValue("lightPos", QVector3D(0, 20, 0));
-    m_billboardProgram->setUniformValue("useTexture", false);
-    m_billboardProgram->setUniformValue("useColor", true);
+    // Set uniforms for floor rendering
+    QMatrix4x4 modelMatrix;
+    modelMatrix.setToIdentity();
     
-    // Render each wall
-    for (const auto& wall : m_walls) {
-        // Safety check
-        if (!wall.vao || !wall.vao->isCreated() || !wall.ibo || !wall.ibo->isCreated()) {
-            continue;
-        }
-        
-        // Set up model matrix (identity - walls are positioned in world space)
-        QMatrix4x4 modelView;
-        modelView.setToIdentity();
-        m_billboardProgram->setUniformValue("modelView", modelView);
-        
-        // Set up projection matrix
-        m_billboardProgram->setUniformValue("projection", m_projectionMatrix);
-        
-        // Bind wall VAO
-        wall.vao->bind();
-        wall.ibo->bind();
-        
-        // Draw wall triangles
-        glDrawElements(GL_TRIANGLES, wall.indexCount, GL_UNSIGNED_INT, nullptr);
-        
-        // Unbind buffers
-        wall.ibo->release();
-        wall.vao->release();
+    m_billboardProgram->setUniformValue("model", modelMatrix);
+    m_billboardProgram->setUniformValue("view", m_viewMatrix);
+    m_billboardProgram->setUniformValue("projection", m_projectionMatrix);
+    
+    // Set floor color (light gray)
+    QVector4D floorColor(0.8f, 0.8f, 0.8f, 1.0f);
+    m_billboardProgram->setUniformValue("color", floorColor);
+    m_billboardProgram->setUniformValue("useTexture", false);  // No texture for now
+    
+    // Bind VAO and IBO - CRITICAL: MUST bind both VAO and IBO!
+    m_floorVAO.bind();
+    m_floorIBO.bind();  // This was missing and causing the crash
+    
+    // Draw floor quad
+    glDrawElements(GL_TRIANGLES, m_floorIndexCount, GL_UNSIGNED_INT, nullptr);
+    
+    // Release bindings
+    m_floorIBO.release();
+    m_floorVAO.release();
+    m_billboardProgram->release();
+}
+
+void GLArenaWidget::createGrid(double size, int divisions) {
+    // Cleanup previous geometry if it exists
+    if (m_gridVAO.isCreated()) {
+        m_gridVAO.destroy();
     }
     
-    // Unbind shader
+    if (m_gridVBO.isCreated()) {
+        m_gridVBO.destroy();
+    }
+    
+    // Create VAO
+    if (!m_gridVAO.create()) {
+        qWarning() << "Failed to create grid VAO";
+        return;
+    }
+    
+    m_gridVAO.bind();
+    
+    // Create VBO
+    if (!m_gridVBO.create()) {
+        qWarning() << "Failed to create grid VBO";
+        m_gridVAO.release();
+        return;
+    }
+    
+    m_gridVBO.bind();
+    
+    // Calculate the number of vertices needed
+    int numLines = divisions + 1;
+    int numVertices = numLines * 4;  // 2 vertices per line, 2 lines per grid line (X and Z)
+    
+    // Create vertex data for grid lines
+    QVector<float> vertices;
+    vertices.reserve(numVertices * 3);  // 3 floats (x, y, z) per vertex
+    
+    float step = size / divisions;
+    float halfSize = size / 2.0f;
+    float y = 0.01f;  // Slightly above floor to avoid z-fighting
+    
+    // Add lines along X-axis
+    for (int i = 0; i <= divisions; i++) {
+        float z = -halfSize + i * step;
+        
+        // Line from -X to +X at current Z
+        vertices.append(-halfSize);
+        vertices.append(y);
+        vertices.append(z);
+        
+        vertices.append(halfSize);
+        vertices.append(y);
+        vertices.append(z);
+    }
+    
+    // Add lines along Z-axis
+    for (int i = 0; i <= divisions; i++) {
+        float x = -halfSize + i * step;
+        
+        // Line from -Z to +Z at current X
+        vertices.append(x);
+        vertices.append(y);
+        vertices.append(-halfSize);
+        
+        vertices.append(x);
+        vertices.append(y);
+        vertices.append(halfSize);
+    }
+    
+    m_gridVBO.allocate(vertices.data(), vertices.size() * sizeof(float));
+    
+    // Set up vertex attributes
+    glEnableVertexAttribArray(0);  // Position only
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), nullptr);
+    
+    // Store the number of vertices
+    m_gridVertexCount = vertices.size() / 3;
+    
+    // Release bindings
+    m_gridVBO.release();
+    m_gridVAO.release();
+    
+    qDebug() << "Grid created with" << m_gridVertexCount << "vertices"
+            << "VAO =" << m_gridVAO.isCreated()
+            << "VBO =" << m_gridVBO.isCreated();
+}
+
+void GLArenaWidget::renderGrid() {
+    // Skip if shader is not available
+    if (!m_billboardProgram || !m_billboardProgram->isLinked()) {
+        return;
+    }
+    
+    // Skip if grid geometry is not created
+    if (!m_gridVAO.isCreated() || !m_gridVBO.isCreated() || m_gridVertexCount == 0) {
+        return;
+    }
+    
+    // Bind shader
+    m_billboardProgram->bind();
+    
+    // Set uniforms for grid rendering
+    QMatrix4x4 modelMatrix;
+    modelMatrix.setToIdentity();
+    
+    m_billboardProgram->setUniformValue("model", modelMatrix);
+    m_billboardProgram->setUniformValue("view", m_viewMatrix);
+    m_billboardProgram->setUniformValue("projection", m_projectionMatrix);
+    
+    // Set grid color (dark gray)
+    QVector4D gridColor(0.3f, 0.3f, 0.3f, 0.7f);
+    m_billboardProgram->setUniformValue("color", gridColor);
+    m_billboardProgram->setUniformValue("useTexture", false);  // No texture for grid
+    
+    // Bind VAO
+    m_gridVAO.bind();
+    
+    // Enable blending for semi-transparent grid
+    GLboolean blendEnabled;
+    glGetBooleanv(GL_BLEND, &blendEnabled);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    
+    // Draw grid lines
+    glDrawArrays(GL_LINES, 0, m_gridVertexCount);
+    
+    // Restore previous blend state
+    if (!blendEnabled) {
+        glDisable(GL_BLEND);
+    }
+    
+    // Release bindings
+    m_gridVAO.release();
     m_billboardProgram->release();
 }
 
 void GLArenaWidget::createArena(double radius, double wallHeight) {
-    // Store the arena parameters
+    qDebug() << "Creating arena with radius" << radius << "and wall height" << wallHeight;
+    
+    // Store parameters
     m_arenaRadius = radius;
     m_wallHeight = wallHeight;
     
@@ -292,161 +280,221 @@ void GLArenaWidget::createArena(double radius, double wallHeight) {
     createFloor(radius);
     
     // Create grid
-    createGrid(radius * 2, 16);
+    createGrid(radius * 2, 10);
     
     // Clear any existing walls
     m_walls.clear();
     
-    // Create four walls for rectangular arena
-    
+    // Create 4 walls for a rectangular arena
     // North wall (positive Z)
-    createWallGeometry(
-        QVector3D(0.0f, wallHeight / 2.0f, radius), // Position at center of wall
-        QVector3D(radius * 2.0f, wallHeight, 0.2f), // Dimensions (x, y, z)
-        QVector3D(0.0f, 0.0f, 0.0f)                // No rotation
-    );
+    QVector3D northWallPos(0, wallHeight / 2, radius);
+    QVector3D northWallDim(radius * 2, wallHeight, 0.2);
+    QVector3D northWallRot(0, 0, 0);
+    createWallGeometry(northWallPos, northWallDim, northWallRot);
     
     // South wall (negative Z)
-    createWallGeometry(
-        QVector3D(0.0f, wallHeight / 2.0f, -radius), // Position
-        QVector3D(radius * 2.0f, wallHeight, 0.2f),  // Dimensions
-        QVector3D(0.0f, 0.0f, 0.0f)                 // No rotation
-    );
+    QVector3D southWallPos(0, wallHeight / 2, -radius);
+    QVector3D southWallDim(radius * 2, wallHeight, 0.2);
+    QVector3D southWallRot(0, 0, 0);
+    createWallGeometry(southWallPos, southWallDim, southWallRot);
     
     // East wall (positive X)
-    createWallGeometry(
-        QVector3D(radius, wallHeight / 2.0f, 0.0f), // Position
-        QVector3D(0.2f, wallHeight, radius * 2.0f), // Dimensions - note z is width now
-        QVector3D(0.0f, 0.0f, 0.0f)                // No rotation
-    );
+    QVector3D eastWallPos(radius, wallHeight / 2, 0);
+    QVector3D eastWallDim(0.2, wallHeight, radius * 2);
+    QVector3D eastWallRot(0, 0, 0);
+    createWallGeometry(eastWallPos, eastWallDim, eastWallRot);
     
     // West wall (negative X)
-    createWallGeometry(
-        QVector3D(-radius, wallHeight / 2.0f, 0.0f), // Position
-        QVector3D(0.2f, wallHeight, radius * 2.0f),  // Dimensions
-        QVector3D(0.0f, 0.0f, 0.0f)                 // No rotation
-    );
+    QVector3D westWallPos(-radius, wallHeight / 2, 0);
+    QVector3D westWallDim(0.2, wallHeight, radius * 2);
+    QVector3D westWallRot(0, 0, 0);
+    createWallGeometry(westWallPos, westWallDim, westWallRot);
     
-    qDebug() << "Arena created with" << m_walls.size() << "walls";
+    qDebug() << "Arena created with 4 walls";
 }
 
 void GLArenaWidget::createWallGeometry(const QVector3D& position, const QVector3D& dimensions, const QVector3D& rotation) {
-    // Create a new wall geometry
+    // Position, dimensions, and rotation are used to create the wall geometry
+    // Let's create a model matrix that we'll apply to the basic box vertices
+    QMatrix4x4 modelMatrix;
+    modelMatrix.setToIdentity();
+    modelMatrix.translate(position);
+    
+    // Apply rotation if any
+    if (rotation.x() != 0.0f) modelMatrix.rotate(rotation.x(), 1.0f, 0.0f, 0.0f);
+    if (rotation.y() != 0.0f) modelMatrix.rotate(rotation.y(), 0.0f, 1.0f, 0.0f);
+    if (rotation.z() != 0.0f) modelMatrix.rotate(rotation.z(), 0.0f, 0.0f, 1.0f);
+    
+    // Create a new wall geometry entry
     WallGeometry wall;
+    wall.vao = std::make_unique<QOpenGLVertexArrayObject>();
+    wall.vbo = std::make_unique<QOpenGLBuffer>(QOpenGLBuffer::VertexBuffer);
+    wall.ibo = std::make_unique<QOpenGLBuffer>(QOpenGLBuffer::IndexBuffer);
     
     // Create VAO
-    wall.vao = std::make_unique<QOpenGLVertexArrayObject>();
-    wall.vao->create();
+    if (!wall.vao->create()) {
+        qWarning() << "Failed to create wall VAO";
+        return;
+    }
+    
     wall.vao->bind();
     
     // Create VBO
-    wall.vbo = std::make_unique<QOpenGLBuffer>(QOpenGLBuffer::VertexBuffer);
-    wall.vbo->create();
+    if (!wall.vbo->create()) {
+        qWarning() << "Failed to create wall VBO";
+        wall.vao->release();
+        return;
+    }
+    
     wall.vbo->bind();
     
-    // Half dimensions for vertex positions
+    // Calculate half dimensions for vertex positions
     float halfWidth = dimensions.x() / 2.0f;
     float halfHeight = dimensions.y() / 2.0f;
     float halfDepth = dimensions.z() / 2.0f;
     
-    // Wall color (grey)
-    float r = 0.7f;
-    float g = 0.7f;
-    float b = 0.7f;
-    
-    // Create vertices for the wall
-    // Format: position (x,y,z), normal (nx,ny,nz), color (r,g,b), texcoord (u,v)
-    const float vertices[] = {
+    // Create box vertices with position, normal, and texture coordinates
+    float vertices[] = {
         // Front face
-        -halfWidth, -halfHeight,  halfDepth,  0.0f, 0.0f,  1.0f,  r, g, b,  0.0f, 0.0f,
-         halfWidth, -halfHeight,  halfDepth,  0.0f, 0.0f,  1.0f,  r, g, b,  1.0f, 0.0f,
-         halfWidth,  halfHeight,  halfDepth,  0.0f, 0.0f,  1.0f,  r, g, b,  1.0f, 1.0f,
-        -halfWidth,  halfHeight,  halfDepth,  0.0f, 0.0f,  1.0f,  r, g, b,  0.0f, 1.0f,
+        -halfWidth, -halfHeight,  halfDepth,  0.0f,  0.0f,  1.0f,  0.0f,  0.0f,
+         halfWidth, -halfHeight,  halfDepth,  0.0f,  0.0f,  1.0f,  1.0f,  0.0f,
+         halfWidth,  halfHeight,  halfDepth,  0.0f,  0.0f,  1.0f,  1.0f,  1.0f,
+        -halfWidth,  halfHeight,  halfDepth,  0.0f,  0.0f,  1.0f,  0.0f,  1.0f,
         
         // Back face
-        -halfWidth, -halfHeight, -halfDepth,  0.0f, 0.0f, -1.0f,  r, g, b,  1.0f, 0.0f,
-        -halfWidth,  halfHeight, -halfDepth,  0.0f, 0.0f, -1.0f,  r, g, b,  1.0f, 1.0f,
-         halfWidth,  halfHeight, -halfDepth,  0.0f, 0.0f, -1.0f,  r, g, b,  0.0f, 1.0f,
-         halfWidth, -halfHeight, -halfDepth,  0.0f, 0.0f, -1.0f,  r, g, b,  0.0f, 0.0f,
-        
-        // Left face
-        -halfWidth,  halfHeight,  halfDepth, -1.0f, 0.0f,  0.0f,  r, g, b,  1.0f, 1.0f,
-        -halfWidth,  halfHeight, -halfDepth, -1.0f, 0.0f,  0.0f,  r, g, b,  0.0f, 1.0f,
-        -halfWidth, -halfHeight, -halfDepth, -1.0f, 0.0f,  0.0f,  r, g, b,  0.0f, 0.0f,
-        -halfWidth, -halfHeight,  halfDepth, -1.0f, 0.0f,  0.0f,  r, g, b,  1.0f, 0.0f,
-        
-        // Right face
-         halfWidth,  halfHeight,  halfDepth,  1.0f, 0.0f,  0.0f,  r, g, b,  0.0f, 1.0f,
-         halfWidth, -halfHeight,  halfDepth,  1.0f, 0.0f,  0.0f,  r, g, b,  0.0f, 0.0f,
-         halfWidth, -halfHeight, -halfDepth,  1.0f, 0.0f,  0.0f,  r, g, b,  1.0f, 0.0f,
-         halfWidth,  halfHeight, -halfDepth,  1.0f, 0.0f,  0.0f,  r, g, b,  1.0f, 1.0f,
-        
-        // Bottom face
-        -halfWidth, -halfHeight, -halfDepth,  0.0f, -1.0f, 0.0f,  r, g, b,  0.0f, 0.0f,
-         halfWidth, -halfHeight, -halfDepth,  0.0f, -1.0f, 0.0f,  r, g, b,  1.0f, 0.0f,
-         halfWidth, -halfHeight,  halfDepth,  0.0f, -1.0f, 0.0f,  r, g, b,  1.0f, 1.0f,
-        -halfWidth, -halfHeight,  halfDepth,  0.0f, -1.0f, 0.0f,  r, g, b,  0.0f, 1.0f,
+        -halfWidth, -halfHeight, -halfDepth,  0.0f,  0.0f, -1.0f,  0.0f,  0.0f,
+        -halfWidth,  halfHeight, -halfDepth,  0.0f,  0.0f, -1.0f,  0.0f,  1.0f,
+         halfWidth,  halfHeight, -halfDepth,  0.0f,  0.0f, -1.0f,  1.0f,  1.0f,
+         halfWidth, -halfHeight, -halfDepth,  0.0f,  0.0f, -1.0f,  1.0f,  0.0f,
         
         // Top face
-        -halfWidth,  halfHeight, -halfDepth,  0.0f,  1.0f, 0.0f,  r, g, b,  0.0f, 0.0f,
-        -halfWidth,  halfHeight,  halfDepth,  0.0f,  1.0f, 0.0f,  r, g, b,  0.0f, 1.0f,
-         halfWidth,  halfHeight,  halfDepth,  0.0f,  1.0f, 0.0f,  r, g, b,  1.0f, 1.0f,
-         halfWidth,  halfHeight, -halfDepth,  0.0f,  1.0f, 0.0f,  r, g, b,  1.0f, 0.0f
+        -halfWidth,  halfHeight, -halfDepth,  0.0f,  1.0f,  0.0f,  0.0f,  0.0f,
+        -halfWidth,  halfHeight,  halfDepth,  0.0f,  1.0f,  0.0f,  0.0f,  1.0f,
+         halfWidth,  halfHeight,  halfDepth,  0.0f,  1.0f,  0.0f,  1.0f,  1.0f,
+         halfWidth,  halfHeight, -halfDepth,  0.0f,  1.0f,  0.0f,  1.0f,  0.0f,
+        
+        // Bottom face
+        -halfWidth, -halfHeight, -halfDepth,  0.0f, -1.0f,  0.0f,  0.0f,  0.0f,
+         halfWidth, -halfHeight, -halfDepth,  0.0f, -1.0f,  0.0f,  1.0f,  0.0f,
+         halfWidth, -halfHeight,  halfDepth,  0.0f, -1.0f,  0.0f,  1.0f,  1.0f,
+        -halfWidth, -halfHeight,  halfDepth,  0.0f, -1.0f,  0.0f,  0.0f,  1.0f,
+        
+        // Right face
+         halfWidth, -halfHeight, -halfDepth,  1.0f,  0.0f,  0.0f,  0.0f,  0.0f,
+         halfWidth,  halfHeight, -halfDepth,  1.0f,  0.0f,  0.0f,  1.0f,  0.0f,
+         halfWidth,  halfHeight,  halfDepth,  1.0f,  0.0f,  0.0f,  1.0f,  1.0f,
+         halfWidth, -halfHeight,  halfDepth,  1.0f,  0.0f,  0.0f,  0.0f,  1.0f,
+        
+        // Left face
+        -halfWidth, -halfHeight, -halfDepth, -1.0f,  0.0f,  0.0f,  0.0f,  0.0f,
+        -halfWidth, -halfHeight,  halfDepth, -1.0f,  0.0f,  0.0f,  0.0f,  1.0f,
+        -halfWidth,  halfHeight,  halfDepth, -1.0f,  0.0f,  0.0f,  1.0f,  1.0f,
+        -halfWidth,  halfHeight, -halfDepth, -1.0f,  0.0f,  0.0f,  1.0f,  0.0f
     };
     
-    // Upload vertex data
     wall.vbo->allocate(vertices, sizeof(vertices));
     
+    // Set up vertex attributes
+    glEnableVertexAttribArray(0);  // Position
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), nullptr);
+    
+    glEnableVertexAttribArray(1);  // Normal
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), 
+                       reinterpret_cast<void*>(3 * sizeof(float)));
+    
+    glEnableVertexAttribArray(2);  // Texture coordinates
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), 
+                       reinterpret_cast<void*>(6 * sizeof(float)));
+    
     // Create IBO
-    wall.ibo = std::make_unique<QOpenGLBuffer>(QOpenGLBuffer::IndexBuffer);
-    wall.ibo->create();
+    if (!wall.ibo->create()) {
+        qWarning() << "Failed to create wall IBO";
+        wall.vbo->release();
+        wall.vao->release();
+        return;
+    }
+    
     wall.ibo->bind();
     
-    // Create indices for the wall (6 faces, 2 triangles each, 3 vertices per triangle)
-    const GLuint indices[] = {
-        // Front face
-        0, 1, 2, 2, 3, 0,
-        // Back face
-        4, 5, 6, 6, 7, 4,
-        // Left face
-        8, 9, 10, 10, 11, 8,
-        // Right face
-        12, 13, 14, 14, 15, 12,
-        // Bottom face
-        16, 17, 18, 18, 19, 16,
-        // Top face
-        20, 21, 22, 22, 23, 20
+    // Indices for 12 triangles (6 faces)
+    unsigned int indices[] = {
+        0, 1, 2, 2, 3, 0,       // Front face
+        4, 5, 6, 6, 7, 4,       // Back face
+        8, 9, 10, 10, 11, 8,    // Top face
+        12, 13, 14, 14, 15, 12, // Bottom face
+        16, 17, 18, 18, 19, 16, // Right face
+        20, 21, 22, 22, 23, 20  // Left face
     };
     
-    // Upload index data
     wall.ibo->allocate(indices, sizeof(indices));
-    wall.indexCount = sizeof(indices) / sizeof(GLuint);
+    wall.indexCount = 36;  // 36 indices total (6 faces, 2 triangles per face, 3 vertices per triangle)
     
-    // Set up vertex attributes
-    // Position
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 11 * sizeof(float), nullptr);
-    
-    // Normal
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 11 * sizeof(float), 
-                        reinterpret_cast<void*>(3 * sizeof(float)));
-    
-    // Color
-    glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 11 * sizeof(float), 
-                        reinterpret_cast<void*>(6 * sizeof(float)));
-    
-    // Texture coordinates
-    glEnableVertexAttribArray(3);
-    glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, 11 * sizeof(float), 
-                        reinterpret_cast<void*>(9 * sizeof(float)));
-    
-    // Release buffers
+    // Release bindings
     wall.ibo->release();
     wall.vbo->release();
     wall.vao->release();
     
-    // Add the wall to the walls vector
+        // Add to walls vector with move semantics
     m_walls.push_back(std::move(wall));
+}
+
+void GLArenaWidget::renderWalls() {
+    // Skip if shader is not available
+    if (!m_billboardProgram || !m_billboardProgram->isLinked()) {
+        return;
+    }
+    
+    // Bind shader
+    m_billboardProgram->bind();
+    
+    // Set up common parameters
+    m_billboardProgram->setUniformValue("view", m_viewMatrix);
+    m_billboardProgram->setUniformValue("projection", m_projectionMatrix);
+    m_billboardProgram->setUniformValue("useTexture", false);  // No texture for walls
+    
+    // Wall color (light blue-gray, semi-transparent)
+    QVector4D wallColor(0.7f, 0.7f, 0.8f, 0.8f);
+    
+    // Enable blending for semi-transparent walls
+    GLboolean blendEnabled;
+    glGetBooleanv(GL_BLEND, &blendEnabled);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    
+    // Draw each wall
+    for (const auto& wall : m_walls) {
+        // Skip walls with invalid geometry
+        if (!wall.vao || !wall.vao->isCreated() || 
+            !wall.vbo || !wall.vbo->isCreated() || 
+            !wall.ibo || !wall.ibo->isCreated()) {
+            continue;
+        }
+        
+        // For each wall, just use an identity model matrix
+        // The wall vertices already contain the transformed positions
+        QMatrix4x4 modelMatrix;
+        modelMatrix.setToIdentity();
+        
+        m_billboardProgram->setUniformValue("model", modelMatrix);
+        m_billboardProgram->setUniformValue("color", wallColor);
+        
+        // Bind VAO and IBO
+        wall.vao->bind();
+        wall.ibo->bind();
+        
+        // Draw wall
+        glDrawElements(GL_TRIANGLES, wall.indexCount, GL_UNSIGNED_INT, nullptr);
+        
+        // Release bindings
+        wall.ibo->release();
+        wall.vao->release();
+    }
+    
+    // Restore previous blend state
+    if (!blendEnabled) {
+        glDisable(GL_BLEND);
+    }
+    
+    // Release shader
+    m_billboardProgram->release();
 }
