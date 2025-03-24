@@ -4,14 +4,9 @@
 #include "../../../../include/arena/debug/console/debug_console.h"
 #include "../../../../include/arena/debug/visualizers/frustum_visualizer.h"
 #include <QDebug>
-#include <QVariant>
-
-// Make sure the quintptr metatype is registered
-Q_DECLARE_METATYPE(quintptr)
 
 // Initialize the debug system
-void GLArenaWidget::initializeDebugSystem()
-{
+void GLArenaWidget::initializeDebugSystem() {
     try {
         // Create debug system with game scene and player controller
         m_debugSystem = std::make_unique<DebugSystem>(m_gameScene, m_playerController, this);
@@ -37,8 +32,7 @@ void GLArenaWidget::initializeDebugSystem()
 }
 
 // Render debug overlays
-void GLArenaWidget::renderDebugSystem()
-{
+void GLArenaWidget::renderDebugSystem() {
     if (!m_debugSystem) {
         return;
     }
@@ -60,8 +54,7 @@ void GLArenaWidget::renderDebugSystem()
 }
 
 // Handle debug key presses
-bool GLArenaWidget::processDebugKeyEvent(QKeyEvent* event)
-{
+bool GLArenaWidget::processDebugKeyEvent(QKeyEvent* event) {
     if (!m_debugSystem || !event) {
         return false;
     }
@@ -81,8 +74,7 @@ bool GLArenaWidget::processDebugKeyEvent(QKeyEvent* event)
 }
 
 // Toggle debug console
-void GLArenaWidget::toggleDebugConsole()
-{
+void GLArenaWidget::toggleDebugConsole() {
     if (!m_debugSystem) {
         return;
     }
@@ -102,8 +94,7 @@ void GLArenaWidget::toggleDebugConsole()
 }
 
 // Check if debug console is visible
-bool GLArenaWidget::isDebugConsoleVisible() const
-{
+bool GLArenaWidget::isDebugConsoleVisible() const {
     if (!m_debugSystem) {
         return false;
     }
@@ -123,8 +114,7 @@ bool GLArenaWidget::isDebugConsoleVisible() const
 }
 
 // Toggle frustum visualization
-void GLArenaWidget::toggleFrustumVisualization()
-{
+void GLArenaWidget::toggleFrustumVisualization() {
     if (!m_debugSystem) {
         return;
     }

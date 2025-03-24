@@ -1,303 +1,339 @@
-// src/arena/ui/gl_widgets/gl_arena_widget_render.cpp
-#include "../../../include/arena/ui/gl_widgets/gl_arena_widget.h"
+// src/arena/ui/gl_widgets/gl_arena_widget_renderer.cpp
+#include "../../../../include/arena/ui/gl_widgets/gl_arena_widget.h"
+#include "../../../../include/arena/debug/debug_system.h"
 #include <QDebug>
-#include <QtMath>
+#include <QOpenGLShaderProgram>
 
-// Initialize shader programs
+// Initialize shaders
 bool GLArenaWidget::initShaders()
 {
-    // Create billboard shader program
-    m_billboardProgram = new QOpenGLShaderProgram();
-    
-    // Add vertex shader
-    if (!m_billboardProgram->addShaderFromSourceFile(QOpenGLShader::Vertex, ":/shaders/billboard.vert")) {
-        qWarning() << "Failed to compile billboard vertex shader:" << m_billboardProgram->log();
+    try {
+        // Create shader program for billboards
+        m_billboardProgram = new QOpenGLShaderProgram(this);
+        
+        // Load and compile shaders
+        if (!m_billboardProgram->addShaderFromSourceFile(QOpenGLShader::Vertex, ":/shaders/billboard.vert")) {
+            qCritical() << "Failed to compile billboard vertex shader:" << m_billboardProgram->log();
+            return false;
+        }
+        
+        if (!m_billboardProgram->addShaderFromSourceFile(QOpenGLShader::Fragment, ":/shaders/billboard.frag")) {
+            qCritical() << "Failed to compile billboard fragment shader:" << m_billboardProgram->log();
+            return false;
+        }
+        
+        // Link shader program
+        if (!m_billboardProgram->link()) {
+            qCritical() << "Failed to link billboard shader program:" << m_billboardProgram->log();
+            return false;
+        }
+        
+        qDebug() << "Shaders initialized successfully";
+        return true;
+    }
+    catch (const std::exception& e) {
+        qCritical() << "Exception in initShaders:" << e.what();
         return false;
     }
-
-// Render grid lines
-void GLArenaWidget::renderGrid()
-{
-    if (!m_gridVAO.isCreated() || m_gridVertexCount == 0) {
-        return;
+    catch (...) {
+        qCritical() << "Unknown exception in initShaders";
+        return false;
     }
-    
-    // Bind shader program
-    QOpenGLShaderProgram program;
-    if (!program.addShaderFromSourceFile(QOpenGLShader::Vertex, ":/shaders/basic.vert") ||
-        !program.addShaderFromSourceFile(QOpenGLShader::Fragment, ":/shaders/basic.frag") ||
-        !program.link()) {
-        qWarning() << "Failed to create basic shader for grid rendering";
-        return;
-    }
-    
-    program.bind();
-    
-    // Set projection and view matrices
-    program.setUniformValue("projection", m_projectionMatrix);
-    program.setUniformValue("view", m_viewMatrix);
-    
-    // Set model matrix (identity for grid)
-    QMatrix4x4 model;
-    model.setToIdentity();
-    program.setUniformValue("model", model);
-    
-    // Set grid color (light grey)
-    program.setUniformValue("objectColor", QVector3D(0.7f, 0.7f, 0.7f));
-    
-    // Set light position (above grid)
-    program.setUniformValue("lightPos", QVector3D(0.0f, 10.0f, 0.0f));
-    
-    // Set view position for specular lighting
-    program.setUniformValue("viewPos", m_playerController->getPosition());
-    
-    // Bind VAO and draw grid lines
-    m_gridVAO.bind();
-    glDrawArrays(GL_LINES, 0, m_gridVertexCount);
-    m_gridVAO.release();
-    
-    // Release shader program
-    program.release();
 }
 
-// Render arena walls
+// Render grid
+void GLArenaWidget::renderGrid()
+{
+    if (!m_gridVAO.isCreated() || !m_gridVBO.isCreated()) {
+        return;
+    }
+    
+    try {
+        // Use a simple shader for grid
+        QOpenGLShaderProgram program;
+        if (!program.addShaderFromSourceFile(QOpenGLShader::Vertex, ":/shaders/basic.vert")) {
+            qWarning() << "Failed to load grid vertex shader";
+            return;
+        }
+        
+        if (!program.addShaderFromSourceFile(QOpenGLShader::Fragment, ":/shaders/basic.frag")) {
+            qWarning() << "Failed to load grid fragment shader";
+            return;
+        }
+        
+        if (!program.link()) {
+            qWarning() << "Failed to link grid shader program";
+            return;
+        }
+        
+        // Bind shader and set uniforms
+        program.bind();
+        program.setUniformValue("model", QMatrix4x4());
+        program.setUniformValue("view", m_viewMatrix);
+        program.setUniformValue("projection", m_projectionMatrix);
+        program.setUniformValue("objectColor", QVector3D(0.5f, 0.5f, 0.5f));
+        
+        // Bind VAO and draw grid
+        m_gridVAO.bind();
+        glDrawArrays(GL_LINES, 0, m_gridVertexCount);
+        m_gridVAO.release();
+        
+        // Release shader
+        program.release();
+    }
+    catch (const std::exception& e) {
+        qWarning() << "Exception in renderGrid:" << e.what();
+    }
+    catch (...) {
+        qWarning() << "Unknown exception in renderGrid";
+    }
+}
+
+// Render walls
 void GLArenaWidget::renderWalls()
 {
     if (m_walls.empty()) {
         return;
     }
     
-    // Bind shader program
-    QOpenGLShaderProgram program;
-    if (!program.addShaderFromSourceFile(QOpenGLShader::Vertex, ":/shaders/basic.vert") ||
-        !program.addShaderFromSourceFile(QOpenGLShader::Fragment, ":/shaders/basic.frag") ||
-        !program.link()) {
-        qWarning() << "Failed to create basic shader for wall rendering";
-        return;
-    }
-    
-    program.bind();
-    
-    // Set projection and view matrices
-    program.setUniformValue("projection", m_projectionMatrix);
-    program.setUniformValue("view", m_viewMatrix);
-    
-    // Set model matrix (identity for walls)
-    QMatrix4x4 model;
-    model.setToIdentity();
-    program.setUniformValue("model", model);
-    
-    // Set wall color (dark grey)
-    program.setUniformValue("objectColor", QVector3D(0.3f, 0.3f, 0.3f));
-    
-    // Set light position (above center of arena)
-    program.setUniformValue("lightPos", QVector3D(0.0f, 10.0f, 0.0f));
-    
-    // Set view position for specular lighting
-    program.setUniformValue("viewPos", m_playerController->getPosition());
-    
-    // Draw each wall
-    for (const WallGeometry& wall : m_walls) {
-        if (wall.vao && wall.vao->isCreated() && wall.indexCount > 0) {
-            wall.vao->bind();
-            glDrawElements(GL_TRIANGLES, wall.indexCount, GL_UNSIGNED_INT, nullptr);
-            wall.vao->release();
+    try {
+        // Use a simple shader for walls
+        QOpenGLShaderProgram program;
+        if (!program.addShaderFromSourceFile(QOpenGLShader::Vertex, ":/shaders/basic.vert")) {
+            qWarning() << "Failed to load wall vertex shader";
+            return;
         }
+        
+        if (!program.addShaderFromSourceFile(QOpenGLShader::Fragment, ":/shaders/basic.frag")) {
+            qWarning() << "Failed to load wall fragment shader";
+            return;
+        }
+        
+        if (!program.link()) {
+            qWarning() << "Failed to link wall shader program";
+            return;
+        }
+        
+        // Bind shader and set common uniforms
+        program.bind();
+        program.setUniformValue("view", m_viewMatrix);
+        program.setUniformValue("projection", m_projectionMatrix);
+        program.setUniformValue("objectColor", QVector3D(0.8f, 0.8f, 0.8f));
+        
+        // Draw each wall
+        for (const auto& wall : m_walls) {
+            if (wall.vao && wall.vao->isCreated() && wall.ibo && wall.indexCount > 0) {
+                program.setUniformValue("model", QMatrix4x4());
+                
+                // Bind VAO and draw
+                wall.vao->bind();
+                glDrawElements(GL_TRIANGLES, wall.indexCount, GL_UNSIGNED_INT, nullptr);
+                wall.vao->release();
+            }
+        }
+        
+        // Release shader
+        program.release();
     }
-    
-    // Release shader program
-    program.release();
+    catch (const std::exception& e) {
+        qWarning() << "Exception in renderWalls:" << e.what();
+    }
+    catch (...) {
+        qWarning() << "Unknown exception in renderWalls";
+    }
 }
 
-// Render character billboards
+// Render characters
 void GLArenaWidget::renderCharacters()
 {
-    if (!m_billboardProgram || m_characterSprites.isEmpty()) {
+    if (m_characterSprites.isEmpty() || !m_billboardProgram || !m_billboardProgram->isLinked()) {
+        renderCharactersFallback();
         return;
     }
     
-    // Bind billboard shader program
-    m_billboardProgram->bind();
-    
-    // Set projection and view matrices
-    m_billboardProgram->setUniformValue("projection", m_projectionMatrix);
-    m_billboardProgram->setUniformValue("view", m_viewMatrix);
-    
-    // Calculate camera up and right vectors from view matrix
-    QVector3D cameraRight = QVector3D(m_viewMatrix(0, 0), m_viewMatrix(1, 0), m_viewMatrix(2, 0));
-    QVector3D cameraUp = QVector3D(m_viewMatrix(0, 1), m_viewMatrix(1, 1), m_viewMatrix(2, 1));
-    
-    m_billboardProgram->setUniformValue("cameraRight", cameraRight);
-    m_billboardProgram->setUniformValue("cameraUp", cameraUp);
-    
-    // Draw each character sprite
-    for (auto it = m_characterSprites.constBegin(); it != m_characterSprites.constEnd(); ++it) {
-        CharacterSprite* sprite = it.value();
-        if (sprite && sprite->hasValidTexture() && sprite->hasValidVAO()) {
-            // Set billboard position and size
-            sprite->render(m_billboardProgram, m_viewMatrix, m_projectionMatrix);
+    try {
+        // Bind shader and set common uniforms
+        m_billboardProgram->bind();
+        
+        // Camera right vector (from view matrix)
+        QVector3D cameraRight(m_viewMatrix(0, 0), m_viewMatrix(0, 1), m_viewMatrix(0, 2));
+        
+        // Camera up vector (from view matrix)
+        QVector3D cameraUp(m_viewMatrix(1, 0), m_viewMatrix(1, 1), m_viewMatrix(1, 2));
+        
+        // Set common uniforms
+        m_billboardProgram->setUniformValue("view", m_viewMatrix);
+        m_billboardProgram->setUniformValue("projection", m_projectionMatrix);
+        m_billboardProgram->setUniformValue("cameraRight", cameraRight);
+        m_billboardProgram->setUniformValue("cameraUp", cameraUp);
+        
+        // Render each character sprite
+        for (auto it = m_characterSprites.constBegin(); it != m_characterSprites.constEnd(); ++it) {
+            CharacterSprite* sprite = it.value();
+            if (sprite && sprite->hasValidTexture() && sprite->hasValidVAO()) {
+                sprite->render(m_billboardProgram, m_viewMatrix, m_projectionMatrix);
+            }
         }
+        
+        // Release shader
+        m_billboardProgram->release();
     }
-    
-    // Release shader program
-    m_billboardProgram->release();
+    catch (const std::exception& e) {
+        qWarning() << "Exception in renderCharacters:" << e.what();
+        renderCharactersSimple();
+    }
+    catch (...) {
+        qWarning() << "Unknown exception in renderCharacters";
+        renderCharactersSimple();
+    }
 }
 
-// Simplified character rendering for fallback
+// Simple character rendering for fallback
 void GLArenaWidget::renderCharactersSimple()
 {
-    if (!m_billboardProgram || m_characterSprites.isEmpty()) {
+    if (m_characterSprites.isEmpty()) {
         return;
     }
     
-    // Bind basic shader program
-    QOpenGLShaderProgram program;
-    if (!program.addShaderFromSourceFile(QOpenGLShader::Vertex, ":/shaders/basic.vert") ||
-        !program.addShaderFromSourceFile(QOpenGLShader::Fragment, ":/shaders/basic.frag") ||
-        !program.link()) {
-        qWarning() << "Failed to create basic shader for simplified character rendering";
-        return;
-    }
-    
-    program.bind();
-    
-    // Set projection and view matrices
-    program.setUniformValue("projection", m_projectionMatrix);
-    program.setUniformValue("view", m_viewMatrix);
-    
-    // Set light position
-    program.setUniformValue("lightPos", QVector3D(0.0f, 10.0f, 0.0f));
-    
-    // Set view position for specular lighting
-    program.setUniformValue("viewPos", m_playerController->getPosition());
-    
-    // Draw each character sprite as a simple colored cube
-    for (auto it = m_characterSprites.constBegin(); it != m_characterSprites.constEnd(); ++it) {
-        CharacterSprite* sprite = it.value();
-        if (sprite) {
-            // Get sprite position
-            QVector3D position = sprite->hasValidVAO() ? 
-                QVector3D(0, 0, 0) : QVector3D(0, sprite->height() / 2, 0);
-                
-            // Create model matrix for sprite
-            QMatrix4x4 model;
-            model.setToIdentity();
-            model.translate(position);
-            model.scale(sprite->width(), sprite->height(), sprite->depth());
-            
-            program.setUniformValue("model", model);
-            
-            // Set color (red by default)
-            program.setUniformValue("objectColor", QVector3D(1.0f, 0.0f, 0.0f));
-            
-            // Draw cube for character
-            // This is a placeholder - in a real implementation you'd have a cube VAO
+    try {
+        // Use a simple shader for characters
+        QOpenGLShaderProgram program;
+        if (!program.addShaderFromSourceFile(QOpenGLShader::Vertex, ":/shaders/basic.vert")) {
+            qWarning() << "Failed to load character vertex shader";
+            renderCharactersFallback();
+            return;
         }
+        
+        if (!program.addShaderFromSourceFile(QOpenGLShader::Fragment, ":/shaders/basic.frag")) {
+            qWarning() << "Failed to load character fragment shader";
+            renderCharactersFallback();
+            return;
+        }
+        
+        if (!program.link()) {
+            qWarning() << "Failed to link character shader program";
+            renderCharactersFallback();
+            return;
+        }
+        
+        // Bind shader and set common uniforms
+        program.bind();
+        program.setUniformValue("view", m_viewMatrix);
+        program.setUniformValue("projection", m_projectionMatrix);
+        
+        // Draw each character as a simple cube
+        for (auto it = m_characterSprites.constBegin(); it != m_characterSprites.constEnd(); ++it) {
+            CharacterSprite* sprite = it.value();
+            if (sprite) {
+                QVector3D position = QVector3D(0, 0, 0); // Get actual position
+                QVector3D size = QVector3D(1, 2, 1); // Simple character size
+                
+                // Draw a colored cube for each character
+                program.setUniformValue("objectColor", QVector3D(0.0f, 0.8f, 0.8f));
+                
+                // TODO: Draw simple cube
+            }
+        }
+        
+        // Release shader
+        program.release();
     }
-    
-    program.release();
+    catch (const std::exception& e) {
+        qWarning() << "Exception in renderCharactersSimple:" << e.what();
+        renderCharactersFallback();
+    }
+    catch (...) {
+        qWarning() << "Unknown exception in renderCharactersSimple";
+        renderCharactersFallback();
+    }
 }
 
-// Ultimate fallback rendering method - just draw colored quads
+// Absolute fallback rendering method for characters
 void GLArenaWidget::renderCharactersFallback()
 {
-    // Draw each character as a simple 2D quad
+    // Direct rendering without complex shader/VAO setup
     for (auto it = m_characterSprites.constBegin(); it != m_characterSprites.constEnd(); ++it) {
-        const QString& name = it.key();
         CharacterSprite* sprite = it.value();
-        
         if (sprite && sprite->hasValidTexture()) {
-            // Get position
-            QVector3D pos(0, 0, 0); // Get actual position from sprite or game state
-            
-            // Draw a simple quad
-            drawCharacterQuad(sprite->getTexture(), pos.x(), pos.y(), pos.z(), 
-                             sprite->width(), sprite->height());
+            // Draw a basic quad for this character
+            drawCharacterQuad(sprite->getTexture(), 0, 0, 0, sprite->width(), sprite->height());
         }
     }
 }
 
-// Direct immediate-mode-style quad drawing for absolute fallback
-void GLArenaWidget::drawCharacterQuad(QOpenGLTexture* texture, float x, float y, float z, 
-                                     float width, float height)
+// Direct quad drawing without VAOs
+void GLArenaWidget::drawCharacterQuad(QOpenGLTexture* texture, float x, float y, float z, float width, float height)
 {
     if (!texture || !texture->isCreated()) {
         return;
     }
     
-    // This is a simplistic approach for fallback only
-    // In a real implementation, you'd want to use proper VAOs and VBOs
-    
-    // Bind texture
-    texture->bind();
-    
-    // Draw textured quad
-    glBegin(GL_QUADS);
-    glTexCoord2f(0, 0); glVertex3f(x - width/2, y, z - height/2);
-    glTexCoord2f(1, 0); glVertex3f(x + width/2, y, z - height/2);
-    glTexCoord2f(1, 1); glVertex3f(x + width/2, y, z + height/2);
-    glTexCoord2f(0, 1); glVertex3f(x - width/2, y, z + height/2);
-    glEnd();
-    
-    // Unbind texture
-    texture->release();
-}
-    
-    // Add fragment shader
-    if (!m_billboardProgram->addShaderFromSourceFile(QOpenGLShader::Fragment, ":/shaders/billboard.frag")) {
-        qWarning() << "Failed to compile billboard fragment shader:" << m_billboardProgram->log();
-        return false;
+    try {
+        // Draw a textured quad directly using OpenGL
+        texture->bind();
+        
+        // Draw quad
+        glBegin(GL_QUADS);
+        glTexCoord2f(0, 0); glVertex3f(x, y, z);
+        glTexCoord2f(1, 0); glVertex3f(x + width, y, z);
+        glTexCoord2f(1, 1); glVertex3f(x + width, y + height, z);
+        glTexCoord2f(0, 1); glVertex3f(x, y + height, z);
+        glEnd();
+        
+        texture->release();
     }
-    
-    // Link shader program
-    if (!m_billboardProgram->link()) {
-        qWarning() << "Failed to link billboard shader program:" << m_billboardProgram->log();
-        return false;
+    catch (const std::exception& e) {
+        qWarning() << "Exception in drawCharacterQuad:" << e.what();
     }
-    
-    return true;
+    catch (...) {
+        qWarning() << "Unknown exception in drawCharacterQuad";
+    }
 }
 
-// Render floor quad
+// Render floor
 void GLArenaWidget::renderFloor()
 {
-    if (!m_floorVAO.isCreated() || m_floorIndexCount == 0) {
+    if (!m_floorVAO.isCreated() || !m_floorVBO.isCreated() || !m_floorIBO.isCreated() || m_floorIndexCount == 0) {
         return;
     }
     
-    // Bind shader program
-    QOpenGLShaderProgram program;
-    if (!program.addShaderFromSourceFile(QOpenGLShader::Vertex, ":/shaders/basic.vert") ||
-        !program.addShaderFromSourceFile(QOpenGLShader::Fragment, ":/shaders/basic.frag") ||
-        !program.link()) {
-        qWarning() << "Failed to create basic shader for floor rendering";
-        return;
+    try {
+        // Use a simple shader for floor
+        QOpenGLShaderProgram program;
+        if (!program.addShaderFromSourceFile(QOpenGLShader::Vertex, ":/shaders/basic.vert")) {
+            qWarning() << "Failed to load floor vertex shader";
+            return;
+        }
+        
+        if (!program.addShaderFromSourceFile(QOpenGLShader::Fragment, ":/shaders/basic.frag")) {
+            qWarning() << "Failed to load floor fragment shader";
+            return;
+        }
+        
+        if (!program.link()) {
+            qWarning() << "Failed to link floor shader program";
+            return;
+        }
+        
+        // Bind shader and set uniforms
+        program.bind();
+        program.setUniformValue("model", QMatrix4x4());
+        program.setUniformValue("view", m_viewMatrix);
+        program.setUniformValue("projection", m_projectionMatrix);
+        program.setUniformValue("objectColor", QVector3D(0.3f, 0.3f, 0.3f));
+        
+        // Bind VAO and draw floor
+        m_floorVAO.bind();
+        glDrawElements(GL_TRIANGLES, m_floorIndexCount, GL_UNSIGNED_INT, nullptr);
+        m_floorVAO.release();
+        
+        // Release shader
+        program.release();
     }
-    
-    program.bind();
-    
-    // Set projection and view matrices
-    program.setUniformValue("projection", m_projectionMatrix);
-    program.setUniformValue("view", m_viewMatrix);
-    
-    // Set model matrix (identity for floor)
-    QMatrix4x4 model;
-    model.setToIdentity();
-    program.setUniformValue("model", model);
-    
-    // Set floor color (grey)
-    program.setUniformValue("objectColor", QVector3D(0.5f, 0.5f, 0.5f));
-    
-    // Set light position (above floor)
-    program.setUniformValue("lightPos", QVector3D(0.0f, 10.0f, 0.0f));
-    
-    // Set view position for specular lighting
-    program.setUniformValue("viewPos", m_playerController->getPosition());
-    
-    // Bind VAO and draw floor
-    m_floorVAO.bind();
-    glDrawElements(GL_TRIANGLES, m_floorIndexCount, GL_UNSIGNED_INT, nullptr);
-    m_floorVAO.release();
-    
-    // Release shader program
-    program.release();
+    catch (const std::exception& e) {
+        qWarning() << "Exception in renderFloor:" << e.what();
+    }
+    catch (...) {
+        qWarning() << "Unknown exception in renderFloor";
+    }
+}

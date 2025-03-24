@@ -1,257 +1,206 @@
 // src/arena/ui/gl_widgets/gl_arena_widget_hooks.cpp
 #include "../../../../include/arena/ui/gl_widgets/gl_arena_widget.h"
+#include "../../../../include/arena/debug/debug_system.h"
+#include "../../../../include/arena/debug/console/debug_console.h"
 #include <QDebug>
 
-// This file contains hook implementations for the GLArenaWidget
-// These hooks connect the widget with various subsystems
-
-// Initialize GL function
-void GLArenaWidget::initializeGL() {
-    // Initialize OpenGL functions
-    initializeOpenGLFunctions();
-    
-    try {
-        // Print OpenGL version info
-        qDebug() << "OpenGL Initialization:";
-        qDebug() << "  Vendor:" << reinterpret_cast<const char*>(glGetString(GL_VENDOR));
-        qDebug() << "  Renderer:" << reinterpret_cast<const char*>(glGetString(GL_RENDERER));
-        qDebug() << "  Version:" << reinterpret_cast<const char*>(glGetString(GL_VERSION));
-        qDebug() << "  GLSL Version:" << reinterpret_cast<const char*>(glGetString(GL_SHADING_LANGUAGE_VERSION));
-        
-        // Set up OpenGL state
-        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-        glEnable(GL_DEPTH_TEST);
-        glEnable(GL_CULL_FACE);
-        glCullFace(GL_BACK);
-        
-        // Initialize shaders
-        if (!initShaders()) {
-            qWarning() << "Failed to initialize shaders";
-            return;
-        }
-        
-        // Create basic geometries
-        createFloor(10.0);
-        createGrid(20.0, 20);
-        
-        // Initialize voxel system
-        m_voxelSystem = new VoxelSystemIntegration(m_gameScene, this);
-        m_voxelSystem->initialize();
-        m_voxelSystem->createDefaultWorld();
-        
-        // Initialize inventory system
-        initializeInventory();
-        
-        // Initialize debug system - THIS IS THE NEW DEBUG HOOK
-        initializeDebugSystem();
-        
-        // Set initialized flag
-        m_initialized = true;
-        
-        // Emit signal that rendering is initialized
-        emit renderingInitialized();
-        
-        qDebug() << "OpenGL initialization complete";
-    } catch (const std::exception& e) {
-        qCritical() << "Exception during OpenGL initialization:" << e.what();
-        m_initialized = false;
-    } catch (...) {
-        qCritical() << "Unknown exception during OpenGL initialization";
-        m_initialized = false;
-    }
-    
-    // Set up update timer to redraw
-    QTimer::singleShot(100, this, [this]() {
-        this->update();
-    });
-}
-
-// Paint GL function
-void GLArenaWidget::paintGL() {
+// OpenGL paint event - overrides QOpenGLWidget::paintGL()
+void GLArenaWidget::paintGL() 
+{
     if (!m_initialized) {
-        // If not initialized, just clear the screen and return
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        // Skip rendering if not initialized
         return;
     }
     
     try {
-        // Clear the screen
+        // Clear the buffers
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
-        // Set up view and projection matrices
-        QMatrix4x4 viewMatrix = m_viewMatrix;
-        QMatrix4x4 projectionMatrix = m_projectionMatrix;
+        // Render floor, walls, and grid
+        renderFloor();
+        renderWalls();
+        renderGrid();
         
-        // Render voxel world
+        // Render voxels
         if (m_voxelSystem) {
-            m_voxelSystem->render(viewMatrix, projectionMatrix);
+            m_voxelSystem->render(m_viewMatrix, m_projectionMatrix);
         }
         
         // Render characters
         renderCharacters();
         
-        // Render voxel highlight
+        // Render voxel highlight if needed
         renderVoxelHighlight();
         
-        // Render inventory UI
+        // Render inventory UI if needed
         renderInventory();
         
-        // Render debug overlays - THIS IS THE NEW DEBUG HOOK
-        renderDebugOverlays();
-    } catch (const std::exception& e) {
-        qWarning() << "Exception during rendering:" << e.what();
-    } catch (...) {
-        qWarning() << "Unknown exception during rendering";
+        // Render debug system if available
+        if (m_debugSystem) {
+            renderDebugSystem();
+        }
     }
-    
-    // Schedule next frame
-    update();
+    catch (const std::exception& e) {
+        qCritical() << "Exception in paintGL:" << e.what();
+    }
+    catch (...) {
+        qCritical() << "Unknown exception in paintGL";
+    }
 }
 
-// Key press event handler
-void GLArenaWidget::keyPressEvent(QKeyEvent* event) {
-    if (!event) return;
-    
-    // Check if debug system handles this key press - THIS IS THE NEW DEBUG HOOK
-    if (handleDebugKeyPress(event)) {
-        return; // Debug system handled the key, stop processing
+// Handle key press events - overrides QWidget::keyPressEvent()
+void GLArenaWidget::keyPressEvent(QKeyEvent* event) 
+{
+    // Check if debug system wants to handle this event
+    if (processDebugKeyEvent(event)) {
+        return;
     }
     
-    // If inventory is open, only handle inventory-related keys
+    // Handle inventory UI key events
     if (m_inventoryUI && m_inventoryUI->isVisible()) {
         m_inventoryUI->handleKeyPress(event->key());
+        update(); // Trigger repaint
         return;
     }
     
-    // Handle inventory toggle key
-    if (event->key() == Qt::Key_I) {
-        if (m_inventoryUI) {
-            m_inventoryUI->setVisible(!m_inventoryUI->isVisible());
-        }
-        return;
-    }
-    
-    // Handle voxel placement keys
-    if (event->key() == Qt::Key_F) {
-        placeVoxel();
-        return;
-    }
-    if (event->key() == Qt::Key_G) {
-        removeVoxel();
-        return;
-    }
-    
-    // Debug visualizer toggle (moved from old V key to Z key to avoid conflict)
-    if (event->key() == Qt::Key_Z && event->modifiers() & Qt::ControlModifier) {
-        toggleDebugVisualizer(0); // Toggle frustum visualizer
-        return;
-    }
-    
-    // Pass to player controller if available
+    // Pass event to player controller
     if (m_playerController) {
+        // Handle player movement keys
         m_playerController->handleKeyPress(event);
-        updateMouseTrackingState();
+    }
+    
+    // Handle other keys
+    switch (event->key()) {
+        case Qt::Key_Escape:
+            // Close inventory if open, or show exit dialog
+            if (m_inventoryUI && m_inventoryUI->isVisible()) {
+                m_inventoryUI->setVisible(false);
+            } else {
+                QWidget::keyPressEvent(event);
+            }
+            break;
+            
+        case Qt::Key_I:
+            // Toggle inventory
+            if (m_inventoryUI) {
+                m_inventoryUI->setVisible(!m_inventoryUI->isVisible());
+            }
+            break;
+            
+        case Qt::Key_F:
+            // Toggle frustum visualization
+            toggleFrustumVisualization();
+            break;
+            
+        default:
+            QWidget::keyPressEvent(event);
+            break;
     }
 }
 
-// Key release event handler
-void GLArenaWidget::keyReleaseEvent(QKeyEvent* event) {
-    if (!event) return;
-    
-    // If inventory is open, don't pass keys to player controller
-    if (m_inventoryUI && m_inventoryUI->isVisible()) {
-        return;
-    }
-    
-    // Pass to player controller if available
+// Handle key release events - overrides QWidget::keyReleaseEvent()
+void GLArenaWidget::keyReleaseEvent(QKeyEvent* event) 
+{
+    // Pass event to player controller
     if (m_playerController) {
         m_playerController->handleKeyRelease(event);
     }
+    
+    QWidget::keyReleaseEvent(event);
 }
 
-// Mouse move event handler
-void GLArenaWidget::mouseMoveEvent(QMouseEvent* event) {
-    if (!event) return;
-    
-    // If inventory is open or debug console is visible, handle UI interaction
-    if ((m_inventoryUI && m_inventoryUI->isVisible()) || 
-        (m_debugSystem && m_debugSystem->getConsole()->isVisible())) {
-        if (m_inventoryUI && m_inventoryUI->isVisible()) {
-            m_inventoryUI->handleMouseMove(event->x(), event->y());
-        }
+// Handle mouse move events - overrides QWidget::mouseMoveEvent()
+void GLArenaWidget::mouseMoveEvent(QMouseEvent* event) 
+{
+    // Check if inventory UI is handling the mouse
+    if (m_inventoryUI && 
+        m_inventoryUI->isVisible() && 
+        m_inventoryUI->isMouseOverUI(event->x(), event->y())) {
+        
+        m_inventoryUI->handleMouseMove(event->x(), event->y());
+        update(); // Trigger repaint
         return;
     }
     
-    // Cast ray for voxel highlighting
-    if (m_voxelSystem && m_playerController) {
-        QVector3D camPos = m_playerController->getPosition();
-        QVector3D camDir = QVector3D(
-            cos(m_playerController->getRotation()) * cos(m_playerController->getPitch()),
-            sin(m_playerController->getPitch()),
-            sin(m_playerController->getRotation()) * cos(m_playerController->getPitch())
-        );
-        raycastVoxels(camPos, camDir);
+    // Check if debug console is active - don't handle camera movement if so
+    if (m_debugSystem && m_debugSystem->getConsole() && m_debugSystem->getConsole()->isVisible()) {
+        return;
     }
     
-    // Pass to player controller if available
-    if (m_playerController) {
-        m_playerController->handleMouseMove(event);
-    }
-    
-    // Recenter mouse cursor if mouse look is enabled
-    if (hasFocus() && 
+    // Pass mouse movement to player controller if not in inventory and not in debug console
+    if (m_playerController && 
         (!m_inventoryUI || !m_inventoryUI->isVisible()) && 
-        (!m_debugSystem || !m_debugSystem->getConsole()->isVisible())) {
-        QCursor::setPos(mapToGlobal(QPoint(width() / 2, height() / 2)));
+        (!m_debugSystem || !m_debugSystem->getConsole() || !m_debugSystem->getConsole()->isVisible())) {
+        
+        // Create a new mouse event with the event data
+        QMouseEvent mouseEvent(QEvent::MouseMove, 
+                              event->pos(), 
+                              event->button(), 
+                              event->buttons(), 
+                              event->modifiers());
+        
+        m_playerController->handleMouseMove(&mouseEvent);
     }
 }
 
-// Mouse press event handler
-void GLArenaWidget::mousePressEvent(QMouseEvent* event) {
-    if (!event) return;
-    
-    // If inventory is open or debug console is visible, handle UI interaction
-    if ((m_inventoryUI && m_inventoryUI->isVisible()) || 
-        (m_debugSystem && m_debugSystem->getConsole()->isVisible())) {
-        if (m_inventoryUI && m_inventoryUI->isVisible()) {
-            m_inventoryUI->handleMousePress(event->x(), event->y(), event->button());
-        }
+// Handle mouse press events - overrides QWidget::mousePressEvent()
+void GLArenaWidget::mousePressEvent(QMouseEvent* event) 
+{
+    // Check if inventory UI is handling the mouse
+    if (m_inventoryUI && 
+        m_inventoryUI->isVisible() && 
+        m_inventoryUI->isMouseOverUI(event->x(), event->y())) {
+        
+        m_inventoryUI->handleMousePress(event->x(), event->y(), event->button());
+        update(); // Trigger repaint
         return;
     }
     
-    // Handle mouse button press for game interactions
+    // Check if debug console is active
+    if (m_debugSystem && m_debugSystem->getConsole() && m_debugSystem->getConsole()->isVisible()) {
+        return;
+    }
+    
+    // Handle voxel placement/removal
     if (event->button() == Qt::LeftButton) {
         placeVoxel();
     } else if (event->button() == Qt::RightButton) {
         removeVoxel();
     }
+    
+    // Call parent implementation
+    QOpenGLWidget::mousePressEvent(event);
 }
 
-// Mouse release event handler
-void GLArenaWidget::mouseReleaseEvent(QMouseEvent* event) {
-    if (!event) return;
-    
-    // If inventory is open, handle UI interaction
-    if (m_inventoryUI && m_inventoryUI->isVisible()) {
+// Handle mouse release events - overrides QWidget::mouseReleaseEvent()
+void GLArenaWidget::mouseReleaseEvent(QMouseEvent* event) 
+{
+    // Check if inventory UI is handling the mouse
+    if (m_inventoryUI && 
+        m_inventoryUI->isVisible()) {
+        
         m_inventoryUI->handleMouseRelease(event->x(), event->y(), event->button());
+        update(); // Trigger repaint
         return;
     }
+    
+    // Call parent implementation
+    QOpenGLWidget::mouseReleaseEvent(event);
 }
 
-// Helper method to handle mouse cursor visibility based on UI state
-void GLArenaWidget::updateMouseTrackingState() {
-    bool showCursor = false;
-    
-    // Show cursor when inventory is open or debug console is visible
-    if ((m_inventoryUI && m_inventoryUI->isVisible()) || 
-        (m_debugSystem && m_debugSystem->getConsole()->isVisible())) {
-        showCursor = true;
-    }
-    
-    // Update cursor visibility
-    if (showCursor) {
-        setCursor(Qt::ArrowCursor);
+// Update mouse tracking state - called when focus or window state changes
+void GLArenaWidget::updateMouseTrackingState() 
+{
+    // Update cursor depending on whether inventory or debug console is open
+    if ((!m_inventoryUI || !m_inventoryUI->isVisible()) &&
+        (!m_debugSystem || !m_debugSystem->getConsole() || !m_debugSystem->getConsole()->isVisible())) {
+        
+        // Hide cursor for gameplay
+        if (isActiveWindow()) {
+            setCursor(Qt::BlankCursor);
+        }
     } else {
-        setCursor(Qt::BlankCursor);
+        // Show cursor for UI
+        setCursor(Qt::ArrowCursor);
     }
 }
