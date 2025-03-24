@@ -76,7 +76,7 @@ public:
     void updateMouseTrackingState();
 
     // Initialize with arena parameters
-    void initializeArena(double width, double height);
+    void initializeArena(double radius, double height);
     
     // Character management
     void setActiveCharacter(const QString& name);
@@ -84,7 +84,7 @@ public:
     void updateCharacterPosition(const QString& characterName, float x, float y, float z);
     
     // Get player controller
-    PlayerController* getPlayerController() const { return m_playerController; }
+    PlayerController* getPlayerController() const;
     
     // Handle key events
     void keyPressEvent(QKeyEvent* event) override;
@@ -144,6 +144,19 @@ private:
     void createFloor(double radius);
     void createArena(double radius, double wallHeight);
     void createGrid(double size, int divisions);
+    
+    // Rendering helper methods
+    void renderFloor();
+    void renderGrid();
+    void renderWalls();
+    
+    // Debug system methods
+    void initializeDebugSystem();
+    void renderDebugSystem();
+    bool processDebugKeyEvent(QKeyEvent* event);
+    void toggleDebugConsole();
+    bool isDebugConsoleVisible() const;
+    void toggleFrustumVisualization();
     
     // Character manager for loading sprites
     CharacterManager* m_characterManager;

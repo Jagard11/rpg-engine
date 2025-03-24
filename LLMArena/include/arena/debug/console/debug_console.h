@@ -134,6 +134,9 @@ private:
     
     // Create quad geometry for console background
     void createQuadGeometry();
+
+    // Include rendering-related methods
+    #include "debug_console_render.h"
 };
 
 #endif // DEBUG_CONSOLE_H
