@@ -4,6 +4,7 @@
 
 #include <QObject>
 #include <memory>
+#include <QVariant>
 
 // Forward declarations
 class GameScene;
@@ -52,16 +53,26 @@ public:
     bool handleKeyPress(int key, const QString& text);
     
     /**
-     * @brief Get the debug console
-     * @return Pointer to debug console
+     * @brief Check if the console is visible
+     * @return True if visible
      */
-    DebugConsole* getConsole() const;
+    Q_INVOKABLE bool isConsoleVisible() const;
     
     /**
-     * @brief Get the frustum visualizer
-     * @return Pointer to frustum visualizer
+     * @brief Toggle console visibility
      */
-    FrustumVisualizer* getFrustumVisualizer() const;
+    Q_INVOKABLE void toggleConsoleVisibility();
+    
+    /**
+     * @brief Toggle frustum visualization
+     */
+    Q_INVOKABLE void toggleFrustumVisualization();
+    
+    /**
+     * @brief Set the widget for console rendering
+     * @param widget Widget pointer as QVariant
+     */
+    Q_INVOKABLE void setConsoleWidget(const QVariant& widget);
     
 private:
     // Game references

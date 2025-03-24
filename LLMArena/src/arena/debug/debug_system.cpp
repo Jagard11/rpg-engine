@@ -1,4 +1,5 @@
 // src/arena/debug/debug_system.cpp
+// src/arena/debug/debug_system.h
 #include "../../../include/arena/debug/debug_system.h"
 #include "../../../include/arena/debug/console/debug_console.h"
 #include "../../../include/arena/debug/commands/location_command.h"
@@ -62,14 +63,47 @@ bool DebugSystem::handleKeyPress(int key, const QString& text)
     return m_console->handleKeyPress(key, text);
 }
 
-DebugConsole* DebugSystem::getConsole() const
+bool DebugSystem::isConsoleVisible() const
 {
-    return m_console.get();
+    if (!m_console) {
+        return false;
+    }
+    
+    return m_console->isVisible();
 }
 
-FrustumVisualizer* DebugSystem::getFrustumVisualizer() const
+void DebugSystem::toggleConsoleVisibility()
 {
-    return m_frustumVisualizer.get();
+    if (!m_console) {
+        return;
+    }
+    
+    m_console->setVisible(!m_console->isVisible());
+}
+
+void DebugSystem::toggleFrustumVisualization()
+{
+    if (!m_frustumVisualizer) {
+        return;
+    }
+    
+    m_frustumVisualizer->setEnabled(!m_frustumVisualizer->isEnabled());
+}
+
+void DebugSystem::setConsoleWidget(const QVariant& widget)
+{
+    if (!m_console) {
+        return;
+    }
+    
+    try {
+        // Set the render widget property for the console
+        m_console->setProperty("render_widget", widget);
+    } catch (const std::exception& e) {
+        qWarning() << "Exception setting console widget:" << e.what();
+    } catch (...) {
+        qWarning() << "Unknown exception setting console widget";
+    }
 }
 
 void DebugSystem::registerCommands()

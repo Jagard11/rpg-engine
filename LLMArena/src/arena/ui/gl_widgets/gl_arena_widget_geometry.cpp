@@ -1,297 +1,327 @@
 // src/arena/ui/gl_widgets/gl_arena_widget_geometry.cpp
 #include "../../../../include/arena/ui/gl_widgets/gl_arena_widget.h"
 #include <QDebug>
-#include <cmath>
+#include <QImage>
+#include <QDir>
 
-// Vertex struct for geometry creation
-struct Vertex {
-    QVector3D position;
-    QVector3D normal;
-    QVector2D texCoord;
-};
+// This file contains geometry initialization methods for GLArenaWidget
 
-void GLArenaWidget::createFloor(double radius)
-{
-    // Step 1: Clean up existing buffers if they exist
-    if (m_floorVAO.isCreated()) {
-        m_floorVAO.destroy();
-    }
-    if (m_floorVBO.isCreated()) {
-        m_floorVBO.destroy();
-    }
-    if (m_floorIBO.isCreated()) {
-        m_floorIBO.destroy();
-    }
-
-    // Step 2: Generate circular floor geometry
-    const int segments = 32; // Number of segments for the circle
-    const float angleStep = 2.0f * M_PI / segments;
-
-    std::vector<float> vertices;         // Position (x, y, z) + Normal (nx, ny, nz)
-    std::vector<unsigned int> indices;   // Indices for triangle fan
-
-    // Center vertex
-    vertices.push_back(0.0f);  // x
-    vertices.push_back(0.0f);  // y
-    vertices.push_back(0.0f);  // z
-    vertices.push_back(0.0f);  // normal x
-    vertices.push_back(1.0f);  // normal y (upward)
-    vertices.push_back(0.0f);  // normal z
-
-    // Outer rim vertices
-    for (int i = 0; i <= segments; ++i) {
-        float angle = i * angleStep;
-        float x = radius * cos(angle);
-        float z = radius * sin(angle);
-        vertices.push_back(x);      // x
-        vertices.push_back(0.0f);   // y
-        vertices.push_back(z);      // z
-        vertices.push_back(0.0f);   // normal x
-        vertices.push_back(1.0f);   // normal y
-        vertices.push_back(0.0f);   // normal z
-    }
-
-    // Indices for triangle fan
-    for (int i = 1; i < segments; ++i) {
-        indices.push_back(0);       // Center vertex
-        indices.push_back(i);       // Current vertex
-        indices.push_back(i + 1);   // Next vertex
-    }
-    // Close the fan
-    indices.push_back(0);
-    indices.push_back(segments);
-    indices.push_back(1);
-
-    m_floorIndexCount = indices.size();
-
-    // Step 3: Set up OpenGL buffers
-    // Create and bind VAO
-    m_floorVAO.create();
-    m_floorVAO.bind();
-
-    // Create and populate VBO
-    m_floorVBO.create();
-    m_floorVBO.bind();
-    m_floorVBO.allocate(vertices.data(), vertices.size() * sizeof(float));
-
-    // Configure vertex attributes
-    glEnableVertexAttribArray(0); // Position
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(1); // Normal
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
-
-    // Create and populate IBO
-    m_floorIBO.create();
-    m_floorIBO.bind();
-    m_floorIBO.allocate(indices.data(), indices.size() * sizeof(unsigned int));
-
-    // Step 4: Release bindings
-    m_floorVAO.release();
-    m_floorVBO.release();
-    m_floorIBO.release();
-
-    // Step 5: Update game scene
+bool GLArenaWidget::initShaders() {
+    // Create shader program for basic rendering
+    m_billboardProgram = new QOpenGLShaderProgram();
     
-    // First, remove old floor entity if exists
-    m_gameScene->removeEntity("arena_floor");
+    // Load shader source from resources
+    if (!m_billboardProgram->addShaderFromSourceFile(QOpenGLShader::Vertex, ":/shaders/basic.vert")) {
+        qCritical() << "Failed to load vertex shader:" << m_billboardProgram->log();
+        return false;
+    }
     
-    // Create a proper GameEntity for the floor
-    GameEntity floorEntity;
-    floorEntity.id = "arena_floor";
-    floorEntity.type = "arena_floor";
-    floorEntity.position = QVector3D(0.0f, -0.05f, 0.0f);
-    floorEntity.dimensions = QVector3D(radius * 2, 0.1, radius * 2);
-    floorEntity.isStatic = true;
+    if (!m_billboardProgram->addShaderFromSourceFile(QOpenGLShader::Fragment, ":/shaders/basic.frag")) {
+        qCritical() << "Failed to load fragment shader:" << m_billboardProgram->log();
+        return false;
+    }
     
-    // Add entity to game scene
-    m_gameScene->addEntity(floorEntity);
+    // Link the shader program
+    if (!m_billboardProgram->link()) {
+        qCritical() << "Failed to link shader program:" << m_billboardProgram->log();
+        return false;
+    }
+    
+    qDebug() << "Shaders initialized successfully";
+    return true;
 }
 
-void GLArenaWidget::createArena(double radius, double wallHeight)
-{
-    // Store parameters
+void GLArenaWidget::initializeArena(double radius, double height) {
+    if (!m_initialized) {
+        qWarning() << "Cannot initialize arena: OpenGL not initialized";
+        return;
+    }
+    
+    // Store arena parameters
     m_arenaRadius = radius;
-    m_wallHeight = wallHeight;
+    m_wallHeight = height;
     
-    // Clear old walls
-    m_walls.clear();
+    // Create arena geometry
+    createArena(radius, height);
     
-    try {
-        // Create octagonal arena walls
-        const int numWalls = 8;
-        m_walls.resize(numWalls);
-        
-        for (int i = 0; i < numWalls; i++) {
-            double angle1 = 2.0 * M_PI * i / numWalls;
-            double angle2 = 2.0 * M_PI * (i + 1) / numWalls;
-            
-            double x1 = radius * cos(angle1);
-            double z1 = radius * sin(angle1);
-            double x2 = radius * cos(angle2);
-            double z2 = radius * sin(angle2);
-            
-            // Compute wall normal (pointing inward)
-            QVector3D wallDir(x2 - x1, 0.0, z2 - z1);
-            QVector3D normal = QVector3D::crossProduct(wallDir, QVector3D(0.0, 1.0, 0.0)).normalized();
-            normal = -normal; // Point inward
-            
-            // Calculate wall length
-            float wallLength = QVector2D(x2 - x1, z2 - z1).length();
-            
-            // Create vertices for wall
-            Vertex vertices[4];
-            // Bottom left
-            vertices[0].position = QVector3D(x1, 0.0, z1);
-            vertices[0].normal = normal;
-            vertices[0].texCoord = QVector2D(0.0, 1.0);
-            
-            // Bottom right
-            vertices[1].position = QVector3D(x2, 0.0, z2);
-            vertices[1].normal = normal;
-            vertices[1].texCoord = QVector2D(1.0, 1.0);
-            
-            // Top right
-            vertices[2].position = QVector3D(x2, wallHeight, z2);
-            vertices[2].normal = normal;
-            vertices[2].texCoord = QVector2D(1.0, 0.0);
-            
-            // Top left
-            vertices[3].position = QVector3D(x1, wallHeight, z1);
-            vertices[3].normal = normal;
-            vertices[3].texCoord = QVector2D(0.0, 0.0);
-            
-            // Indices for two triangles
-            GLuint indices[6] = { 0, 1, 2, 2, 3, 0 };
-            
-            // Create new WallGeometry
-            WallGeometry& wall = m_walls[i];
-            
-            // Initialize OpenGL objects if they don't exist
-            if (!wall.vao) wall.vao.reset(new QOpenGLVertexArrayObject);
-            if (!wall.vbo) wall.vbo.reset(new QOpenGLBuffer(QOpenGLBuffer::VertexBuffer));
-            if (!wall.ibo) wall.ibo.reset(new QOpenGLBuffer(QOpenGLBuffer::IndexBuffer));
-            
-            // Create and bind VAO first
-            if (!wall.vao->create()) {
-                qWarning() << "Failed to create VAO for wall" << i;
-                continue;
-            }
-            wall.vao->bind();
-            
-            // Create and bind VBO
-            if (!wall.vbo->create()) {
-                qWarning() << "Failed to create VBO for wall" << i;
-                wall.vao->release();
-                continue;
-            }
-            wall.vbo->bind();
-            wall.vbo->allocate(vertices, 4 * sizeof(Vertex));
-            
-            // Enable vertex attributes
-            glEnableVertexAttribArray(0);
-            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), 
-                                reinterpret_cast<void*>(offsetof(Vertex, position)));
-            
-            glEnableVertexAttribArray(1);
-            glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), 
-                                reinterpret_cast<void*>(offsetof(Vertex, normal)));
-            
-            glEnableVertexAttribArray(2);
-            glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), 
-                                reinterpret_cast<void*>(offsetof(Vertex, texCoord)));
-            
-            // Create and bind IBO
-            if (!wall.ibo->create()) {
-                qWarning() << "Failed to create IBO for wall" << i;
-                wall.vbo->release();
-                wall.vao->release();
-                continue;
-            }
-            wall.ibo->bind();
-            wall.ibo->allocate(indices, 6 * sizeof(GLuint));
-            
-            wall.indexCount = 6;
-            
-            // Release bindings
-            wall.ibo->release();
-            wall.vbo->release();
-            wall.vao->release();
-            
-            // Create wall entity in game scene
-            GameEntity wallEntity;
-            wallEntity.id = QString("arena_wall_%1").arg(i);
-            wallEntity.type = "arena_wall";
-            wallEntity.position = QVector3D((x1 + x2) / 2, wallHeight / 2, (z1 + z2) / 2);
-            wallEntity.dimensions = QVector3D(wallLength, wallHeight, 0.2);
-            wallEntity.isStatic = true;
-            
-            m_gameScene->addEntity(wallEntity);
-        }
-        
-        createFloor(radius);
-        createGrid(radius * 2, 20);
-    } catch (const std::exception& e) {
-        qCritical() << "Exception in createArena:" << e.what();
+    // Initialize voxel system
+    if (m_voxelSystem) {
+        m_voxelSystem->createDefaultWorld();
+    }
+    
+    // Create player entity in the game scene
+    if (m_playerController) {
+        m_playerController->createPlayerEntity();
+        m_playerController->startUpdates();
     }
 }
 
-void GLArenaWidget::createGrid(double size, int divisions)
-{
-    try {
-        // Clean up existing grid if needed
-        if (m_gridVAO.isCreated()) {
-            m_gridVAO.destroy();
-        }
-        if (m_gridVBO.isCreated()) {
-            m_gridVBO.destroy();
-        }
-        
-        // Create a grid of lines for orientation
-        QVector<QVector3D> lineVertices;
-        
-        float step = size / divisions;
-        float halfSize = size / 2.0f;
-        
-        // Create grid lines along x-axis
-        for (int i = 0; i <= divisions; i++) {
-            float x = -halfSize + i * step;
-            lineVertices.append(QVector3D(x, -0.04f, -halfSize)); // Start point
-            lineVertices.append(QVector3D(x, -0.04f, halfSize));  // End point
-        }
-        
-        // Create grid lines along z-axis
-        for (int i = 0; i <= divisions; i++) {
-            float z = -halfSize + i * step;
-            lineVertices.append(QVector3D(-halfSize, -0.04f, z)); // Start point
-            lineVertices.append(QVector3D(halfSize, -0.04f, z));  // End point
-        }
-        
-        // Create VAO
-        if (!m_gridVAO.create()) {
-            qWarning() << "Failed to create grid VAO";
-            return;
-        }
-        m_gridVAO.bind();
-        
-        // Create VBO
-        if (!m_gridVBO.create()) {
-            qWarning() << "Failed to create grid VBO";
-            m_gridVAO.release();
-            return;
-        }
-        m_gridVBO.bind();
-        m_gridVBO.allocate(lineVertices.constData(), lineVertices.size() * sizeof(QVector3D));
-        
-        // Set vertex attribute
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(QVector3D), nullptr);
-        
-        m_gridVertexCount = lineVertices.size();
-        
-        // Release bindings
-        m_gridVBO.release();
-        m_gridVAO.release();
-    } catch (const std::exception& e) {
-        qCritical() << "Exception in createGrid:" << e.what();
+void GLArenaWidget::loadCharacterSprite(const QString& characterName, const QString& texturePath) {
+    // Skip if not initialized
+    if (!m_initialized) {
+        qWarning() << "Cannot load character sprite: OpenGL not initialized";
+        return;
     }
+    
+    // Delete existing sprite if any
+    if (m_characterSprites.contains(characterName)) {
+        delete m_characterSprites[characterName];
+        m_characterSprites.remove(characterName);
+    }
+    
+    try {
+        // Create a new sprite
+        CharacterSprite* sprite = new CharacterSprite();
+        
+        // Get character information for sizing
+        double width = 1.0;
+        double height = 2.0;
+        double depth = 0.2;
+        
+        // Find character data from manager if available
+        if (m_characterManager) {
+            // Use default dimensions since getCollisionGeometry might not be available
+            // Look for a better way to get character dimensions in the future
+            width = 1.0;  // Default width
+            height = 2.0; // Default height
+            depth = 0.2;  // Default depth
+        }
+        
+        // Initialize the sprite
+        sprite->init(context(), texturePath, width, height, depth);
+        
+        // Add to sprite map
+        m_characterSprites[characterName] = sprite;
+        
+        qDebug() << "Loaded character sprite for" << characterName << "with dimensions:" 
+                 << width << "x" << height << "x" << depth;
+        
+        // Add character to game scene if it doesn't exist
+        if (m_gameScene) {
+            GameEntity entity;
+            entity.id = characterName;
+            entity.type = "character";
+            entity.position = QVector3D(0, height / 2, 0); // Position at origin initially
+            entity.dimensions = QVector3D(width, height, depth);
+            entity.spritePath = texturePath;
+            entity.isStatic = false;
+            
+            try {
+                m_gameScene->addEntity(entity);
+            } catch (const std::exception& e) {
+                qWarning() << "Failed to add character entity to scene:" << e.what();
+            }
+        }
+    } catch (const std::exception& e) {
+        qWarning() << "Exception loading character sprite:" << e.what();
+    } catch (...) {
+        qWarning() << "Unknown exception loading character sprite";
+    }
+}
+
+void GLArenaWidget::updateCharacterPosition(const QString& characterName, float x, float y, float z) {
+    // Skip if not initialized
+    if (!m_initialized) {
+        return;
+    }
+    
+    // Update character position in sprites
+    if (m_characterSprites.contains(characterName)) {
+        m_characterSprites[characterName]->updatePosition(x, y, z);
+    }
+    
+    // Update character position in game scene
+    if (m_gameScene) {
+        try {
+            m_gameScene->updateEntityPosition(characterName, QVector3D(x, y, z));
+        } catch (const std::exception& e) {
+            qWarning() << "Failed to update character position in scene:" << e.what();
+        }
+    }
+    
+    // Emit signal for position update
+    emit characterPositionUpdated(characterName, x, y, z);
+}
+
+void GLArenaWidget::onPlayerPositionChanged(const QVector3D& position) {
+    // Update player position in game scene
+    if (m_gameScene) {
+        try {
+            m_gameScene->updateEntityPosition("player", position);
+        } catch (const std::exception& e) {
+            qWarning() << "Failed to update player position in scene:" << e.what();
+        }
+    }
+    
+    // Update voxel streaming if voxel system is available
+    if (m_voxelSystem) {
+        try {
+            m_voxelSystem->streamChunksAroundPlayer(position);
+        } catch (const std::exception& e) {
+            qWarning() << "Failed to update voxel streaming:" << e.what();
+        }
+    }
+    
+    // Emit signal for position update
+    emit playerPositionUpdated(position.x(), position.y(), position.z());
+}
+
+void GLArenaWidget::onPlayerRotationChanged(float rotation) {
+    // Currently, just update the view matrix, which is done in paintGL
+    update(); // Request a repaint to update view matrix
+}
+
+void GLArenaWidget::onPlayerPitchChanged(float pitch) {
+    // Currently, just update the view matrix, which is done in paintGL
+    update(); // Request a repaint to update view matrix
+}
+
+// Character sprite initialization methods
+
+CharacterSprite::CharacterSprite() : 
+    m_texture(nullptr), 
+    m_position(0, 0, 0),
+    m_width(1.0f),
+    m_height(2.0f),
+    m_depth(0.2f)
+{
+    // Initialize buffers
+    m_vertexBuffer = QOpenGLBuffer(QOpenGLBuffer::VertexBuffer);
+    m_indexBuffer = QOpenGLBuffer(QOpenGLBuffer::IndexBuffer);
+}
+
+CharacterSprite::~CharacterSprite() {
+    // Clean up OpenGL resources
+    if (m_vertexBuffer.isCreated()) {
+        m_vertexBuffer.destroy();
+    }
+    
+    if (m_indexBuffer.isCreated()) {
+        m_indexBuffer.destroy();
+    }
+    
+    if (m_vao.isCreated()) {
+        m_vao.destroy();
+    }
+    
+    delete m_texture;
+}
+
+void CharacterSprite::init(QOpenGLContext* context, const QString& texturePath, 
+                          double width, double height, double depth) {
+    initializeOpenGLFunctions();
+    
+    // Store dimensions
+    m_width = width;
+    m_height = height;
+    m_depth = depth;
+    
+    // Create texture
+    QImage image;
+    if (!texturePath.isEmpty() && QFile::exists(texturePath)) {
+        if (!image.load(texturePath)) {
+            qWarning() << "Failed to load character texture:" << texturePath;
+            // Use default texture
+            image = QImage(16, 32, QImage::Format_RGBA8888);
+            image.fill(Qt::magenta);
+        }
+    } else {
+        // Create default texture
+        image = QImage(16, 32, QImage::Format_RGBA8888);
+        image.fill(Qt::magenta);
+    }
+    
+    // Create OpenGL texture
+    m_texture = new QOpenGLTexture(image);
+    m_texture->setMinificationFilter(QOpenGLTexture::Nearest);
+    m_texture->setMagnificationFilter(QOpenGLTexture::Nearest);
+    m_texture->setWrapMode(QOpenGLTexture::ClampToEdge);
+    
+    // Create VAO
+    m_vao.create();
+    m_vao.bind();
+    
+    // Create VBO
+    m_vertexBuffer.create();
+    m_vertexBuffer.bind();
+    
+    // Define vertices for a simple quad
+    // Position (3) + TexCoord (2)
+    float vertices[] = {
+        -0.5f, -0.5f, 0.0f,  0.0f, 0.0f,
+         0.5f, -0.5f, 0.0f,  1.0f, 0.0f,
+         0.5f,  0.5f, 0.0f,  1.0f, 1.0f,
+        -0.5f,  0.5f, 0.0f,  0.0f, 1.0f
+    };
+    
+    m_vertexBuffer.allocate(vertices, sizeof(vertices));
+    
+    // Create IBO
+    m_indexBuffer.create();
+    m_indexBuffer.bind();
+    
+    // Define indices for quad (two triangles)
+    GLuint indices[] = {
+        0, 1, 2,  // First triangle
+        0, 2, 3   // Second triangle
+    };
+    
+    m_indexBuffer.allocate(indices, sizeof(indices));
+    
+    // Set vertex attributes
+    // Position
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), nullptr);
+    
+    // Texture coordinates
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), 
+                         reinterpret_cast<void*>(3 * sizeof(GLfloat)));
+    
+    // Unbind
+    m_indexBuffer.release();
+    m_vertexBuffer.release();
+    m_vao.release();
+}
+
+void CharacterSprite::render(QOpenGLShaderProgram* program, QMatrix4x4& viewMatrix, QMatrix4x4& projectionMatrix) {
+    if (!program || !program->isLinked() || !m_texture || !m_texture->isCreated() || !m_vao.isCreated()) {
+        return;
+    }
+    
+    // Compute billboard orientation vectors
+    QVector3D right = QVector3D::crossProduct(QVector3D(0, 1, 0), 
+                                             QVector3D(viewMatrix(0, 2), viewMatrix(1, 2), viewMatrix(2, 2))).normalized();
+    QVector3D up(0, 1, 0);
+    
+    // Bind shader program
+    program->bind();
+    
+    // Set uniforms
+    program->setUniformValue("view", viewMatrix);
+    program->setUniformValue("projection", projectionMatrix);
+    program->setUniformValue("cameraRight", right);
+    program->setUniformValue("cameraUp", up);
+    program->setUniformValue("billboardPos", m_position);
+    program->setUniformValue("billboardSize", QVector2D(m_width, m_height));
+    
+    // Bind texture
+    glActiveTexture(GL_TEXTURE0);
+    m_texture->bind();
+    program->setUniformValue("textureSampler", 0);
+    
+    // Bind VAO and draw
+    m_vao.bind();
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);
+    m_vao.release();
+    
+    // Unbind texture
+    m_texture->release();
+    
+    // Unbind shader program
+    program->release();
+}
+
+void CharacterSprite::updatePosition(float x, float y, float z) {
+    m_position = QVector3D(x, y, z);
 }
