@@ -5,6 +5,7 @@
 #include <QObject>
 #include <memory>
 #include <QVariant>
+#include <QMatrix4x4>
 
 // Forward declarations
 class GameScene;
@@ -26,11 +27,21 @@ class DebugSystem : public QObject {
     Q_OBJECT
     
 public:
+    /**
+     * @brief Constructor - creates debug system components
+     * @param scene Game scene reference
+     * @param player Player controller reference
+     * @param parent Parent QObject
+     */
     explicit DebugSystem(GameScene* scene, PlayerController* player, QObject* parent = nullptr);
-    ~DebugSystem();
     
     /**
-     * @brief Initialize the debug system
+     * @brief Destructor
+     */
+    ~DebugSystem() override;
+    
+    /**
+     * @brief Initialize the debug system components
      */
     void initialize();
     
@@ -56,23 +67,23 @@ public:
      * @brief Check if the console is visible
      * @return True if visible
      */
-    Q_INVOKABLE bool isConsoleVisible() const;
+    bool isConsoleVisible() const;
     
     /**
      * @brief Toggle console visibility
      */
-    Q_INVOKABLE void toggleConsoleVisibility();
+    void toggleConsoleVisibility();
     
     /**
      * @brief Toggle frustum visualization
      */
-    Q_INVOKABLE void toggleFrustumVisualization();
+    void toggleFrustumVisualization();
     
     /**
      * @brief Set the widget for console rendering
      * @param widget Widget pointer as QVariant
      */
-    Q_INVOKABLE void setConsoleWidget(const QVariant& widget);
+    void setConsoleWidget(const QVariant& widget);
     
 private:
     // Game references

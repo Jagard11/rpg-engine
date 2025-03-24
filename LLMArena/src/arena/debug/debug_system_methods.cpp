@@ -11,36 +11,78 @@ bool DebugSystem::isConsoleVisible() const {
         return false;
     }
     
-    return m_console->isVisible();
+    try {
+        return m_console->isVisible();
+    }
+    catch (const std::exception& e) {
+        qWarning() << "Exception checking console visibility:" << e.what();
+    }
+    catch (...) {
+        qWarning() << "Unknown exception checking console visibility";
+    }
+    
+    return false;
 }
 
 void DebugSystem::toggleConsoleVisibility() {
     if (!m_console) {
-        return;
-    }
-    
-    m_console->setVisible(!m_console->isVisible());
-}
-
-void DebugSystem::toggleFrustumVisualization() {
-    if (!m_frustumVisualizer) {
-        return;
-    }
-    
-    m_frustumVisualizer->setEnabled(!m_frustumVisualizer->isEnabled());
-}
-
-void DebugSystem::setConsoleWidget(const QVariant& widget) {
-    if (!m_console) {
+        qWarning() << "Cannot toggle console visibility: console not available";
         return;
     }
     
     try {
+        bool newState = !m_console->isVisible();
+        m_console->setVisible(newState);
+        qDebug() << "Console visibility toggled to:" << newState;
+    }
+    catch (const std::exception& e) {
+        qWarning() << "Exception toggling console visibility:" << e.what();
+    }
+    catch (...) {
+        qWarning() << "Unknown exception toggling console visibility";
+    }
+}
+
+void DebugSystem::toggleFrustumVisualization() {
+    if (!m_frustumVisualizer) {
+        qWarning() << "Cannot toggle frustum visualization: visualizer not available";
+        return;
+    }
+    
+    try {
+        bool newState = !m_frustumVisualizer->isEnabled();
+        m_frustumVisualizer->setEnabled(newState);
+        qDebug() << "Frustum visualization toggled to:" << newState;
+    }
+    catch (const std::exception& e) {
+        qWarning() << "Exception toggling frustum visualization:" << e.what();
+    }
+    catch (...) {
+        qWarning() << "Unknown exception toggling frustum visualization";
+    }
+}
+
+void DebugSystem::setConsoleWidget(const QVariant& widget) {
+    if (!m_console) {
+        qWarning() << "Cannot set console widget: console not available";
+        return;
+    }
+    
+    try {
+        // Validate widget pointer
+        if (!widget.isValid()) {
+            qWarning() << "Invalid widget pointer provided to setConsoleWidget";
+            return;
+        }
+        
         // Set the render widget property for the console
         m_console->setProperty("render_widget", widget);
-    } catch (const std::exception& e) {
+        qDebug() << "Console widget set successfully";
+    }
+    catch (const std::exception& e) {
         qWarning() << "Exception setting console widget:" << e.what();
-    } catch (...) {
+    }
+    catch (...) {
         qWarning() << "Unknown exception setting console widget";
     }
 }

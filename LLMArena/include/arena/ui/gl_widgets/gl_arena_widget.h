@@ -110,6 +110,7 @@ private:
     void createFloor(double radius);
     void createArena(double radius, double wallHeight);
     void createGrid(double size, int divisions);
+    void createWallGeometry(const QVector3D& position, const QVector3D& dimensions, const QVector3D& rotation);
     
     // Rendering helper methods
     void renderFloor();

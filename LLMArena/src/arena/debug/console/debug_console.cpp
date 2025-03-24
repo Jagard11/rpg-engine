@@ -61,9 +61,17 @@ DebugConsole::~DebugConsole() {
 }
 
 void DebugConsole::initialize() {
-    // Initialize OpenGL resources
-    initializeGL();
+    // The initialize method no longer tries to initialize OpenGL resources immediately
+    // Instead, we'll defer OpenGL initialization until rendering time
+    // when we know a valid context is available
+    
+    qDebug() << "Debug console initialize called - OpenGL initialization deferred";
+    
+    // We still can do non-OpenGL initialization here
+    // For example, set up command history, console properties, etc.
 }
+
+
 
 void DebugConsole::render(int screenWidth, int screenHeight) {
     if (!m_visible) {

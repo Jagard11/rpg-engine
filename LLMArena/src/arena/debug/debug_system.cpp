@@ -1,5 +1,4 @@
 // src/arena/debug/debug_system.cpp
-// src/arena/debug/debug_system.h
 #include "../../../include/arena/debug/debug_system.h"
 #include "../../../include/arena/debug/console/debug_console.h"
 #include "../../../include/arena/debug/commands/location_command.h"
@@ -14,16 +13,43 @@
 DebugSystem::DebugSystem(GameScene* scene, PlayerController* player, QObject* parent)
     : QObject(parent),
       m_gameScene(scene),
-      m_playerController(player)
+      m_playerController(player),
+      m_console(nullptr),
+      m_frustumVisualizer(nullptr),
+      m_locationCommand(nullptr),
+      m_teleportCommand(nullptr),
+      m_frustumCullCommand(nullptr)
 {
-    // Create debug components
-    m_console = std::make_unique<DebugConsole>(scene, player, this);
-    m_frustumVisualizer = std::make_unique<FrustumVisualizer>(this);
+    // Verify inputs
+    if (!scene || !player) {
+        qWarning() << "Debug system created with null scene or player";
+    }
     
-    // Create commands
-    m_locationCommand = std::make_unique<LocationCommand>(this);
-    m_teleportCommand = std::make_unique<TeleportCommand>(this);
-    m_frustumCullCommand = std::make_unique<FrustumCullCommand>(m_frustumVisualizer.get(), this);
+    try {
+        // Create console
+        qDebug() << "Creating debug console...";
+        m_console = std::make_unique<DebugConsole>(scene, player, this);
+        
+        // Create visualizers
+        qDebug() << "Creating frustum visualizer...";
+        m_frustumVisualizer = std::make_unique<FrustumVisualizer>(this);
+        
+        // Create commands
+        qDebug() << "Creating debug commands...";
+        m_locationCommand = std::make_unique<LocationCommand>(this);
+        m_teleportCommand = std::make_unique<TeleportCommand>(this);
+        
+        qDebug() << "Debug system objects created successfully";
+        
+        // Note: We'll create the FrustumCullCommand later during initialization
+        // as it depends on the visualizer
+    }
+    catch (const std::exception& e) {
+        qWarning() << "Exception in DebugSystem constructor:" << e.what();
+    }
+    catch (...) {
+        qWarning() << "Unknown exception in DebugSystem constructor";
+    }
     
     qDebug() << "Debug system created";
 }
@@ -35,32 +61,96 @@ DebugSystem::~DebugSystem()
 
 void DebugSystem::initialize()
 {
-    // Initialize console
-    m_console->initialize();
+    qDebug() << "Initializing debug system...";
     
-    // Initialize visualizers
-    m_frustumVisualizer->initialize();
+    // Create the frustum cull command here since it needs the visualizer
+    try {
+        if (m_frustumVisualizer) {
+            m_frustumCullCommand = std::make_unique<FrustumCullCommand>(m_frustumVisualizer.get(), this);
+        }
+    }
+    catch (const std::exception& e) {
+        qWarning() << "Exception creating frustum cull command:" << e.what();
+    }
     
-    // Register commands
-    registerCommands();
-    
-    qDebug() << "Debug system initialized";
+    // Initialize components
+    try {
+        // Initialize console if available - 
+        // Note: OpenGL initialization will be deferred until rendering
+        if (m_console) {
+            qDebug() << "Initializing debug console...";
+            m_console->initialize();
+        }
+        
+        // Initialize visualizers if available
+        // This will be initialized using the current OpenGL context if available
+        if (m_frustumVisualizer && QOpenGLContext::currentContext()) {
+            qDebug() << "Initializing frustum visualizer...";
+            m_frustumVisualizer->initialize();
+        }
+        
+        // Register commands after console is initialized
+        if (m_console) {
+            qDebug() << "Registering debug commands...";
+            registerCommands();
+        }
+        
+        qDebug() << "Debug system initialization complete";
+    }
+    catch (const std::exception& e) {
+        qWarning() << "Exception in debug system initialization:" << e.what();
+    }
+    catch (...) {
+        qWarning() << "Unknown exception in debug system initialization";
+    }
 }
 
 void DebugSystem::render(const QMatrix4x4& viewMatrix, const QMatrix4x4& projectionMatrix,
                         int screenWidth, int screenHeight)
 {
-    // Render frustum visualizer
-    m_frustumVisualizer->render(viewMatrix, projectionMatrix);
+    // Render frustum visualizer if enabled
+    if (m_frustumVisualizer && m_frustumVisualizer->isEnabled()) {
+        try {
+            m_frustumVisualizer->render(viewMatrix, projectionMatrix);
+        }
+        catch (const std::exception& e) {
+            qWarning() << "Exception rendering frustum visualizer:" << e.what();
+        }
+        catch (...) {
+            qWarning() << "Unknown exception rendering frustum visualizer";
+        }
+    }
     
-    // Render console (always last to overlay everything)
-    m_console->render(screenWidth, screenHeight);
+    // Render console if visible
+    if (m_console && m_console->isVisible()) {
+        try {
+            m_console->render(screenWidth, screenHeight);
+        }
+        catch (const std::exception& e) {
+            qWarning() << "Exception rendering debug console:" << e.what();
+        }
+        catch (...) {
+            qWarning() << "Unknown exception rendering debug console";
+        }
+    }
 }
 
 bool DebugSystem::handleKeyPress(int key, const QString& text)
 {
-    // First, let the console handle the input
-    return m_console->handleKeyPress(key, text);
+    // If console is available, let it handle the input
+    if (m_console) {
+        try {
+            return m_console->handleKeyPress(key, text);
+        }
+        catch (const std::exception& e) {
+            qWarning() << "Exception handling key press in debug console:" << e.what();
+        }
+        catch (...) {
+            qWarning() << "Unknown exception handling key press in debug console";
+        }
+    }
+    
+    return false;
 }
 
 bool DebugSystem::isConsoleVisible() const
@@ -69,7 +159,17 @@ bool DebugSystem::isConsoleVisible() const
         return false;
     }
     
-    return m_console->isVisible();
+    try {
+        return m_console->isVisible();
+    }
+    catch (const std::exception& e) {
+        qWarning() << "Exception checking console visibility:" << e.what();
+    }
+    catch (...) {
+        qWarning() << "Unknown exception checking console visibility";
+    }
+    
+    return false;
 }
 
 void DebugSystem::toggleConsoleVisibility()
@@ -78,7 +178,15 @@ void DebugSystem::toggleConsoleVisibility()
         return;
     }
     
-    m_console->setVisible(!m_console->isVisible());
+    try {
+        m_console->setVisible(!m_console->isVisible());
+    }
+    catch (const std::exception& e) {
+        qWarning() << "Exception toggling console visibility:" << e.what();
+    }
+    catch (...) {
+        qWarning() << "Unknown exception toggling console visibility";
+    }
 }
 
 void DebugSystem::toggleFrustumVisualization()
@@ -87,31 +195,73 @@ void DebugSystem::toggleFrustumVisualization()
         return;
     }
     
-    m_frustumVisualizer->setEnabled(!m_frustumVisualizer->isEnabled());
+    try {
+        m_frustumVisualizer->setEnabled(!m_frustumVisualizer->isEnabled());
+    }
+    catch (const std::exception& e) {
+        qWarning() << "Exception toggling frustum visualization:" << e.what();
+    }
+    catch (...) {
+        qWarning() << "Unknown exception toggling frustum visualization";
+    }
 }
 
 void DebugSystem::setConsoleWidget(const QVariant& widget)
 {
     if (!m_console) {
+        qWarning() << "Cannot set console widget: console not available";
         return;
     }
     
     try {
         // Set the render widget property for the console
         m_console->setProperty("render_widget", widget);
-    } catch (const std::exception& e) {
+    }
+    catch (const std::exception& e) {
         qWarning() << "Exception setting console widget:" << e.what();
-    } catch (...) {
+    }
+    catch (...) {
         qWarning() << "Unknown exception setting console widget";
     }
 }
 
 void DebugSystem::registerCommands()
 {
-    // Register all commands with the console
-    m_console->registerCommand(m_locationCommand.get());
-    m_console->registerCommand(m_teleportCommand.get());
-    m_console->registerCommand(m_frustumCullCommand.get());
+    // Verify console is available
+    if (!m_console) {
+        qWarning() << "Cannot register commands: console not available";
+        return;
+    }
+    
+    // Register location command
+    if (m_locationCommand) {
+        try {
+            m_console->registerCommand(m_locationCommand.get());
+        }
+        catch (const std::exception& e) {
+            qWarning() << "Exception registering location command:" << e.what();
+        }
+    }
+    
+    // Register teleport command
+    if (m_teleportCommand) {
+        try {
+            m_console->registerCommand(m_teleportCommand.get());
+        }
+        catch (const std::exception& e) {
+            qWarning() << "Exception registering teleport command:" << e.what();
+        }
+    }
+    
+    // Register frustum cull command
+    if (m_frustumCullCommand) {
+        try {
+            m_console->registerCommand(m_frustumCullCommand.get());
+        }
+        catch (const std::exception& e) {
+            qWarning() << "Exception registering frustum cull command:" << e.what();
+        }
+    }
     
     qDebug() << "Debug commands registered";
 }

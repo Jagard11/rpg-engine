@@ -35,23 +35,51 @@ FrustumVisualizer::~FrustumVisualizer()
     delete m_shader;
 }
 
-void FrustumVisualizer::initialize()
-{
-    // Initialize OpenGL functions
-    initializeOpenGLFunctions();
-    
-    // Create shader program
-    createShaders();
-    
-    // Create frustum geometry
-    createFrustumGeometry();
+void FrustumVisualizer::initialize() {
+    // Defer the actual OpenGL initialization until we render
+    qDebug() << "FrustumVisualizer initialize called - OpenGL initialization deferred";
 }
 
 void FrustumVisualizer::render(const QMatrix4x4& viewMatrix, const QMatrix4x4& projectionMatrix)
 {
-    if (!m_enabled || !m_shader || !m_shader->isLinked() || !m_vao.isCreated()) {
+    if (!m_enabled) {
         return;
     }
+    
+    // Check if we have a valid current context
+    if (!QOpenGLContext::currentContext()) {
+        qWarning() << "No valid OpenGL context in frustum visualizer render";
+        return;
+    }
+
+        // Check if OpenGL functions are initialized, if not initialize them now
+        static bool openGLInitialized = false;
+        if (!openGLInitialized) {
+            try {
+                qDebug() << "Initializing OpenGL functions for frustum visualizer";
+                initializeOpenGLFunctions();
+                
+                // Now create shaders and other OpenGL resources
+                createShaders();
+                createFrustumGeometry();
+                
+                openGLInitialized = true;
+            }
+            catch (const std::exception& e) {
+                qWarning() << "Exception initializing OpenGL for frustum visualizer:" << e.what();
+                return;
+            }
+            catch (...) {
+                qWarning() << "Unknown exception initializing OpenGL for frustum visualizer";
+                return;
+            }
+        }
+        
+        // Make sure shader is created and linked
+        if (!m_shader || !m_shader->isLinked() || !m_vao.isCreated()) {
+            qWarning() << "Frustum visualizer not properly initialized";
+            return;
+        }
     
     // Compute the inverse view-projection matrix to transform NDC corners to world space
     QMatrix4x4 viewProjection = projectionMatrix * viewMatrix;
