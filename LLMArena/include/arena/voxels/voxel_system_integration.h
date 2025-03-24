@@ -77,14 +77,11 @@ private:
     VoxelHighlightRenderer* m_highlightRenderer;
     
     // Voxel highlight data
-    VoxelPos m_highlightedVoxelPos;
+    QVector3D m_highlightedVoxelPos;
     int m_highlightedVoxelFace;
     
     // Connect signals
     void connectSignals();
-    
-    // Set world type
-    void setWorldType(VoxelWorldSystem::WorldType type, unsigned int seed);
 };
 
 #endif // VOXEL_SYSTEM_INTEGRATION_H

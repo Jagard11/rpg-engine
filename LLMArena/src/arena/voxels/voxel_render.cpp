@@ -259,9 +259,6 @@ void VoxelRenderer::updateRenderData() {
     }
     
     m_voxelCount = m_visibleVoxels.size();
-    
-    // Debug output
-    qDebug() << "Updated render data: " << m_voxelCount << " visible voxels";
 }
 
 void VoxelRenderer::render(const QMatrix4x4& viewMatrix, const QMatrix4x4& projectionMatrix) {
