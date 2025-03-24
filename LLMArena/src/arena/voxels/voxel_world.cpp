@@ -1,15 +1,12 @@
 // src/arena/voxels/voxel_world.cpp
 #include "../../../include/arena/voxels/voxel_world.h"
 #include <QDebug>
-#include <QDateTime>
-#include <QDir>
 
 VoxelWorld::VoxelWorld(QObject* parent) : QObject(parent) {
-    // Initialize with an empty world
-    // Set texture paths
-    m_texturePaths[VoxelType::Cobblestone] = QDir::currentPath() + "/resources/cobblestone.png";
-    m_texturePaths[VoxelType::Grass] = QDir::currentPath() + "/resources/grass.png";
-    m_texturePaths[VoxelType::Dirt] = QDir::currentPath() + "/resources/dirt.png";
+    // Initialize texture paths for voxel types
+    m_texturePaths[VoxelType::Dirt] = ":/resources/dirt.png";
+    m_texturePaths[VoxelType::Grass] = ":/resources/grass.png";
+    m_texturePaths[VoxelType::Cobblestone] = ":/resources/cobblestone.png";
 }
 
 Voxel VoxelWorld::getVoxel(int x, int y, int z) const {
@@ -17,7 +14,16 @@ Voxel VoxelWorld::getVoxel(int x, int y, int z) const {
 }
 
 Voxel VoxelWorld::getVoxel(const VoxelPos& pos) const {
-    return m_voxels.contains(pos) ? m_voxels[pos] : Voxel();
+    // Check if the voxel exists in our storage
+    if (m_voxels.contains(pos)) {
+        return m_voxels[pos];
+    }
+    
+    // Return air (empty) voxel if not found
+    Voxel emptyVoxel;
+    emptyVoxel.type = VoxelType::Air;
+    emptyVoxel.color = Qt::transparent;
+    return emptyVoxel;
 }
 
 void VoxelWorld::setVoxel(int x, int y, int z, const Voxel& voxel) {
@@ -25,43 +31,56 @@ void VoxelWorld::setVoxel(int x, int y, int z, const Voxel& voxel) {
 }
 
 void VoxelWorld::setVoxel(const VoxelPos& pos, const Voxel& voxel) {
-    // Check if voxel actually changed to prevent unnecessary updates
-    bool changed = false;
+    // Validate position
+    if (!pos.isValid()) {
+        qWarning() << "Attempted to set voxel at invalid position:" << pos.x << pos.y << pos.z;
+        return;
+    }
     
+    // Check if we're setting an air block (removing a voxel)
     if (voxel.type == VoxelType::Air) {
+        // Remove the voxel if it exists
         if (m_voxels.contains(pos)) {
-            m_voxels.remove(pos); // Don't store air blocks
-            changed = true;
+            m_voxels.remove(pos);
         }
     } else {
-        if (!m_voxels.contains(pos) || m_voxels[pos].type != voxel.type || m_voxels[pos].color != voxel.color) {
-            // Create a copy of the voxel with the texture path if needed
-            Voxel finalVoxel = voxel;
-            if (finalVoxel.texturePath.isEmpty() && m_texturePaths.contains(finalVoxel.type)) {
-                finalVoxel.texturePath = m_texturePaths[finalVoxel.type];
-            }
-            m_voxels[pos] = finalVoxel;
-            changed = true;
+        // Store the voxel
+        m_voxels[pos] = voxel;
+        
+        // Set texture path if not already set
+        if (voxel.texturePath.isEmpty() && m_texturePaths.contains(voxel.type)) {
+            m_voxels[pos].texturePath = m_texturePaths[voxel.type];
         }
     }
     
-    // Signal that the world has changed only if there was an actual change
-    if (changed) {
-        emit worldChanged();
-    }
+    // Notify that the world has changed
+    emit worldChanged();
 }
 
 void VoxelWorld::createFlatWorld() {
     // Clear existing voxels
     m_voxels.clear();
     
-    // Create a flat terrain at y=0 with some color
-    Voxel grass(VoxelType::Grass, QColor(34, 139, 34), m_texturePaths[VoxelType::Grass]); // Forest green
+    // Create a flat terrain at y=0
+    const int WORLD_SIZE = 16;
+    const int HALF_SIZE = WORLD_SIZE / 2;
     
-    // Generate 50x50 flat world
-    for (int x = -25; x < 25; x++) {
-        for (int z = -25; z < 25; z++) {
-            setVoxel(x, 0, z, grass);
+    // Create dirt foundation
+    Voxel dirtVoxel(VoxelType::Dirt, QColor(139, 69, 19));
+    dirtVoxel.texturePath = m_texturePaths[VoxelType::Dirt];
+    
+    // Create grass top layer
+    Voxel grassVoxel(VoxelType::Grass, QColor(34, 139, 34));
+    grassVoxel.texturePath = m_texturePaths[VoxelType::Grass];
+    
+    // Create grid of voxels
+    for (int x = -HALF_SIZE; x < HALF_SIZE; x++) {
+        for (int z = -HALF_SIZE; z < HALF_SIZE; z++) {
+            // Set dirt for bottom layer
+            setVoxel(x, -1, z, dirtVoxel);
+            
+            // Set grass for top layer
+            setVoxel(x, 0, z, grassVoxel);
         }
     }
     
@@ -69,104 +88,88 @@ void VoxelWorld::createFlatWorld() {
 }
 
 void VoxelWorld::createRoomWithWalls(int width, int length, int height) {
+    // Ensure reasonable dimensions
+    width = qMax(4, qMin(width, 128));
+    length = qMax(4, qMin(length, 128));
+    height = qMax(2, qMin(height, 64));
+    
+    // Calculate center offset
+    int offsetX = -width / 2;
+    int offsetZ = -length / 2;
+    
     // Clear existing voxels
     m_voxels.clear();
     
-    // Calculate room boundaries
-    int halfWidth = width / 2;
-    int halfLength = length / 2;
+    // Create voxel types with proper textures
+    Voxel floorVoxel(VoxelType::Cobblestone, QColor(128, 128, 128));
+    floorVoxel.texturePath = m_texturePaths[VoxelType::Cobblestone];
     
-    // Create floor with grass and dirt
-    Voxel grassVoxel(VoxelType::Grass, QColor(34, 139, 34), m_texturePaths[VoxelType::Grass]);
-    Voxel dirtVoxel(VoxelType::Dirt, QColor(160, 82, 45), m_texturePaths[VoxelType::Dirt]);
+    Voxel wallVoxel(VoxelType::Cobblestone, QColor(100, 100, 100));
+    wallVoxel.texturePath = m_texturePaths[VoxelType::Cobblestone];
     
-    // Create grass in the center (2/3 of the floor)
-    int grassWidth = (width * 2) / 3;
-    int grassLength = (length * 2) / 3;
-    int grassHalfWidth = grassWidth / 2;
-    int grassHalfLength = grassLength / 2;
+    // Create floor
+    generateFloor(0, width, length, floorVoxel);
     
-    // Generate the floor with grass in center and dirt on perimeter
-    for (int x = -halfWidth; x < halfWidth; x++) {
-        for (int z = -halfLength; z < halfLength; z++) {
-            // Check if this is in the center grass area
-            if (x >= -grassHalfWidth && x < grassHalfWidth &&
-                z >= -grassHalfLength && z < grassHalfLength) {
-                setVoxel(x, 0, z, grassVoxel);
-            } else {
-                setVoxel(x, 0, z, dirtVoxel);
-            }
-        }
-    }
-    
-    // Create walls with cobblestone
-    Voxel wallVoxel(VoxelType::Cobblestone, QColor(192, 192, 192), m_texturePaths[VoxelType::Cobblestone]);
+    // Create walls
+    // South wall (negative Z)
+    generateWall(offsetX, offsetZ, offsetX + width, offsetZ, 1, height, wallVoxel);
     
     // North wall (positive Z)
-    generateWall(-halfWidth, halfLength-1, halfWidth-1, halfLength-1, 1, height, wallVoxel);
-    
-    // South wall (negative Z)
-    generateWall(-halfWidth, -halfLength, halfWidth-1, -halfLength, 1, height, wallVoxel);
-    
-    // East wall (positive X)
-    generateWall(halfWidth-1, -halfLength, halfWidth-1, halfLength-1, 1, height, wallVoxel);
+    generateWall(offsetX, offsetZ + length, offsetX + width, offsetZ + length, 1, height, wallVoxel);
     
     // West wall (negative X)
-    generateWall(-halfWidth, -halfLength, -halfWidth, halfLength-1, 1, height, wallVoxel);
+    generateWall(offsetX, offsetZ, offsetX, offsetZ + length, 1, height, wallVoxel);
     
+    // East wall (positive X)
+    generateWall(offsetX + width, offsetZ, offsetX + width, offsetZ + length, 1, height, wallVoxel);
+    
+    // Notify that world has changed
     emit worldChanged();
 }
 
-void VoxelWorld::generateFloor(int y, int width, int length, const Voxel& voxel) {
-    int halfWidth = width / 2;
-    int halfLength = length / 2;
-    
-    for (int x = -halfWidth; x < halfWidth; x++) {
-        for (int z = -halfLength; z < halfLength; z++) {
-            setVoxel(x, y, z, voxel);
-        }
-    }
-}
-
-void VoxelWorld::generateWall(int x1, int z1, int x2, int z2, int y1, int y2, const Voxel& voxel) {
-    // Determine direction and length
-    int dx = (x2 > x1) ? 1 : (x2 < x1) ? -1 : 0;
-    int dz = (z2 > z1) ? 1 : (z2 < z1) ? -1 : 0;
-    
-    int steps = 0;
-    if (dx != 0) {
-        steps = abs(x2 - x1);
-    } else {
-        steps = abs(z2 - z1);
-    }
-    
-    // Generate voxels along the wall
-    for (int i = 0; i <= steps; i++) {
-        int x = x1 + dx * i;
-        int z = z1 + dz * i;
-        
-        // Generate voxels vertically for this wall segment
-        for (int y = y1; y < y2; y++) {
-            setVoxel(x, y, z, voxel);
-        }
-    }
-}
-
 bool VoxelWorld::isVoxelVisible(const VoxelPos& pos) const {
+    // A voxel is visible if it's not air and at least one of its six neighbors is air
+    Voxel voxel = getVoxel(pos);
+    
+    // Air voxels are never visible (they're empty space)
+    if (voxel.type == VoxelType::Air) {
+        return false;
+    }
+    
+    // Check if the voxel has at least one empty neighbor
     return hasEmptyNeighbor(pos);
 }
 
+QVector<VoxelPos> VoxelWorld::getVisibleVoxels() const {
+    QVector<VoxelPos> visibleVoxels;
+    
+    // Check each voxel in our storage
+    for (auto it = m_voxels.constBegin(); it != m_voxels.constEnd(); ++it) {
+        const VoxelPos& pos = it.key();
+        
+        // Add to the list if the voxel is visible (has at least one empty neighbor)
+        if (isVoxelVisible(pos)) {
+            visibleVoxels.append(pos);
+        }
+    }
+    
+    return visibleVoxels;
+}
+
 bool VoxelWorld::hasEmptyNeighbor(const VoxelPos& pos) const {
-    // Check all 6 neighbors
-    static const VoxelPos neighbors[] = {
-        VoxelPos(1, 0, 0), VoxelPos(-1, 0, 0),
-        VoxelPos(0, 1, 0), VoxelPos(0, -1, 0),
-        VoxelPos(0, 0, 1), VoxelPos(0, 0, -1)
+    // Check all six neighbor positions
+    const VoxelPos neighbors[] = {
+        VoxelPos(pos.x + 1, pos.y, pos.z), // Right
+        VoxelPos(pos.x - 1, pos.y, pos.z), // Left
+        VoxelPos(pos.x, pos.y + 1, pos.z), // Top
+        VoxelPos(pos.x, pos.y - 1, pos.z), // Bottom
+        VoxelPos(pos.x, pos.y, pos.z + 1), // Front
+        VoxelPos(pos.x, pos.y, pos.z - 1)  // Back
     };
     
+    // Check if any neighbor is air (empty)
     for (int i = 0; i < 6; i++) {
-        VoxelPos neighborPos(pos.x + neighbors[i].x, pos.y + neighbors[i].y, pos.z + neighbors[i].z);
-        if (!m_voxels.contains(neighborPos) || m_voxels[neighborPos].type == VoxelType::Air) {
+        if (getVoxel(neighbors[i]).type == VoxelType::Air) {
             return true;
         }
     }
@@ -174,15 +177,43 @@ bool VoxelWorld::hasEmptyNeighbor(const VoxelPos& pos) const {
     return false;
 }
 
-QVector<VoxelPos> VoxelWorld::getVisibleVoxels() const {
-    QVector<VoxelPos> visibleVoxels;
+void VoxelWorld::generateFloor(int y, int width, int length, const Voxel& voxel) {
+    int offsetX = -width / 2;
+    int offsetZ = -length / 2;
     
-    // Iterate through all voxels and check visibility
-    for (auto it = m_voxels.constBegin(); it != m_voxels.constEnd(); ++it) {
-        if (isVoxelVisible(it.key())) {
-            visibleVoxels.append(it.key());
+    for (int x = 0; x < width; x++) {
+        for (int z = 0; z < length; z++) {
+            setVoxel(offsetX + x, y, offsetZ + z, voxel);
         }
     }
+}
+
+void VoxelWorld::generateWall(int x1, int z1, int x2, int z2, int y1, int y2, const Voxel& voxel) {
+    // Ensure proper order of coordinates
+    if (x1 > x2) std::swap(x1, x2);
+    if (z1 > z2) std::swap(z1, z2);
+    if (y1 > y2) std::swap(y1, y2);
     
-    return visibleVoxels;
+    // Check for vertical wall
+    if (x1 == x2) {
+        // Generate voxels along z-axis
+        for (int z = z1; z <= z2; z++) {
+            for (int y = y1; y < y2; y++) {
+                setVoxel(x1, y, z, voxel);
+            }
+        }
+    }
+    // Check for horizontal wall
+    else if (z1 == z2) {
+        // Generate voxels along x-axis
+        for (int x = x1; x <= x2; x++) {
+            for (int y = y1; y < y2; y++) {
+                setVoxel(x, y, z1, voxel);
+            }
+        }
+    }
+    // Diagonal walls not supported in this simple implementation
+    else {
+        qWarning() << "Diagonal walls not supported";
+    }
 }

@@ -1,139 +1,111 @@
 // src/arena/voxels/voxel_system_integration.cpp
 #include "../../../include/arena/voxels/voxel_system_integration.h"
-#include "../../../include/arena/voxels/world/voxel_world_system.h"
-#include "../../../include/arena/skybox/skybox_core.h"
 #include "../../../include/arena/ui/voxel_highlight_renderer.h"
-#include "../../../include/arena/game/player_controller.h"
-#include "../../../include/arena/core/arena_core.h"
-
 #include <QDebug>
-#include <QMatrix4x4>
-#include <QOpenGLContext>
+#include <QDir>
 
 VoxelSystemIntegration::VoxelSystemIntegration(GameScene* gameScene, QObject* parent)
     : QObject(parent),
-      m_gameScene(gameScene),
       m_world(nullptr),
       m_renderer(nullptr),
       m_sky(nullptr),
-      m_highlightedVoxelPos(0, 0, 0),  // Initialize with zero vector
+      m_gameScene(gameScene),
+      m_highlightRenderer(nullptr),
       m_highlightedVoxelFace(-1)
 {
     qDebug() << "Creating VoxelSystemIntegration...";
     
-    // Create voxel world for testing
-    // Note: We're just creating the world object here, not initializing OpenGL resources
-    m_world = new VoxelWorld(this);
+    // Create voxel world
     qDebug() << "Creating VoxelWorld...";
+    m_world = new VoxelWorld(this);
     
-    // Create renderer but don't initialize it yet
-    m_renderer = new VoxelRenderer(this);
+    // Create renderer
     qDebug() << "Creating VoxelRenderer...";
+    m_renderer = new VoxelRenderer(this);
     
-    // Create voxel highlight renderer but don't initialize it yet
-    m_highlightRenderer = new VoxelHighlightRenderer(this);
+    // Create voxel highlight renderer
     qDebug() << "Creating VoxelHighlightRenderer...";
+    m_highlightRenderer = new VoxelHighlightRenderer(this);
     
-    // Create sky system but don't initialize it yet
-    m_sky = new SkySystem(this);
+    // Create sky system
     qDebug() << "Creating SkySystem...";
+    m_sky = new SkySystem(this);
     
     // Connect signals
-    connectSignals();
     qDebug() << "Connecting world signals to renderer...";
+    connectSignals();
     
     qDebug() << "VoxelSystemIntegration created successfully";
 }
 
 VoxelSystemIntegration::~VoxelSystemIntegration()
 {
-    // The parent-child relationship will handle deletion of these objects
+    // World, renderer, and sky are QObjects with parent-child relationships
+    // that will be automatically cleaned up
+    
+    // Clean up world system which is a unique_ptr
+    m_worldSystem.reset();
 }
 
 void VoxelSystemIntegration::initialize()
 {
-    // Safety check to ensure we have an OpenGL context
-    if (!QOpenGLContext::currentContext()) {
-        qWarning() << "No OpenGL context available during VoxelSystemIntegration initialization";
-        return;
-    }
-    
     qDebug() << "Initializing VoxelSystemIntegration...";
     
-    // Initialize renderer
     try {
-        qDebug() << "Initializing VoxelRenderer...";
+        // Initialize OpenGL functions
         initializeOpenGLFunctions();
+        
+        // Initialize renderer with world reference
+        qDebug() << "Initializing VoxelRenderer...";
         m_renderer->setWorld(m_world);
         m_renderer->initialize();
-    } catch (const std::exception& e) {
-        qCritical() << "Exception initializing renderer:" << e.what();
-    } catch (...) {
-        qCritical() << "Unknown exception initializing renderer";
-    }
-    
-    // Initialize highlight renderer
-    try {
+        
+        // Initialize highlight renderer
         qDebug() << "Initializing VoxelHighlightRenderer...";
         m_highlightRenderer->initialize();
-    } catch (const std::exception& e) {
-        qCritical() << "Exception initializing highlight renderer:" << e.what();
-    } catch (...) {
-        qCritical() << "Unknown exception initializing highlight renderer";
-    }
-    
-    // Initialize sky
-    try {
+        
+        // Initialize sky system
         qDebug() << "Initializing SkySystem...";
         m_sky->initialize();
-    } catch (const std::exception& e) {
-        qCritical() << "Exception initializing sky system:" << e.what();
-    } catch (...) {
-        qCritical() << "Unknown exception initializing sky system";
+        
+        // Connect any remaining signals
+        connectSignals();
+        
+        qDebug() << "VoxelSystemIntegration initialization complete";
     }
-    
-    qDebug() << "VoxelSystemIntegration initialization complete";
+    catch (const std::exception& e) {
+        qCritical() << "Exception during VoxelSystemIntegration initialization:" << e.what();
+    }
+    catch (...) {
+        qCritical() << "Unknown exception during VoxelSystemIntegration initialization";
+    }
 }
 
 void VoxelSystemIntegration::render(const QMatrix4x4& viewMatrix, const QMatrix4x4& projectionMatrix)
 {
-    // Skip if not ready
-    if (!QOpenGLContext::currentContext()) {
+    // Safety checks before rendering
+    if (!m_renderer || !m_sky || !m_highlightRenderer) {
         return;
     }
     
-    // Render sky first (background)
-    if (m_sky) {
-        try {
-            m_sky->render(viewMatrix, projectionMatrix);
-        } catch (const std::exception& e) {
-            qWarning() << "Exception rendering sky:" << e.what();
-        } catch (...) {
-            qWarning() << "Unknown exception rendering sky";
-        }
-    }
-    
-    // Render voxel world
-    if (m_renderer && m_world) {
-        try {
-            m_renderer->render(viewMatrix, projectionMatrix);
-        } catch (const std::exception& e) {
-            qWarning() << "Exception rendering voxels:" << e.what();
-        } catch (...) {
-            qWarning() << "Unknown exception rendering voxels";
-        }
-    }
-    
-    // Render voxel highlight if enabled
-    if (m_highlightRenderer && m_highlightedVoxelFace != -1) {
-        try {
+    try {
+        // Render sky background first
+        m_sky->render(viewMatrix, projectionMatrix);
+        
+        // Render voxel world
+        m_renderer->render(viewMatrix, projectionMatrix);
+        
+        // Render voxel highlight if needed
+        if (m_highlightedVoxelFace >= 0) {
             m_highlightRenderer->render(viewMatrix, projectionMatrix, 
-                                      m_highlightedVoxelPos, m_highlightedVoxelFace);
-        } catch (const std::exception& e) {
-            qWarning() << "Exception rendering highlight:" << e.what();
-        } catch (...) {
-            qWarning() << "Unknown exception rendering highlight";
+                                       m_highlightedVoxelPos, m_highlightedVoxelFace);
         }
+    }
+    catch (const std::exception& e) {
+        qWarning() << "Exception during VoxelSystemIntegration rendering:" << e.what();
+    }
+    catch (...) {
+        qWarning() << "Unknown exception during VoxelSystemIntegration rendering";
     }
 }
 
@@ -144,47 +116,52 @@ VoxelWorld* VoxelSystemIntegration::getWorld() const
 
 void VoxelSystemIntegration::createDefaultWorld()
 {
-    if (!m_world) {
-        qWarning() << "No voxel world available";
-        return;
-    }
-    
     qDebug() << "Creating default world...";
-    // Create a simple world with a room
-    m_world->createRoomWithWalls(10, 10, 5);
     
-    // Add some voxels for testing
-    for (int i = 0; i < 5; i++) {
-        for (int j = 0; j < 5; j++) {
-            // Create a platform
-            if (i < 3 && j < 3) {
-                // Platform
-                VoxelPos pos(i, 1, j);
-                Voxel voxel(VoxelType::Cobblestone, QColor(128, 128, 128));
-                m_world->setVoxel(pos, voxel);
-            }
-            
-            // Create some columns
-            if ((i == 4 && j == 4) || (i == 0 && j == 4) || (i == 4 && j == 0)) {
-                for (int h = 0; h < 3; h++) {
-                    VoxelPos pos(i, h, j);
-                    Voxel voxel((h == 0) ? VoxelType::Cobblestone : 
-                               ((h == 1) ? VoxelType::Dirt : VoxelType::Grass),
-                               (h == 0) ? QColor(128, 128, 128) :
-                               ((h == 1) ? QColor(139, 69, 19) : QColor(34, 139, 34)));
-                    m_world->setVoxel(pos, voxel);
-                }
-            }
-        }
+    try {
+        // Create a simple room with walls for now
+        m_world->createRoomWithWalls(16, 16, 4);
+        
+        // Create a WorldSystem if needed later
+        // m_worldSystem = std::make_unique<VoxelWorldSystem>(this);
+        // m_worldSystem->initialize(VoxelWorldSystem::WorldType::Flat, 12345);
+        
+        // Update game scene to match voxel world
+        updateGameScene();
+        
+        emit worldChanged();
     }
-    
-    // Update game scene with new world data
-    updateGameScene();
+    catch (const std::exception& e) {
+        qCritical() << "Exception creating default world:" << e.what();
+    }
+    catch (...) {
+        qCritical() << "Unknown exception creating default world";
+    }
 }
 
 void VoxelSystemIntegration::createSphericalPlanet(float radius, float terrainHeight, unsigned int seed)
 {
-    // To be implemented
+    try {
+        if (!m_worldSystem) {
+            m_worldSystem = std::make_unique<VoxelWorldSystem>(this);
+        }
+        
+        m_worldSystem->initialize(VoxelWorldSystem::WorldType::Spherical, seed);
+        
+        // Configure spherical planet parameters
+        // This would typically modify the generator's parameters
+        
+        // Update game scene to match voxel world
+        updateGameScene();
+        
+        emit worldChanged();
+    }
+    catch (const std::exception& e) {
+        qCritical() << "Exception creating spherical planet:" << e.what();
+    }
+    catch (...) {
+        qCritical() << "Unknown exception creating spherical planet";
+    }
 }
 
 void VoxelSystemIntegration::setVoxelHighlight(const VoxelPos& pos, int face)
@@ -203,132 +180,210 @@ int VoxelSystemIntegration::getHighlightedVoxelFace() const
     return m_highlightedVoxelFace;
 }
 
-bool VoxelSystemIntegration::raycast(const QVector3D& origin, const QVector3D& direction, float maxDistance,
-                                 QVector3D& outHitPos, QVector3D& outHitNormal, Voxel& outVoxel)
+bool VoxelSystemIntegration::raycast(const QVector3D& origin, const QVector3D& direction, 
+                                   float maxDistance, QVector3D& outHitPos, 
+                                   QVector3D& outHitNormal, Voxel& outVoxel)
 {
-    // Simple raycast for now (will be improved later)
-    float step = 0.1f;
-    float distance = 0.0f;
+    // Simple raycast implementation for voxel world
+    const float stepSize = 0.1f; // Step size for ray marching
     
-    while (distance < maxDistance) {
-        QVector3D position = origin + direction * distance;
-        VoxelPos voxelPos = VoxelPos::fromVector3D(position);
+    // Normalize direction
+    QVector3D rayDir = direction.normalized();
+    
+    // Perform ray marching
+    for (float distance = 0.0f; distance < maxDistance; distance += stepSize) {
+        // Calculate current position along ray
+        QVector3D currentPos = origin + rayDir * distance;
         
-        Voxel voxel = m_world->getVoxel(voxelPos);
+        // Get voxel at current position
+        Voxel voxel = m_world->getVoxel(
+            floor(currentPos.x()), 
+            floor(currentPos.y()), 
+            floor(currentPos.z())
+        );
+        
+        // Check if voxel is solid (not air)
         if (voxel.type != VoxelType::Air) {
-            // Found a hit
-            outHitPos = position;
+            // Calculate hit position
+            outHitPos = currentPos;
             
-            // Determine hit normal (crude approximation)
-            float dx = position.x() - floor(position.x()) - 0.5f;
-            float dy = position.y() - floor(position.y()) - 0.5f;
-            float dz = position.z() - floor(position.z()) - 0.5f;
+            // Calculate normal by checking neighboring voxels
+            // This is a simple approach - checking in the 6 main directions
+            QVector3D normal(0, 0, 0);
             
-            if (fabs(dx) > fabs(dy) && fabs(dx) > fabs(dz)) {
-                outHitNormal = QVector3D(dx > 0 ? 1 : -1, 0, 0);
-            } else if (fabs(dy) > fabs(dx) && fabs(dy) > fabs(dz)) {
-                outHitNormal = QVector3D(0, dy > 0 ? 1 : -1, 0);
-            } else {
-                outHitNormal = QVector3D(0, 0, dz > 0 ? 1 : -1);
+            // Check x-axis
+            if (m_world->getVoxel(floor(currentPos.x()) - 1, floor(currentPos.y()), floor(currentPos.z())).type == VoxelType::Air) {
+                normal.setX(-1);
+            } else if (m_world->getVoxel(floor(currentPos.x()) + 1, floor(currentPos.y()), floor(currentPos.z())).type == VoxelType::Air) {
+                normal.setX(1);
             }
             
+            // Check y-axis
+            if (m_world->getVoxel(floor(currentPos.x()), floor(currentPos.y()) - 1, floor(currentPos.z())).type == VoxelType::Air) {
+                normal.setY(-1);
+            } else if (m_world->getVoxel(floor(currentPos.x()), floor(currentPos.y()) + 1, floor(currentPos.z())).type == VoxelType::Air) {
+                normal.setY(1);
+            }
+            
+            // Check z-axis
+            if (m_world->getVoxel(floor(currentPos.x()), floor(currentPos.y()), floor(currentPos.z()) - 1).type == VoxelType::Air) {
+                normal.setZ(-1);
+            } else if (m_world->getVoxel(floor(currentPos.x()), floor(currentPos.y()), floor(currentPos.z()) + 1).type == VoxelType::Air) {
+                normal.setZ(1);
+            }
+            
+            // If normal is still zero, use the ray direction as a fallback
+            if (normal.lengthSquared() < 0.01f) {
+                normal = -rayDir;
+            } else {
+                normal.normalize();
+            }
+            
+            outHitNormal = normal;
             outVoxel = voxel;
+            
             return true;
         }
-        
-        distance += step;
     }
     
+    // No hit
     return false;
 }
 
 bool VoxelSystemIntegration::placeVoxel(const QVector3D& hitPos, const QVector3D& normal, const Voxel& voxel)
 {
-    // Calculate voxel position to place at
-    QVector3D placePos = hitPos + normal * 0.5f;
-    VoxelPos voxelPos = VoxelPos::fromVector3D(placePos);
+    // Calculate position for new voxel (adjacent to hit position in direction of normal)
+    QVector3D newPos = hitPos + normal * 0.5f;
     
-    // Check if position is valid
-    if (!voxelPos.isValid()) {
-        return false;
-    }
+    // Round to nearest voxel position
+    int x = static_cast<int>(floor(newPos.x()));
+    int y = static_cast<int>(floor(newPos.y()));
+    int z = static_cast<int>(floor(newPos.z()));
     
     // Place the voxel
-    m_world->setVoxel(voxelPos, voxel);
+    m_world->setVoxel(x, y, z, voxel);
     
     // Update game scene
     updateGameScene();
+    
+    emit worldChanged();
     
     return true;
 }
 
 bool VoxelSystemIntegration::removeVoxel(const QVector3D& hitPos)
 {
-    // Calculate voxel position to remove
-    VoxelPos voxelPos = VoxelPos::fromVector3D(hitPos);
-    
-    // Check if position is valid
-    if (!voxelPos.isValid()) {
-        return false;
-    }
+    // Round to nearest voxel position
+    int x = static_cast<int>(floor(hitPos.x()));
+    int y = static_cast<int>(floor(hitPos.y()));
+    int z = static_cast<int>(floor(hitPos.z()));
     
     // Create an air voxel (empty space)
-    Voxel airVoxel(VoxelType::Air, Qt::transparent);
+    Voxel airVoxel;
+    airVoxel.type = VoxelType::Air;
     
-    // Replace the voxel with air
-    m_world->setVoxel(voxelPos, airVoxel);
+    // Remove the voxel (replace with air)
+    m_world->setVoxel(x, y, z, airVoxel);
     
     // Update game scene
     updateGameScene();
+    
+    emit worldChanged();
     
     return true;
 }
 
 void VoxelSystemIntegration::updateGameScene()
 {
-    if (!m_gameScene) {
+    // Safety check
+    if (!m_gameScene || !m_world) {
         return;
     }
-    
-    // Get all solid voxels
-    const QHash<VoxelPos, Voxel>& allVoxels = m_world->getAllVoxels();
-    int addedVoxels = 0;
-    
-    // Add solid voxels to scene as collision entities
-    for (auto it = allVoxels.constBegin(); it != allVoxels.constEnd(); ++it) {
-        const VoxelPos& pos = it.key();
-        const Voxel& voxel = it.value();
+
+    try {
+        // Get all visible voxels
+        QVector<VoxelPos> visibleVoxels = m_world->getVisibleVoxels();
         
-        if (voxel.type != VoxelType::Air) {
-            // Create a game entity for collision
-            GameEntity voxelEntity;
-            voxelEntity.id = QString("voxel_%1_%2_%3").arg(pos.x).arg(pos.y).arg(pos.z);
-            voxelEntity.type = "voxel";
-            voxelEntity.position = QVector3D(pos.x + 0.5f, pos.y + 0.5f, pos.z + 0.5f);
-            voxelEntity.dimensions = QVector3D(1.0f, 1.0f, 1.0f);
-            voxelEntity.isStatic = true;
+        // Remove existing voxel entities
+        QStringList voxelEntities;
+        for (auto it = 0; it < visibleVoxels.size(); ++it) {
+            voxelEntities.append(QString("voxel_%1_%2_%3")
+                              .arg(visibleVoxels[it].x)
+                              .arg(visibleVoxels[it].y)
+                              .arg(visibleVoxels[it].z));
+        }
+        
+        // Add voxel entities to the game scene
+        for (const VoxelPos& pos : visibleVoxels) {
+            // Skip air voxels
+            Voxel voxel = m_world->getVoxel(pos);
+            if (voxel.type == VoxelType::Air) {
+                continue;
+            }
             
-            // Add to scene
-            m_gameScene->addEntity(voxelEntity);
-            addedVoxels++;
+            // Create entity ID
+            QString entityId = QString("voxel_%1_%2_%3")
+                             .arg(pos.x)
+                             .arg(pos.y)
+                             .arg(pos.z);
+            
+            // Create game entity
+            GameEntity entity;
+            entity.id = entityId;
+            entity.type = "voxel";
+            entity.position = QVector3D(pos.x + 0.5f, pos.y + 0.5f, pos.z + 0.5f); // Center of voxel
+            entity.dimensions = QVector3D(1.0f, 1.0f, 1.0f); // Standard voxel size
+            entity.isStatic = true;
+            
+            // Add to game scene
+            m_gameScene->addEntity(entity);
         }
     }
-    
-    emit worldChanged();
+    catch (const std::exception& e) {
+        qWarning() << "Exception updating game scene:" << e.what();
+    }
+    catch (...) {
+        qWarning() << "Unknown exception updating game scene";
+    }
 }
 
 void VoxelSystemIntegration::streamChunksAroundPlayer(const QVector3D& playerPosition)
 {
-    // To be implemented when chunk streaming is added
+    // If using the chunk-based VoxelWorldSystem, we would update loaded chunks here
+    if (m_worldSystem) {
+        try {
+            m_worldSystem->updateAroundViewer(playerPosition);
+        }
+        catch (const std::exception& e) {
+            qWarning() << "Exception streaming chunks:" << e.what();
+        }
+        catch (...) {
+            qWarning() << "Unknown exception streaming chunks";
+        }
+    }
 }
 
 void VoxelSystemIntegration::connectSignals()
 {
-    if (m_world) {
-        connect(m_world, &VoxelWorld::worldChanged, 
-                m_renderer, &VoxelRenderer::updateRenderData);
-        
-        connect(m_world, &VoxelWorld::worldChanged, 
+    // Connect world signals to renderer
+    // These signal connections ensure the renderer updates when the world changes
+    if (m_world && m_renderer) {
+        connect(m_world, &VoxelWorld::worldChanged, m_renderer, &VoxelRenderer::updateRenderData);
+        connect(m_world, &VoxelWorld::worldChanged, this, &VoxelSystemIntegration::updateGameScene);
+    }
+    
+    // Connect world system signals if available
+    if (m_worldSystem) {
+        connect(m_worldSystem.get(), &VoxelWorldSystem::chunkLoaded, 
+                this, &VoxelSystemIntegration::chunkLoaded);
+        connect(m_worldSystem.get(), &VoxelWorldSystem::chunkUnloaded, 
+                this, &VoxelSystemIntegration::chunkUnloaded);
+        connect(m_worldSystem.get(), &VoxelWorldSystem::chunkModified, 
                 this, &VoxelSystemIntegration::updateGameScene);
+        connect(m_worldSystem.get(), &VoxelWorldSystem::memoryUsageChanged, 
+                [this](size_t usage, size_t maxUsage) {
+                    qDebug() << "Voxel memory usage:" << usage / (1024 * 1024) << "MB of" 
+                            << maxUsage / (1024 * 1024) << "MB";
+                });
     }
 }
