@@ -150,9 +150,12 @@ void ChunkManager::updateChunksAroundPoint(const QVector3D& position) {
     std::vector<ChunkCoordinate> chunksToLoad;
     
     // Add chunks in a cube around the center
-    for (int x = -m_viewDistance; x <= m_viewDistance; x++) {
-        for (int y = -m_viewDistance; y <= m_viewDistance; y++) {
-            for (int z = -m_viewDistance; z <= m_viewDistance; z++) {
+    // Add an extra layer to ensure overlap for chunk boundaries
+    int loadDistance = m_viewDistance + 1;
+    
+    for (int x = -loadDistance; x <= loadDistance; x++) {
+        for (int y = -loadDistance; y <= loadDistance; y++) {
+            for (int z = -loadDistance; z <= loadDistance; z++) {
                 ChunkCoordinate coord = centerCoord.offset(x, y, z);
                 
                 // Skip if already loaded
@@ -163,8 +166,25 @@ void ChunkManager::updateChunksAroundPoint(const QVector3D& position) {
                 // Calculate priority based on distance
                 float priority = calculateChunkPriority(coord, position);
                 
+                // Give higher priority to chunks adjacent to loaded chunks
+                // to ensure proper seamless terrain rendering
+                bool isAdjacent = false;
+                auto neighbors = coord.getFaceNeighbors();
+                for (const auto& neighbor : neighbors) {
+                    if (isChunkLoaded(neighbor)) {
+                        isAdjacent = true;
+                        priority *= 1.5f; // Boost priority for adjacent chunks
+                        break;
+                    }
+                }
+                
                 // Add to queue
                 m_loadQueue.push({coord, priority});
+                
+                // Add debug output for chunk loading
+                if (isAdjacent) {
+                    qDebug() << "Prioritized loading of adjacent chunk:" << coord.getX() << coord.getY() << coord.getZ();
+                }
             }
         }
     }

@@ -38,7 +38,7 @@ void PlayerController::handleKeyPress(QKeyEvent *event) {
             case Qt::Key_Space:  // Jump
                 if (stance == PlayerStance::Standing && !jumping) {
                     jumping = true;
-                    jumpVelocity = 0.2f; // Initial upward velocity
+                    jumpVelocity = 0.25f; // Increased from original value for higher jumps
                 }
                 break;
             case Qt::Key_Shift:  // Sprint

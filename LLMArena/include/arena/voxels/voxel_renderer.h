@@ -85,6 +85,7 @@ private:
         VoxelPos pos;
         QColor color;
         VoxelType type;
+        bool isBoundary = false;  // Indicates voxel is at a chunk boundary
     };
     
     QVector<RenderVoxel> m_visibleVoxels;

@@ -1,6 +1,7 @@
 // src/arena/game/player_controller_movement.cpp
 #include "../include/arena/game/player_controller.h"
 #include "include/arena/core/arena_core.h"
+#include "include/arena/voxels/voxel_system_integration.h"
 #include <QDebug>
 #include <QMutex>
 #include <cmath>
@@ -60,6 +61,29 @@ void PlayerController::updatePosition() {
         while (newRotation < 0) newRotation += 2 * M_PI;
         while (newRotation >= 2 * M_PI) newRotation -= 2 * M_PI;
         
+        // Track if position has changed
+        bool positionHasChanged = false;
+        
+        // Apply gravity regardless of jumping state
+        // This makes the player fall when in the air
+        bool isOnGround = false;
+        float groundHeight = 1.0f; // Default ground height
+        
+        // Check if we're on a voxel surface
+        if (gameScene && gameScene->getVoxelSystem()) {
+            // Get surface height at current position
+            try {
+                float surfaceHeight = gameScene->getVoxelSystem()->getSurfaceHeightAt(position.x(), position.z());
+                if (surfaceHeight > 0) {
+                    groundHeight = surfaceHeight + 0.1f; // Slightly above surface
+                    // Check if we're on or very close to the ground
+                    isOnGround = (position.y() <= groundHeight + 0.1f);
+                }
+            } catch (...) {
+                // Use default ground height if surface check fails
+            }
+        }
+            
         // Handle jumping physics
         if (jumping) {
             // Apply gravity to jump velocity
@@ -69,15 +93,33 @@ void PlayerController::updatePosition() {
             newPosition.setY(newPosition.y() + jumpVelocity);
             
             // Check if we've landed
-            if (newPosition.y() <= 1.0f) { // Adjusted to match new floor level of 1.0
-                newPosition.setY(1.0f); 
+            if (newPosition.y() <= groundHeight) {
+                newPosition.setY(groundHeight); 
                 jumping = false;
                 jumpVelocity = 0.0f;
+                isOnGround = true;
             }
+        }
+        // Apply gravity when not on ground
+        else if (!isOnGround) {
+            // Apply gravity
+            velocity.setY(velocity.y() - gravity);
+            
+            // Update vertical position
+            newPosition.setY(newPosition.y() + velocity.y());
+            
+            // Check if we've landed
+            if (newPosition.y() <= groundHeight) {
+                newPosition.setY(groundHeight);
+                velocity.setY(0);
+                isOnGround = true;
+            }
+            
+            positionHasChanged = true;
         }
         
         // Apply movement changes at speed based on stance
-        bool positionHasChanged = false;
+        // bool positionHasChanged = false; // Already declared above
         
         // Reset target velocity to zero
         targetVelocity = QVector3D(0, 0, 0);
@@ -164,8 +206,8 @@ void PlayerController::updatePosition() {
         }
         
         // Apply vertical boundary limit only - prevent falling through floor
-        if (newPosition.y() < 1.0f && !jumping) {
-            newPosition.setY(1.0f); // Adjusted to match new floor level of 1.0
+        if (newPosition.y() < groundHeight && !jumping) {
+            newPosition.setY(groundHeight); // Use our calculated ground height
         }
         
         // Update position if changed

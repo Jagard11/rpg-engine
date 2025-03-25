@@ -297,10 +297,36 @@ void VoxelRenderer::updateRenderData() {
         // Skip air voxels (invisible)
         if (voxel.type == VoxelType::Air) continue;
         
+        // Create render voxel
         RenderVoxel renderVoxel;
         renderVoxel.pos = pos;
         renderVoxel.color = voxel.color;
         renderVoxel.type = voxel.type;
+        
+        // Calculate world position to detect chunk boundaries
+        QVector3D worldPos = pos.toWorldPos();
+        ChunkCoordinate chunkCoord = ChunkCoordinate::fromWorldPosition(worldPos);
+        
+        // Calculate local coordinates within the chunk
+        int localX = static_cast<int>(worldPos.x()) % ChunkCoordinate::CHUNK_SIZE;
+        int localY = static_cast<int>(worldPos.y()) % ChunkCoordinate::CHUNK_SIZE;
+        int localZ = static_cast<int>(worldPos.z()) % ChunkCoordinate::CHUNK_SIZE;
+        
+        // Ensure correct handling of negative coordinates
+        if (localX < 0) localX += ChunkCoordinate::CHUNK_SIZE;
+        if (localY < 0) localY += ChunkCoordinate::CHUNK_SIZE;
+        if (localZ < 0) localZ += ChunkCoordinate::CHUNK_SIZE;
+        
+        // Check if voxel is at a chunk boundary (within 1 voxel of edge)
+        bool isChunkBoundary = 
+            localX == 0 || localX == ChunkCoordinate::CHUNK_SIZE - 1 ||
+            localY == 0 || localY == ChunkCoordinate::CHUNK_SIZE - 1 ||
+            localZ == 0 || localZ == ChunkCoordinate::CHUNK_SIZE - 1;
+        
+        // Always add boundary voxels to ensure seamless rendering
+        if (isChunkBoundary) {
+            renderVoxel.isBoundary = true;
+        }
         
         m_visibleVoxels.push_back(renderVoxel);
     }
@@ -309,29 +335,25 @@ void VoxelRenderer::updateRenderData() {
 }
 
 void VoxelRenderer::render(const QMatrix4x4& viewMatrix, const QMatrix4x4& projectionMatrix) {
-    // Basic safety checks
-    if (!m_world || !m_shaderProgram || !m_viewFrustum) {
-        return;
-    }
-    
     try {
+        if (!m_world || !m_shaderProgram) return;
+        
         // Combine view and projection matrices (for frustum extraction)
         QMatrix4x4 viewProjection = projectionMatrix * viewMatrix;
+        
+        // Update view frustum for culling
+        if (m_frustumCullingEnabled) {
+            m_viewFrustum->update(viewProjection);
+        }
         
         // Extract camera position from view matrix (inverse view matrix * origin)
         QMatrix4x4 invView = viewMatrix.inverted();
         QVector3D camPos = invView * QVector3D(0, 0, 0);
         
-        // Update view frustum for culling
-        if (m_frustumCullingEnabled) {
-            // Debug output to help diagnose frustum culling issues
-            static int frameCounter = 0;
-            if (frameCounter++ % 300 == 0) { // Every ~5 seconds at 60fps
-                qDebug() << "ViewFrustum update - Camera position:" << camPos;
-            }
-            
-            m_viewFrustum->update(viewProjection);
-        }
+        // Performance monitor
+        static int debugFrameCounter = 0;
+        int visibleVoxels = 0;
+        int culledVoxels = 0;
         
         // Enable or disable backface culling
         if (m_backfaceCullingEnabled) {
@@ -368,18 +390,18 @@ void VoxelRenderer::render(const QMatrix4x4& viewMatrix, const QMatrix4x4& proje
         // Track current bound texture to avoid redundant binds
         GLuint currentTexture = 0;
         
-        // Counter for debug info
-        int visibleVoxels = 0;
-        int culledVoxels = 0;
-        static int debugFrameCounter = 0;
-        
         // Draw each visible voxel
         for (const RenderVoxel& voxel : m_visibleVoxels) {
-            // Skip voxels outside the view frustum
-            if (m_frustumCullingEnabled) {
-                QVector3D worldPos = voxel.pos.toWorldPos();
-                // Use sphere test instead of point test with a larger radius
-                float radius = 1.0f; // Unit cube bounding sphere
+            // Get world position
+            QVector3D worldPos = voxel.pos.toWorldPos();
+            
+            // Skip if outside frustum - but always render boundary voxels
+            // to ensure seamless terrain at chunk boundaries
+            if (m_frustumCullingEnabled && !voxel.isBoundary) {
+                // Create a bounding sphere for the voxel
+                float radius = 0.866f; // Radius of bounding sphere for a unit cube
+                
+                // Check if voxel is inside the view frustum
                 if (!m_viewFrustum->isSphereInside(worldPos, radius)) {
                     culledVoxels++;
                     continue;
@@ -389,11 +411,12 @@ void VoxelRenderer::render(const QMatrix4x4& viewMatrix, const QMatrix4x4& proje
             visibleVoxels++;
             
             // Set voxel-specific uniforms
-            m_shaderProgram->setUniformValue("voxelPosition", voxel.pos.toWorldPos());
+            m_shaderProgram->setUniformValue("model", QMatrix4x4());
+            m_shaderProgram->setUniformValue("voxelPosition", worldPos);
             m_shaderProgram->setUniformValue("voxelColor", QVector4D(
                 voxel.color.redF(), voxel.color.greenF(), voxel.color.blueF(), voxel.color.alphaF()));
             
-            // Select texture based on voxel type
+            // Set texture based on voxel type
             QOpenGLTexture* texture = nullptr;
             bool useTexture = true;
             
@@ -435,7 +458,9 @@ void VoxelRenderer::render(const QMatrix4x4& viewMatrix, const QMatrix4x4& proje
         if (m_frustumCullingEnabled && debugFrameCounter++ % 300 == 0) {
             qDebug() << "Frustum culling stats: Visible:" << visibleVoxels 
                     << "Culled:" << culledVoxels 
-                    << "Total:" << (visibleVoxels + culledVoxels);
+                    << "Total:" << (visibleVoxels + culledVoxels)
+                    << "Boundary voxels:" << std::count_if(m_visibleVoxels.begin(), m_visibleVoxels.end(), 
+                                                         [](const RenderVoxel& v) { return v.isBoundary; });
         }
         
         // Unbind any bound texture

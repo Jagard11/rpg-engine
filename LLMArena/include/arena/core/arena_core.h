@@ -8,6 +8,9 @@
 #include <QVector3D>
 #include <QSet>
 
+// Forward declarations
+class VoxelSystemIntegration;
+
 // Structure to represent a game entity with position and collision data
 struct GameEntity {
     QString id;
@@ -62,6 +65,12 @@ public:
     
     // Check if an entity type can be collided with
     bool isCollidable(const QString &entityType) const;
+    
+    // Get voxel system integration
+    VoxelSystemIntegration* getVoxelSystem() const { return m_voxelSystem; }
+    
+    // Set voxel system integration
+    void setVoxelSystem(VoxelSystemIntegration* system) { m_voxelSystem = system; }
 
 signals:
     // Signal for when an entity is added
@@ -84,6 +93,9 @@ private:
     double arenaRadius;
     double arenaWallHeight;
     bool worldBoundariesEnabled = true;
+    
+    // Voxel system integration reference
+    VoxelSystemIntegration* m_voxelSystem = nullptr;
     
     // Check if two entities are colliding
     bool areEntitiesColliding(const GameEntity &entityA, const GameEntity &entityB) const;

@@ -1,6 +1,7 @@
 // src/arena/player/player_core.cpp
 #include "../include/arena/game/player_controller.h"
 #include "include/arena/core/arena_core.h"
+#include "include/arena/voxels/voxel_system_integration.h"
 #include <QDebug>
 #include <QDateTime>
 #include <QMutex>
@@ -43,11 +44,40 @@ void PlayerController::createPlayerEntity() {
     QMutexLocker locker(&playerMovementMutex);
     
     try {
+        // Get the voxel system from the gameScene
+        auto* voxelSystem = gameScene->getVoxelSystem();
+        
+        // Default spawn position - higher up to ensure terrain loads
+        QVector3D spawnPosition(0, 10.0f, 0);
+        
+        // If voxel system exists, try to find surface height with error handling
+        if (voxelSystem) {
+            try {
+                float surfaceHeight = voxelSystem->getSurfaceHeightAt(0, 0);
+                
+                // Only use the surface height if it's a valid value above 0
+                if (surfaceHeight > 0) {
+                    // Set spawn position 5 blocks above surface for safety
+                    spawnPosition = QVector3D(0, surfaceHeight + 5.0f, 0);
+                    qDebug() << "Spawning player at surface height:" << surfaceHeight 
+                             << " (actual Y position:" << spawnPosition.y() << ")";
+                } else {
+                    qDebug() << "Surface height not found or invalid (below 0), using default position";
+                }
+            }
+            catch (const std::exception& e) {
+                qWarning() << "Exception getting surface height:" << e.what();
+            }
+            catch (...) {
+                qWarning() << "Unknown exception getting surface height";
+            }
+        }
+        
         // Create player entity in the game scene
         GameEntity playerEntity;
         playerEntity.id = "player";
         playerEntity.type = "player";
-        playerEntity.position = QVector3D(5, 5.0, 5); // Start position - 5 units above floor (was 1.0)
+        playerEntity.position = spawnPosition;
         playerEntity.dimensions = QVector3D(0.6, 1.8, 0.6); // Human dimensions
         playerEntity.isStatic = false;
         

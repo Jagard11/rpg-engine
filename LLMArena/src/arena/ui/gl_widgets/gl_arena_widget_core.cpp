@@ -32,6 +32,8 @@ GLArenaWidget::GLArenaWidget(CharacterManager* charManager, QWidget* parent)
     try {
         qDebug() << "Creating VoxelSystemIntegration...";
         m_voxelSystem = new VoxelSystemIntegration(m_gameScene, this);
+        // Set the voxel system in the game scene
+        m_gameScene->setVoxelSystem(m_voxelSystem);
         qDebug() << "VoxelSystemIntegration created successfully";
     } catch (const std::exception& e) {
         qCritical() << "Failed to create VoxelSystemIntegration:" << e.what();

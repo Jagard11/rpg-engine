@@ -55,6 +55,9 @@ public:
     // Remove voxel at the raycast hit position
     bool removeVoxel(const QVector3D& hitPos);
     
+    // Get the surface height at a specific XZ coordinate
+    float getSurfaceHeightAt(float x, float z) const;
+    
 public slots:
     // Update game scene to match voxel world
     void updateGameScene();

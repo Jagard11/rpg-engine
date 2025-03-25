@@ -153,9 +153,11 @@ bool VoxelOctree::isVoxelVisible(int x, int y, int z) const {
         int ny = y + dy[i];
         int nz = z + dz[i];
         
-        // If out of bounds, consider it as "air" (transparent)
+        // If out of bounds, always consider it visible
+        // This ensures voxels at chunk boundaries are always rendered
+        // even when adjacent chunks aren't loaded yet
         if (nx < 0 || nx >= 16 || ny < 0 || ny >= 16 || nz < 0 || nz >= 16) {
-            return true;  // Visible from chunk boundary
+            return true;  // Always visible from chunk boundary
         }
         
         // Check if the neighbor is transparent

@@ -47,6 +47,12 @@ bool VoxelWorldSystem::initialize(WorldType worldType, unsigned int seed) {
             m_chunkGenerator = generator;
             break;
         }
+        case WorldType::Improved: {
+            auto generator = std::make_shared<ImprovedTerrainGenerator>();
+            generator->setSeed(seed);
+            m_chunkGenerator = generator;
+            break;
+        }
         default:
             qWarning() << "Unknown world type:" << static_cast<int>(worldType);
             return false;
@@ -318,4 +324,70 @@ void VoxelWorldSystem::setupSignalConnections() {
     
     connect(m_chunkManager.get(), &ChunkManager::memoryUsageChanged, 
             this, &VoxelWorldSystem::memoryUsageChanged);
+}
+
+float VoxelWorldSystem::getSurfaceHeightAt(float x, float z) const {
+    try {
+        // Check if we have a valid chunk generator
+        if (!m_chunkGenerator) {
+            qWarning() << "Cannot get surface height: No chunk generator available";
+            return -1.0f;
+        }
+        
+        // If using improved generator, use its direct surface height function
+        if (m_worldType == WorldType::Improved) {
+            try {
+                auto* improvedGenerator = dynamic_cast<ImprovedTerrainGenerator*>(m_chunkGenerator.get());
+                if (improvedGenerator) {
+                    return improvedGenerator->getSurfaceHeightAt(x, z);
+                }
+                else {
+                    qWarning() << "Cannot get surface height: Failed to cast to ImprovedTerrainGenerator";
+                }
+            }
+            catch (const std::exception& e) {
+                qWarning() << "Exception in ImprovedTerrainGenerator::getSurfaceHeightAt:" << e.what();
+            }
+            catch (...) {
+                qWarning() << "Unknown exception in ImprovedTerrainGenerator::getSurfaceHeightAt";
+            }
+        }
+        
+        // For other world types, use raycasting from above
+        try {
+            QVector3D origin(x, 100.0f, z);  // Start high up
+            QVector3D direction(0, -1, 0);   // Look straight down
+            float maxDistance = 200.0f;      // Look up to 200 units down
+            
+            QVector3D hitPos;
+            QVector3D hitNormal;
+            Voxel hitVoxel;
+            ChunkCoordinate hitChunk;
+            
+            // Perform the raycast
+            if (raycast(origin, direction, maxDistance, hitPos, hitNormal, hitVoxel, hitChunk)) {
+                return hitPos.y();
+            }
+            else {
+                qDebug() << "No surface found at position (" << x << ", " << z << ") with raycast";
+            }
+        }
+        catch (const std::exception& e) {
+            qWarning() << "Exception in raycast for surface height:" << e.what();
+        }
+        catch (...) {
+            qWarning() << "Unknown exception in raycast for surface height";
+        }
+        
+        // Failed to determine surface height
+        return -1.0f;
+    }
+    catch (const std::exception& e) {
+        qWarning() << "Exception in VoxelWorldSystem::getSurfaceHeightAt:" << e.what();
+        return -1.0f;
+    }
+    catch (...) {
+        qWarning() << "Unknown exception in VoxelWorldSystem::getSurfaceHeightAt";
+        return -1.0f;
+    }
 }

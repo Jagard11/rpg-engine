@@ -118,4 +118,58 @@ private:
     bool isPointInSphere(const QVector3D& point, float radius) const;
 };
 
+/**
+ * @brief Enhanced noise-based terrain generator with seamless chunk boundaries.
+ * 
+ * Creates procedural terrain that is continuous across chunk boundaries
+ * and provides methods for finding surface height at specific coordinates.
+ */
+class ImprovedTerrainGenerator : public ChunkGenerator {
+public:
+    ImprovedTerrainGenerator();
+    
+    std::shared_ptr<Chunk> generateChunk(const ChunkCoordinate& coordinate) override;
+    void setSeed(unsigned int seed) override;
+    
+    // Configure noise parameters
+    void setFrequency(float frequency) { m_frequency = frequency; }
+    void setAmplitude(float amplitude) { m_amplitude = amplitude; }
+    void setOctaves(int octaves) { m_octaves = octaves; }
+    void setLacunarity(float lacunarity) { m_lacunarity = lacunarity; }
+    void setPersistence(float persistence) { m_persistence = persistence; }
+    
+    // Get the surface height at a specific world position
+    float getSurfaceHeightAt(float x, float z) const;
+    
+    // Determine if a block at specific coordinates should be solid
+    bool isSolid(float x, float y, float z) const;
+    
+    // Noise generation methods
+    float getNoise(float x, float z) const;
+    float getFractalNoise(float x, float z) const;
+    
+private:
+    unsigned int m_seed;
+    std::mt19937 m_random;
+    
+    // Feature generation
+    void generateTree(std::shared_ptr<Chunk> chunk, int x, int y, int z);
+    void generateRock(std::shared_ptr<Chunk> chunk, int x, int y, int z);
+    
+    // Helper methods for chunk boundary seamless detection
+    bool isNearChunkBoundary(int localX, int localZ) const;
+    
+    // Noise parameters
+    float m_frequency;
+    float m_amplitude;
+    int m_octaves;
+    float m_lacunarity;
+    float m_persistence;
+    
+    // Biome parameters
+    float m_grasslandThreshold;
+    float m_mountainThreshold;
+    float m_snowThreshold;
+};
+
 #endif // CHUNK_GENERATOR_H

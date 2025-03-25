@@ -24,7 +24,8 @@ public:
     enum class WorldType {
         Flat,       // Flat world with simple terrain
         Hills,      // Rolling hills with noise-based terrain
-        Spherical   // Globe-shaped world (planet)
+        Spherical,  // Globe-shaped world (planet)
+        Improved    // Enhanced procedural terrain generation
     };
     
     /**
@@ -135,6 +136,20 @@ public:
      * @return The planet radius in blocks
      */
     float getPlanetRadius() const { return m_planetRadius; }
+    
+    /**
+     * @brief Get the surface height at a specific X,Z coordinate
+     * @param x X coordinate in world space
+     * @param z Z coordinate in world space
+     * @return The Y coordinate of the surface at the specified X,Z position
+     */
+    float getSurfaceHeightAt(float x, float z) const;
+    
+    /**
+     * @brief Get the chunk manager
+     * @return The chunk manager
+     */
+    ChunkManager* getChunkManager() const { return m_chunkManager.get(); }
     
 signals:
     /**
