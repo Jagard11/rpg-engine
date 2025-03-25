@@ -75,8 +75,19 @@ void DebugSystem::setConsoleWidget(const QVariant& widget) {
             return;
         }
         
+        quintptr ptr = widget.value<quintptr>();
+        if (ptr == 0) {
+            qWarning() << "Invalid null widget pointer in setConsoleWidget";
+            return;
+        }
+        
+        // Log successful widget pointer setting
+        qDebug() << "Setting console widget pointer:" << ptr;
+        
         // Set the render widget property for the console
         m_console->setProperty("render_widget", widget);
+        // No need to call update() since DebugConsole is not a QWidget
+        
         qDebug() << "Console widget set successfully";
     }
     catch (const std::exception& e) {

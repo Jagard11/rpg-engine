@@ -20,30 +20,25 @@ void GLArenaWidget::initializeDebugSystem() {
         m_debugSystem = std::make_unique<DebugSystem>(m_gameScene, m_playerController, this);
         qDebug() << "Debug system created successfully";
         
-        // Delay further initialization until after construction is complete
-        QTimer::singleShot(100, this, [this]() {
-            try {
-                if (m_debugSystem) {
-                    // Initialize the debug system
-                    m_debugSystem->initialize();
-                    
-                    // Set the render widget for the debug system (for console overlay)
-                    // Use a QVariant to store the widget pointer
-                    quintptr thisPtr = reinterpret_cast<quintptr>(this);
-                    m_debugSystem->setConsoleWidget(QVariant::fromValue(thisPtr));
-                    
-                    qDebug() << "Debug system initialized successfully";
-                }
+        // Set the render widget immediately
+        if (m_debugSystem) {
+            // Initialize the debug system
+            m_debugSystem->initialize();
+            
+            // Set the render widget for the debug system (for console overlay)
+            quintptr thisPtr = reinterpret_cast<quintptr>(this);
+            QVariant widgetProp = QVariant::fromValue(thisPtr);
+            
+            // Verify the widget pointer is valid
+            if (thisPtr != 0 && widgetProp.isValid()) {
+                qDebug() << "Setting console widget pointer to:" << thisPtr;
+                m_debugSystem->setConsoleWidget(widgetProp);
+            } else {
+                qWarning() << "Failed to create valid widget pointer for debug console";
             }
-            catch (const std::exception& e) {
-                qWarning() << "Failed to initialize debug system components:" << e.what();
-                m_debugSystem.reset(); // Clean up on failure
-            }
-            catch (...) {
-                qWarning() << "Unknown exception initializing debug system components";
-                m_debugSystem.reset(); // Clean up on failure
-            }
-        });
+            
+            qDebug() << "Debug system initialized successfully";
+        }
     }
     catch (const std::exception& e) {
         qWarning() << "Failed to create debug system:" << e.what();
@@ -73,13 +68,31 @@ void GLArenaWidget::renderDebugSystem() {
             return;
         }
         
+        // Always set the console widget before rendering
+        // This ensures the widget pointer is up-to-date
+        quintptr thisPtr = reinterpret_cast<quintptr>(this);
+        QVariant widgetProp = QVariant::fromValue(thisPtr);
+        
+        if (thisPtr != 0 && widgetProp.isValid()) {
+            m_debugSystem->setConsoleWidget(widgetProp);
+        }
+        
         // Render debug system components with valid matrices
         if (m_viewMatrix.isIdentity() && m_projectionMatrix.isIdentity()) {
             // Don't render with identity matrices - likely not properly set up yet
             return;
         }
         
+        // Save OpenGL state
+        glFinish();  // Make sure all GL commands are executed
+        
+        // Render the debug system
         m_debugSystem->render(m_viewMatrix, m_projectionMatrix, width(), height());
+        
+        // Force update to ensure the debug console is drawn
+        if (m_debugSystem->isConsoleVisible()) {
+            update();
+        }
     }
     catch (const std::exception& e) {
         qWarning() << "Exception rendering debug system:" << e.what();
@@ -96,6 +109,13 @@ bool GLArenaWidget::processDebugKeyEvent(QKeyEvent* event) {
     }
     
     try {
+        // Check specifically for backtick/tilde key for toggling console
+        if (event->key() == Qt::Key_QuoteLeft || event->key() == Qt::Key_AsciiTilde) {
+            qDebug() << "Backtick/tilde key detected - toggling debug console";
+            toggleDebugConsole();
+            return true;
+        }
+        
         // Pass key event to debug system
         return m_debugSystem->handleKeyPress(event->key(), event->text());
     }
@@ -112,11 +132,21 @@ bool GLArenaWidget::processDebugKeyEvent(QKeyEvent* event) {
 // Toggle debug console visibility
 void GLArenaWidget::toggleDebugConsole() {
     if (!m_debugSystem) {
+        qWarning() << "Cannot toggle debug console: debug system not available";
         return;
     }
     
     try {
+        // Always update the widget pointer before toggling
+        quintptr thisPtr = reinterpret_cast<quintptr>(this);
+        QVariant widgetProp = QVariant::fromValue(thisPtr);
+        
+        if (thisPtr != 0 && widgetProp.isValid()) {
+            m_debugSystem->setConsoleWidget(widgetProp);
+        }
+        
         m_debugSystem->toggleConsoleVisibility();
+        qDebug() << "Debug console toggled, new visible state:" << m_debugSystem->isConsoleVisible();
         update(); // Trigger redraw
     }
     catch (const std::exception& e) {

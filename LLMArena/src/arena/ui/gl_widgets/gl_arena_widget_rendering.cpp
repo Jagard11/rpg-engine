@@ -2,6 +2,7 @@
 #include "../../../../include/arena/ui/gl_widgets/gl_arena_widget.h"
 #include <QDebug>
 #include <QMutex>
+#include <QMetaObject>
 #include <stdexcept>
 #include <cmath>
 
@@ -209,6 +210,39 @@ void GLArenaWidget::paintGL()
             }
         }
         
+        // Render debug overlays last (on top of everything)
+        if (m_debugSystem) {
+            try {
+                // Since we can't directly access the debug system methods due to forward declaration,
+                // we'll simply skip the widget pointer update in this class.
+                // The widget pointer is set in GLArenaWidget::initializeDebugSystem and 
+                // GLArenaWidget::toggleDebugConsole which properly include the DebugSystem.h header
+                
+                // Render the debug system with our matrix info
+                renderDebugSystem();
+                
+                // Switch to 2D mode for UI rendering if needed for debug console
+                bool consoleVisible = isDebugConsoleVisible();
+                
+                if (consoleVisible) {
+                    // Make sure depth test is disabled for UI elements
+                    glDisable(GL_DEPTH_TEST);
+                    glEnable(GL_BLEND);
+                    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+                } else {
+                    // Use normal depth testing for 3D visualizers
+                    glEnable(GL_DEPTH_TEST);
+                }
+                
+                // Render the debug system
+                renderDebugSystem();
+            } catch (const std::exception& e) {
+                qWarning() << "Exception in debug system rendering:" << e.what();
+            } catch (...) {
+                qWarning() << "Unknown exception in debug system rendering";
+            }
+        }
+        
         // Check for any OpenGL errors (but limit reporting to avoid spam)
         GLenum err;
         while ((err = glGetError()) != GL_NO_ERROR) {
@@ -248,73 +282,5 @@ void GLArenaWidget::paintGL()
         // Emergency drawing
         glClearColor(0.5f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    }
-}
-
-// Function stubs that now call the fallback rendering
-void GLArenaWidget::renderCharacters()
-{
-    // Add extra safety check
-    if (m_characterSprites.size() > 0 && context() && context()->isValid() && m_billboardProgram && m_billboardProgram->isLinked()) {
-        renderCharactersFallback();
-    }
-}
-
-void GLArenaWidget::renderCharactersSimple()
-{
-    // Add extra safety check
-    if (m_characterSprites.size() > 0 && context() && context()->isValid() && m_billboardProgram && m_billboardProgram->isLinked()) {
-        renderCharactersFallback();
-    }
-}
-
-// Render inventory UI
-void GLArenaWidget::renderInventory() {
-    if (!m_inventoryUI) {
-        return;
-    }
-    
-    try {
-        // Additional context check
-        if (!context() || !context()->isValid()) {
-            return;
-        }
-    
-        // Save current OpenGL state
-        GLboolean depthTestEnabled;
-        glGetBooleanv(GL_DEPTH_TEST, &depthTestEnabled);
-        
-        GLint blendSrc, blendDst;
-        glGetIntegerv(GL_BLEND_SRC_ALPHA, &blendSrc);
-        glGetIntegerv(GL_BLEND_DST_ALPHA, &blendDst);
-        
-        // Setup for 2D UI rendering
-        glDisable(GL_DEPTH_TEST);
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        
-        // Verify width and height are valid
-        int w = width();
-        int h = height();
-        if (w <= 0 || h <= 0) {
-            qWarning() << "Invalid widget dimensions for inventory UI:" << w << "x" << h;
-            return;
-        }
-        
-        // Render inventory UI
-        m_inventoryUI->render(w, h);
-        
-        // Restore OpenGL state
-        if (depthTestEnabled) {
-            glEnable(GL_DEPTH_TEST);
-        } else {
-            glDisable(GL_DEPTH_TEST);
-        }
-        
-        glBlendFunc(blendSrc, blendDst);
-    } catch (const std::exception& e) {
-        qCritical() << "Exception in renderInventory:" << e.what();
-    } catch (...) {
-        qCritical() << "Unknown exception in renderInventory";
     }
 }

@@ -54,7 +54,7 @@ DebugConsole::~DebugConsole() {
     delete m_consoleShader;
     
     // Delete commands
-    for (auto command : m_commands) {
+    for (auto command : m_commands.values()) {
         delete command;
     }
     m_commands.clear();
@@ -69,89 +69,41 @@ void DebugConsole::initialize() {
     
     // We still can do non-OpenGL initialization here
     // For example, set up command history, console properties, etc.
+    
+    // Log the fact that debug console is initialized
+    qDebug() << "Debug console initialized with OpenGL initialization deferred";
+    
+    // Make sure we have a valid property set for the render widget
+    if (!property("render_widget").isValid()) {
+        qWarning() << "Debug console initialized without a valid render_widget property";
+    } else {
+        qDebug() << "Debug console initialized with render_widget property:" 
+                << property("render_widget").value<quintptr>();
+    }
 }
-
-
 
 void DebugConsole::render(int screenWidth, int screenHeight) {
     if (!m_visible) {
         return;
     }
     
-    // Make sure we have a valid shader
-    if (!m_consoleShader || !m_consoleShader->isLinked() || !m_quadVAO.isCreated()) {
-        qWarning() << "Debug console not properly initialized";
-        return;
+    // Make sure we have a valid property set for the render widget
+    if (!property("render_widget").isValid()) {
+        qWarning() << "Debug console trying to render without valid render_widget property";
     }
     
     // Calculate console dimensions
     float consoleHeight = screenHeight * m_consoleHeight;
     
-    // Save OpenGL state
-    GLint oldBlend;
-    glGetIntegerv(GL_BLEND, &oldBlend);
-    
-    // Enable blending for transparency
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    
-    // Disable depth testing for UI
-    GLint oldDepthTest;
-    glGetIntegerv(GL_DEPTH_TEST, &oldDepthTest);
-    glDisable(GL_DEPTH_TEST);
-    
-    // Bind shader
-    m_consoleShader->bind();
-    
-    // Set up orthographic projection
-    QMatrix4x4 projection;
-    projection.ortho(0, screenWidth, screenHeight, 0, -1, 1); // Origin at top-left
-    m_consoleShader->setUniformValue("projection", projection);
-    
-    // Draw console background
-    m_quadVAO.bind();
-    
-    // Set background color (semi-transparent black)
-    m_consoleShader->setUniformValue("color", QVector4D(0.1f, 0.1f, 0.2f, m_consoleOpacity));
-    
-    // Set model matrix for background
-    QMatrix4x4 model;
-    model.setToIdentity();
-    model.translate(0, 0, 0);
-    model.scale(screenWidth, consoleHeight, 1);
-    m_consoleShader->setUniformValue("model", model);
-    
-    // Draw background quad
-    glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-    
-    m_quadVAO.release();
-    m_consoleShader->release();
-    
-    // Get the rendering target widget using a safer approach
-    quintptr widgetPtr = this->property("render_widget").value<quintptr>();
-    QWidget* widget = reinterpret_cast<QWidget*>(widgetPtr);
-    
-    // Draw console text using the drawConsoleText helper
-    if (widget) {
-        drawConsoleText(screenWidth, screenHeight, consoleHeight);
-    }
-    
-    // Restore OpenGL state
-    if (oldBlend) {
-        glEnable(GL_BLEND);
-    } else {
-        glDisable(GL_BLEND);
-    }
-    
-    if (oldDepthTest) {
-        glEnable(GL_DEPTH_TEST);
-    }
+    // Use the helper function to draw text
+    drawConsoleText(screenWidth, screenHeight, consoleHeight);
 }
 
 bool DebugConsole::handleKeyPress(int key, const QString& text) {
     // Toggle console visibility with backtick key
     if (key == Qt::Key_QuoteLeft) {
         setVisible(!m_visible);
+        qDebug() << "Debug console toggled to visibility:" << m_visible;
         return true;
     }
     
@@ -177,6 +129,7 @@ bool DebugConsole::handleKeyPress(int key, const QString& text) {
             
         case Qt::Key_Escape:
             setVisible(false);
+            qDebug() << "Debug console hidden via escape key";
             return true;
             
         case Qt::Key_Backspace:
@@ -232,6 +185,13 @@ void DebugConsole::registerCommand(DebugCommand* command) {
 
 void DebugConsole::setVisible(bool visible) {
     if (m_visible != visible) {
+        qDebug() << "Debug console visibility changing from" << m_visible << "to" << visible;
+        
+        // Check if we have a valid render widget before becoming visible
+        if (visible && !property("render_widget").isValid()) {
+            qWarning() << "Debug console trying to become visible without a valid render_widget property";
+        }
+        
         m_visible = visible;
         emit visibilityChanged(m_visible);
         
