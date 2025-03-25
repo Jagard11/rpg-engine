@@ -34,13 +34,11 @@ QString TeleportCommand::execute(const QStringList& args, GameScene* gameScene,
         return "Error: Invalid coordinates";
     }
     
-    // Get current position to find the entity ID
-    QVector3D currentPos = playerController->getPosition();
+    // Create new position vector
+    QVector3D newPosition(x, y, z);
     
-    // Update player position in game scene
-    if (gameScene) {
-        gameScene->updateEntityPosition("player", QVector3D(x, y, z));
-    }
+    // Use the PlayerController's setPosition method to directly teleport the player
+    playerController->setPosition(newPosition);
     
     // Handle optional rotation argument
     if (args.size() >= 4) {
@@ -55,9 +53,8 @@ QString TeleportCommand::execute(const QStringList& args, GameScene* gameScene,
                 rotationRad = degreesToRadians(rotation);
             }
             
-            // Note: We don't directly set rotation as no setRotation method exists
-            // Instead we would normally emit a signal or call another method
-            // For this example, we'll just log it
+            // Set the player's rotation
+            playerController->setRotation(rotationRad);
             qDebug() << "Setting rotation to" << rotationRad;
         }
     }
@@ -79,8 +76,8 @@ QString TeleportCommand::execute(const QStringList& args, GameScene* gameScene,
             const float maxPitch = 89.0f * M_PI / 180.0f;
             pitchRad = qBound(-maxPitch, pitchRad, maxPitch);
             
-            // Note: We don't directly set pitch as no setter exists
-            // Just log it for now
+            // Set the player's pitch
+            playerController->setPitch(pitchRad);
             qDebug() << "Setting pitch to" << pitchRad;
         }
     }

@@ -47,7 +47,7 @@ void PlayerController::createPlayerEntity() {
         GameEntity playerEntity;
         playerEntity.id = "player";
         playerEntity.type = "player";
-        playerEntity.position = QVector3D(5, 1.0, 5); // Start position - 1 unit above floor (was 0.9)
+        playerEntity.position = QVector3D(5, 5.0, 5); // Start position - 5 units above floor (was 1.0)
         playerEntity.dimensions = QVector3D(0.6, 1.8, 0.6); // Human dimensions
         playerEntity.isStatic = false;
         
@@ -106,4 +106,46 @@ void PlayerController::startUpdates() {
 
 void PlayerController::stopUpdates() {
     updateTimer.stop();
+}
+
+void PlayerController::setPosition(const QVector3D& newPosition) {
+    // Acquire mutex for thread safety
+    QMutexLocker locker(&playerMovementMutex);
+    
+    // Update internal position
+    position = newPosition;
+    
+    // Update entity in game scene
+    if (gameScene) {
+        try {
+            gameScene->updateEntityPosition("player", newPosition);
+        } catch (const std::exception& e) {
+            qWarning() << "Exception updating player position:" << e.what();
+        }
+    }
+    
+    // Emit position changed signal
+    emit positionChanged(position);
+}
+
+void PlayerController::setRotation(float newRotation) {
+    // Acquire mutex for thread safety
+    QMutexLocker locker(&playerMovementMutex);
+    
+    // Update internal rotation
+    rotation = newRotation;
+    
+    // Emit rotation changed signal
+    emit rotationChanged(rotation);
+}
+
+void PlayerController::setPitch(float newPitch) {
+    // Acquire mutex for thread safety
+    QMutexLocker locker(&playerMovementMutex);
+    
+    // Update internal pitch
+    pitch = newPitch;
+    
+    // Emit pitch changed signal
+    emit pitchChanged(pitch);
 }

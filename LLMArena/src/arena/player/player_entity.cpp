@@ -64,8 +64,8 @@ void PlayerEntity::initialize() {
     // Initialize camera component
     m_camera->initialize();
     
-    // Set initial position (slightly above the ground)
-    setPosition(QVector3D(0, getEyeHeight(), 0));
+    // Set initial position (higher above the ground)
+    setPosition(QVector3D(0, 5.0, 0));
     
     // Set initial rotation (looking forward)
     setRotation(0, 0);

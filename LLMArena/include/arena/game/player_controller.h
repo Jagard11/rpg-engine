@@ -66,6 +66,15 @@ public:
     // Create the player entity in the scene
     void createPlayerEntity();
 
+    // Set player position directly (for teleporting)
+    void setPosition(const QVector3D &newPosition);
+    
+    // Set player rotation directly (for teleporting)
+    void setRotation(float newRotation);
+    
+    // Set player pitch directly (for teleporting)
+    void setPitch(float newPitch);
+
     // Helper methods for determining the size of the parent widget for mouse centering
     int width() const;
     int height() const;
