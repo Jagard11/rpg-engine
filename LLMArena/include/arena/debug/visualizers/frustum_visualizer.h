@@ -9,6 +9,8 @@
 #include <QOpenGLVertexArrayObject>
 #include <QMatrix4x4>
 #include <memory>
+#include <QVector3D>
+#include <QVector>
 
 // Forward declarations
 class ViewFrustum;
@@ -63,6 +65,9 @@ private:
     // Frustum data
     QVector<QVector3D> m_frustumPoints;
     std::unique_ptr<ViewFrustum> m_viewFrustum;
+    
+    // Number of indices for drawing
+    int m_wireframeIndexCount;
     
     // Create shader program
     void createShaders();

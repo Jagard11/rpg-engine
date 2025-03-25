@@ -52,34 +52,49 @@ void FrustumVisualizer::render(const QMatrix4x4& viewMatrix, const QMatrix4x4& p
         return;
     }
 
-        // Check if OpenGL functions are initialized, if not initialize them now
-        static bool openGLInitialized = false;
-        if (!openGLInitialized) {
-            try {
-                qDebug() << "Initializing OpenGL functions for frustum visualizer";
-                initializeOpenGLFunctions();
-                
-                // Now create shaders and other OpenGL resources
-                createShaders();
-                createFrustumGeometry();
-                
-                openGLInitialized = true;
-            }
-            catch (const std::exception& e) {
-                qWarning() << "Exception initializing OpenGL for frustum visualizer:" << e.what();
-                return;
-            }
-            catch (...) {
-                qWarning() << "Unknown exception initializing OpenGL for frustum visualizer";
-                return;
-            }
+    // Check if OpenGL functions are initialized, if not initialize them now
+    static bool openGLInitialized = false;
+    static bool geometryCreated = false;
+    
+    if (!openGLInitialized) {
+        try {
+            qDebug() << "Initializing OpenGL functions for frustum visualizer";
+            initializeOpenGLFunctions();
+            openGLInitialized = true;
         }
-        
-        // Make sure shader is created and linked
-        if (!m_shader || !m_shader->isLinked() || !m_vao.isCreated()) {
-            qWarning() << "Frustum visualizer not properly initialized";
+        catch (const std::exception& e) {
+            qWarning() << "Exception initializing OpenGL for frustum visualizer:" << e.what();
             return;
         }
+        catch (...) {
+            qWarning() << "Unknown exception initializing OpenGL for frustum visualizer";
+            return;
+        }
+    }
+    
+    // Create shader programs and geometry if not already done
+    if (!geometryCreated) {
+        try {
+            createShaders();
+            createFrustumGeometry();
+            geometryCreated = true;
+        }
+        catch (const std::exception& e) {
+            qWarning() << "Exception creating frustum geometry:" << e.what();
+            return;
+        }
+        catch (...) {
+            qWarning() << "Unknown exception creating frustum geometry";
+            return;
+        }
+    }
+    
+    // Make sure shader is created and linked
+    if (!m_shader || !m_shader->isLinked() || !m_vao.isCreated() || 
+        !m_vertexBuffer.isCreated() || !m_indexBuffer.isCreated()) {
+        qWarning() << "Frustum visualizer not properly initialized";
+        return;
+    }
     
     // Compute the inverse view-projection matrix to transform NDC corners to world space
     QMatrix4x4 viewProjection = projectionMatrix * viewMatrix;
@@ -112,8 +127,19 @@ void FrustumVisualizer::render(const QMatrix4x4& viewMatrix, const QMatrix4x4& p
     m_vertexBuffer.write(0, m_frustumPoints.constData(), m_frustumPoints.size() * sizeof(QVector3D));
     m_vertexBuffer.release();
     
-    // Draw frustum lines
-    glDrawElements(GL_LINES, 24, GL_UNSIGNED_INT, nullptr);
+    // Draw frustum lines - ensure index buffer is bound before drawing
+    m_indexBuffer.bind();
+    
+    // Double check index buffer is created and has data
+    if (m_indexBuffer.isCreated() && m_wireframeIndexCount > 0) {
+        glDrawElements(GL_LINES, m_wireframeIndexCount, GL_UNSIGNED_INT, nullptr);
+    }
+    else {
+        qWarning() << "Index buffer not ready for drawing";
+    }
+    
+    // Release index buffer
+    m_indexBuffer.release();
     
     // Unbind VAO
     m_vao.release();
@@ -207,6 +233,9 @@ void FrustumVisualizer::createFrustumGeometry()
         // Connecting lines
         0, 4, 1, 5, 2, 6, 3, 7
     };
+    
+    // Store the number of indices for drawing
+    m_wireframeIndexCount = sizeof(indices) / sizeof(indices[0]);
     
     // Create and bind index buffer
     m_indexBuffer.create();
