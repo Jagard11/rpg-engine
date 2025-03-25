@@ -163,6 +163,7 @@ private:
     QOpenGLBuffer m_floorVBO;
     QOpenGLBuffer m_floorIBO;
     int m_floorIndexCount;
+    int m_floorVertexCount;  // Add this new member variable
     
     QOpenGLVertexArrayObject m_gridVAO;
     QOpenGLBuffer m_gridVBO;

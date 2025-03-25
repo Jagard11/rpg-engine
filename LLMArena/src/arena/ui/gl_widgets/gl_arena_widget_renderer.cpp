@@ -8,8 +8,12 @@
 #include <QPainter>
 #include <cmath>
 
-void GLArenaWidget::createFloor(double radius) {
-    // Cleanup previous geometry if it exists
+// Modified createFloor method to use vertex array only (no indices)
+void GLArenaWidget::createFloor(double radius)
+{
+    qDebug() << "Creating floor with radius" << radius;
+    
+    // Clean up any existing resources
     if (m_floorVAO.isCreated()) {
         m_floorVAO.destroy();
     }
@@ -18,119 +22,103 @@ void GLArenaWidget::createFloor(double radius) {
         m_floorVBO.destroy();
     }
     
+    // Clean up IBO but we won't use it anymore
     if (m_floorIBO.isCreated()) {
         m_floorIBO.destroy();
     }
     
-    // Create VAO
-    if (!m_floorVAO.create()) {
-        qWarning() << "Failed to create floor VAO";
-        return;
-    }
+    // Create a simple square floor with explicit triangles for glDrawArrays
+    float halfSize = static_cast<float>(radius);
     
-    m_floorVAO.bind();
-    
-    // Create VBO
-    if (!m_floorVBO.create()) {
-        qWarning() << "Failed to create floor VBO";
-        m_floorVAO.release();
-        return;
-    }
-    
-    m_floorVBO.bind();
-    
-    // Simple square for the floor
-    const float floorY = 0.0f;  // At ground level
+    // Create floor with explicit triangle vertices - 6 vertices total (2 triangles)
+    // Format: Position(3) + Normal(3) + Color(3)
     float vertices[] = {
-        // Position (x, y, z)    // Normal     // TexCoord (u, v)
-        -radius, floorY, -radius, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
-        radius, floorY, -radius, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f,
-        radius, floorY, radius, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f,
-        -radius, floorY, radius, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f
+        // First triangle
+        -halfSize, 0.0f, -halfSize,   0.0f, 1.0f, 0.0f,   0.5f, 0.5f, 0.5f,  // Bottom-left
+         halfSize, 0.0f, -halfSize,   0.0f, 1.0f, 0.0f,   0.5f, 0.5f, 0.5f,  // Bottom-right
+         halfSize, 0.0f,  halfSize,   0.0f, 1.0f, 0.0f,   0.5f, 0.5f, 0.5f,  // Top-right
+        
+        // Second triangle
+        -halfSize, 0.0f, -halfSize,   0.0f, 1.0f, 0.0f,   0.5f, 0.5f, 0.5f,  // Bottom-left
+         halfSize, 0.0f,  halfSize,   0.0f, 1.0f, 0.0f,   0.5f, 0.5f, 0.5f,  // Top-right
+        -halfSize, 0.0f,  halfSize,   0.0f, 1.0f, 0.0f,   0.5f, 0.5f, 0.5f   // Top-left
     };
     
+    // Store number of vertices
+    m_floorVertexCount = 6;  // 6 vertices for 2 triangles
+    
+    // Create and bind VAO
+    m_floorVAO.create();
+    m_floorVAO.bind();
+    
+    // Create and bind VBO
+    m_floorVBO.create();
+    m_floorVBO.bind();
     m_floorVBO.allocate(vertices, sizeof(vertices));
     
     // Set up vertex attributes
-    glEnableVertexAttribArray(0);  // Position
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), nullptr);
+    // Position (3 floats)
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 9 * sizeof(float), nullptr);
     
-    glEnableVertexAttribArray(1);  // Normal
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), 
-                        reinterpret_cast<void*>(3 * sizeof(float)));
+    // Normal (3 floats)
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 9 * sizeof(float), 
+                         reinterpret_cast<void*>(3 * sizeof(float)));
     
-    glEnableVertexAttribArray(2);  // Texture coordinates
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), 
-                        reinterpret_cast<void*>(6 * sizeof(float)));
+    // Color (3 floats)
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 9 * sizeof(float), 
+                         reinterpret_cast<void*>(6 * sizeof(float)));
     
-    // Create IBO
-    if (!m_floorIBO.create()) {
-        qWarning() << "Failed to create floor IBO";
-        m_floorVBO.release();
-        m_floorVAO.release();
-        return;
-    }
-    
-    m_floorIBO.bind();
-    
-    // Indices for 2 triangles forming a quad
-    unsigned int indices[] = {
-        0, 1, 2,   // First triangle
-        0, 2, 3    // Second triangle
-    };
-    
-    m_floorIBO.allocate(indices, sizeof(indices));
-    m_floorIndexCount = 6;  // 6 indices, 2 triangles
-    
-    // Release bindings
-    m_floorIBO.release();
+    // Unbind buffers and VAO
     m_floorVBO.release();
     m_floorVAO.release();
     
     qDebug() << "Floor geometry created successfully: radius =" << radius 
             << "VAO =" << m_floorVAO.isCreated() 
-            << "VBO =" << m_floorVBO.isCreated() 
-            << "IBO =" << m_floorIBO.isCreated()
-            << "Indices =" << m_floorIndexCount;
+            << "VBO =" << m_floorVBO.isCreated()
+            << "Vertices =" << m_floorVertexCount;
 }
 
-void GLArenaWidget::renderFloor() {
-    // Skip if shader is not available
-    if (!m_billboardProgram || !m_billboardProgram->isLinked()) {
+// Modified renderFloor method to use glDrawArrays instead of glDrawElements
+void GLArenaWidget::renderFloor()
+{
+    // Skip rendering if VAO is not created
+    if (!m_floorVAO.isCreated()) {
+        qWarning() << "Cannot render floor: VAO not created";
         return;
     }
     
-    // Skip if any required buffer isn't available
-    if (!m_floorVAO.isCreated() || !m_floorVBO.isCreated() || !m_floorIBO.isCreated()) {
-        qWarning() << "Floor geometry not properly initialized for rendering";
+    // Skip rendering if index count is invalid 
+    if (m_floorIndexCount <= 0) {
+        qWarning() << "Cannot render floor: Invalid index count";
         return;
     }
     
-    // Bind shader
-    m_billboardProgram->bind();
+    // Bind shader program
+    if (!m_billboardProgram->bind()) {
+        qWarning() << "Failed to bind shader for floor rendering";
+        return;
+    }
     
-    // Set uniforms for floor rendering
+    // Set up model matrix
     QMatrix4x4 modelMatrix;
     modelMatrix.setToIdentity();
     
+    // Set uniforms
     m_billboardProgram->setUniformValue("model", modelMatrix);
     m_billboardProgram->setUniformValue("view", m_viewMatrix);
     m_billboardProgram->setUniformValue("projection", m_projectionMatrix);
     
-    // Set floor color (light gray)
-    QVector4D floorColor(0.8f, 0.8f, 0.8f, 1.0f);
-    m_billboardProgram->setUniformValue("color", floorColor);
-    m_billboardProgram->setUniformValue("useTexture", false);  // No texture for now
-    
-    // Bind VAO and IBO - CRITICAL: MUST bind both VAO and IBO!
+    // Bind VAO
     m_floorVAO.bind();
-    m_floorIBO.bind();  // This was missing and causing the crash
     
-    // Draw floor quad
-    glDrawElements(GL_TRIANGLES, m_floorIndexCount, GL_UNSIGNED_INT, nullptr);
+    // For debugging - just render the floor using arrays instead of elements
+    // This will show the floor without using indices
+    glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
     
-    // Release bindings
-    m_floorIBO.release();
+    // Release VAO and shader
     m_floorVAO.release();
     m_billboardProgram->release();
 }
