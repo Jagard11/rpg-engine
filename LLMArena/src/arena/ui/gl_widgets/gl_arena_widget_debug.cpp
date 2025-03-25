@@ -1,7 +1,6 @@
 // src/arena/ui/gl_widgets/gl_arena_widget_debug.cpp
 #include "../../../../include/arena/ui/gl_widgets/gl_arena_widget.h"
 #include "../../../../include/arena/debug/debug_system.h"
-#include <QVariant>
 #include <QDebug>
 
 // Initialize the debug system
@@ -86,11 +85,12 @@ void GLArenaWidget::renderDebugSystem() {
         // Save OpenGL state
         glFinish();  // Make sure all GL commands are executed
         
-        // Render the debug system
+        // Render the debug system - use direct call instead of QMetaObject::invokeMethod
         m_debugSystem->render(m_viewMatrix, m_projectionMatrix, width(), height());
         
         // Force update to ensure the debug console is drawn
-        if (m_debugSystem->isConsoleVisible()) {
+        bool consoleVisible = m_debugSystem->isConsoleVisible();
+        if (consoleVisible) {
             update();
         }
     }
@@ -112,7 +112,8 @@ bool GLArenaWidget::processDebugKeyEvent(QKeyEvent* event) {
         // Check specifically for backtick/tilde key for toggling console
         if (event->key() == Qt::Key_QuoteLeft || event->key() == Qt::Key_AsciiTilde) {
             qDebug() << "Backtick/tilde key detected - toggling debug console";
-            toggleDebugConsole();
+            // Use direct call instead of QMetaObject::invokeMethod
+            m_debugSystem->toggleConsoleVisibility();
             return true;
         }
         
@@ -145,7 +146,10 @@ void GLArenaWidget::toggleDebugConsole() {
             m_debugSystem->setConsoleWidget(widgetProp);
         }
         
+        // Direct call instead of QMetaObject::invokeMethod
         m_debugSystem->toggleConsoleVisibility();
+        
+        // Log success
         qDebug() << "Debug console toggled, new visible state:" << m_debugSystem->isConsoleVisible();
         update(); // Trigger redraw
     }
@@ -164,6 +168,7 @@ bool GLArenaWidget::isDebugConsoleVisible() const {
     }
     
     try {
+        // Direct call instead of QMetaObject::invokeMethod
         return m_debugSystem->isConsoleVisible();
     }
     catch (const std::exception& e) {
@@ -183,6 +188,7 @@ void GLArenaWidget::toggleFrustumVisualization() {
     }
     
     try {
+        // Direct call instead of QMetaObject::invokeMethod
         m_debugSystem->toggleFrustumVisualization();
         update(); // Trigger redraw
     }

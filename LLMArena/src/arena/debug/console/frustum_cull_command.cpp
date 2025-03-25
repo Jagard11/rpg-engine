@@ -9,6 +9,10 @@ FrustumCullCommand::FrustumCullCommand(FrustumVisualizer* visualizer, QObject* p
     : DebugCommand(parent),
       m_visualizer(visualizer)
 {
+    // Ensure we have a valid visualizer
+    if (!m_visualizer) {
+        qWarning() << "FrustumCullCommand created with null visualizer";
+    }
 }
 
 QString FrustumCullCommand::execute(const QStringList& args, GameScene* gameScene, 
@@ -26,6 +30,9 @@ QString FrustumCullCommand::execute(const QStringList& args, GameScene* gameScen
         // Toggle visualization
         bool newState = !m_visualizer->isEnabled();
         m_visualizer->setEnabled(newState);
+        
+        qDebug() << "Frustum culling visualization toggled to:" << newState;
+        
         return QString("Frustum culling visualization %1").arg(newState ? "enabled" : "disabled");
     } else {
         // Set specific state
@@ -37,6 +44,9 @@ QString FrustumCullCommand::execute(const QStringList& args, GameScene* gameScen
         }
         
         m_visualizer->setEnabled(state == 1);
+        
+        qDebug() << "Frustum culling visualization set to:" << (state == 1);
+        
         return QString("Frustum culling visualization %1").arg(state == 1 ? "enabled" : "disabled");
     }
 }

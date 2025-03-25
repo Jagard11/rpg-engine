@@ -67,23 +67,23 @@ public:
      * @brief Check if the console is visible
      * @return True if visible
      */
-    bool isConsoleVisible() const;
+    Q_INVOKABLE bool isConsoleVisible() const;
     
     /**
      * @brief Toggle console visibility
      */
-    void toggleConsoleVisibility();
+    Q_INVOKABLE void toggleConsoleVisibility();
     
     /**
      * @brief Toggle frustum visualization
      */
-    void toggleFrustumVisualization();
+    Q_INVOKABLE void toggleFrustumVisualization();
     
     /**
      * @brief Set the widget for console rendering
      * @param widget Widget pointer as QVariant
      */
-    void setConsoleWidget(const QVariant& widget);
+    Q_INVOKABLE void setConsoleWidget(const QVariant& widget);
     
 private:
     // Game references

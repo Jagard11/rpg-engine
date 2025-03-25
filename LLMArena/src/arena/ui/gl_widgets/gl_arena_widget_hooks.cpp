@@ -7,26 +7,44 @@
 // This file contains input event hooks for GLArenaWidget
 
 void GLArenaWidget::keyPressEvent(QKeyEvent* event) {
-    // First, check if debug system wants to handle this
-    if (m_debugSystem && processDebugKeyEvent(event)) {
+    if (!event) {
         return;
+    }
+    
+    // Special handling of tilde/backtick key for debug console
+    if (event->key() == Qt::Key_QuoteLeft || event->key() == Qt::Key_AsciiTilde) {
+        qDebug() << "Detected tilde/backtick key directly in keyPressEvent";
+        if (m_debugSystem) {
+            toggleDebugConsole();
+            event->accept();
+            return;
+        }
+    }
+    
+    // Then try other debug key event handlers
+    if (m_debugSystem && processDebugKeyEvent(event)) {
+        event->accept();
+        return; // Debug system handled the event
     }
     
     // Handle inventory UI
     if (m_inventoryUI && m_inventoryUI->isVisible()) {
         m_inventoryUI->handleKeyPress(event->key());
+        event->accept();
         return;
     }
     
     // Handle voxel placement
     if (event->key() == Qt::Key_E && m_highlightedVoxelFace >= 0 && m_voxelSystem) {
         placeVoxel();
+        event->accept();
         return;
     }
     
     // Handle voxel removal
     if (event->key() == Qt::Key_Q && m_highlightedVoxelFace >= 0 && m_voxelSystem) {
         removeVoxel();
+        event->accept();
         return;
     }
     
@@ -34,21 +52,21 @@ void GLArenaWidget::keyPressEvent(QKeyEvent* event) {
     if (event->key() == Qt::Key_I && m_inventoryUI) {
         m_inventoryUI->setVisible(!m_inventoryUI->isVisible());
         updateMouseTrackingState();
+        event->accept();
         return;
     }
     
-    // Handle debug console toggle
+    // Handle debug console visibility with Escape key
     if (event->key() == Qt::Key_Escape) {
         bool consoleVisible = false;
         
-        // Check if debug console is visible using isConsoleVisible method
+        // Check console visibility - use direct method call
         if (m_debugSystem) {
-            QMetaObject::invokeMethod(m_debugSystem.get(), "isConsoleVisible", 
-                                     Qt::DirectConnection,
-                                     Q_RETURN_ARG(bool, consoleVisible));
+            consoleVisible = m_debugSystem->isConsoleVisible();
             
             if (consoleVisible) {
                 toggleDebugConsole();
+                event->accept();
                 return;
             }
         }
@@ -57,6 +75,7 @@ void GLArenaWidget::keyPressEvent(QKeyEvent* event) {
         if (m_inventoryUI && m_inventoryUI->isVisible()) {
             m_inventoryUI->setVisible(false);
             updateMouseTrackingState();
+            event->accept();
             return;
         }
     }

@@ -75,8 +75,7 @@ void DebugSystem::initialize()
     
     // Initialize components
     try {
-        // Initialize console if available - 
-        // Note: OpenGL initialization will be deferred until rendering
+        // Initialize console if available
         if (m_console) {
             qDebug() << "Initializing debug console...";
             m_console->initialize();
@@ -111,7 +110,15 @@ void DebugSystem::render(const QMatrix4x4& viewMatrix, const QMatrix4x4& project
     // Render frustum visualizer if enabled
     if (m_frustumVisualizer && m_frustumVisualizer->isEnabled()) {
         try {
+            // Pass view and projection matrices to the visualizer
             m_frustumVisualizer->render(viewMatrix, projectionMatrix);
+            
+            // Log that we're rendering the frustum visualizer
+            static int logCounter = 0;
+            if (logCounter++ % 100 == 0) { // Log only periodically to avoid spam
+                qDebug() << "Rendering frustum visualizer (enabled state:" 
+                        << m_frustumVisualizer->isEnabled() << ")";
+            }
         }
         catch (const std::exception& e) {
             qWarning() << "Exception rendering frustum visualizer:" << e.what();
@@ -192,11 +199,14 @@ void DebugSystem::toggleConsoleVisibility()
 void DebugSystem::toggleFrustumVisualization()
 {
     if (!m_frustumVisualizer) {
+        qWarning() << "Cannot toggle frustum visualization: visualizer not available";
         return;
     }
     
     try {
-        m_frustumVisualizer->setEnabled(!m_frustumVisualizer->isEnabled());
+        bool newState = !m_frustumVisualizer->isEnabled();
+        m_frustumVisualizer->setEnabled(newState);
+        qDebug() << "Frustum visualization toggled to: " << newState;
     }
     catch (const std::exception& e) {
         qWarning() << "Exception toggling frustum visualization:" << e.what();
@@ -257,6 +267,7 @@ void DebugSystem::registerCommands()
     if (m_frustumCullCommand) {
         try {
             m_console->registerCommand(m_frustumCullCommand.get());
+            qDebug() << "Frustum cull command registered successfully";
         }
         catch (const std::exception& e) {
             qWarning() << "Exception registering frustum cull command:" << e.what();

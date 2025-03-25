@@ -90,13 +90,28 @@ void DebugConsole::render(int screenWidth, int screenHeight) {
     // Make sure we have a valid property set for the render widget
     if (!property("render_widget").isValid()) {
         qWarning() << "Debug console trying to render without valid render_widget property";
+        return;
+    }
+    
+    // Early validation of dimensions
+    if (screenWidth <= 0 || screenHeight <= 0) {
+        qWarning() << "Invalid screen dimensions for debug console rendering:" 
+                  << screenWidth << "x" << screenHeight;
+        return;
     }
     
     // Calculate console dimensions
     float consoleHeight = screenHeight * m_consoleHeight;
     
     // Use the helper function to draw text
-    drawConsoleText(screenWidth, screenHeight, consoleHeight);
+    try {
+        drawConsoleText(screenWidth, screenHeight, consoleHeight);
+        qDebug() << "Debug console rendered successfully at" << screenWidth << "x" << consoleHeight;
+    } catch (const std::exception& e) {
+        qWarning() << "Exception in debug console rendering:" << e.what();
+    } catch (...) {
+        qWarning() << "Unknown exception in debug console rendering";
+    }
 }
 
 bool DebugConsole::handleKeyPress(int key, const QString& text) {

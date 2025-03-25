@@ -90,12 +90,6 @@ void GLArenaWidget::renderFloor()
         return;
     }
     
-    // Skip rendering if index count is invalid 
-    if (m_floorIndexCount <= 0) {
-        qWarning() << "Cannot render floor: Invalid index count";
-        return;
-    }
-    
     // Bind shader program
     if (!m_billboardProgram->bind()) {
         qWarning() << "Failed to bind shader for floor rendering";
@@ -111,12 +105,20 @@ void GLArenaWidget::renderFloor()
     m_billboardProgram->setUniformValue("view", m_viewMatrix);
     m_billboardProgram->setUniformValue("projection", m_projectionMatrix);
     
+    // Set floor color
+    m_billboardProgram->setUniformValue("color", QVector4D(0.5f, 0.5f, 0.5f, 1.0f));
+    m_billboardProgram->setUniformValue("useTexture", false);
+    
     // Bind VAO
     m_floorVAO.bind();
     
-    // For debugging - just render the floor using arrays instead of elements
-    // This will show the floor without using indices
-    glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+    // Draw using vertex count instead of index count
+    if (m_floorVertexCount > 0) {
+        glDrawArrays(GL_TRIANGLES, 0, m_floorVertexCount);
+    } else {
+        // Fallback if no vertices defined
+        glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+    }
     
     // Release VAO and shader
     m_floorVAO.release();

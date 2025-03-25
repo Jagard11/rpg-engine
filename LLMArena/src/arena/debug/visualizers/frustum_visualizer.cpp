@@ -36,8 +36,16 @@ FrustumVisualizer::~FrustumVisualizer()
 }
 
 void FrustumVisualizer::initialize() {
-    // Defer the actual OpenGL initialization until we render
-    qDebug() << "FrustumVisualizer initialize called - OpenGL initialization deferred";
+    // Initialize OpenGL resources
+    initializeOpenGLFunctions();
+    
+    // Create shader program
+    createShaders();
+    
+    // Create frustum geometry
+    createFrustumGeometry();
+    
+    qDebug() << "FrustumVisualizer fully initialized";
 }
 
 void FrustumVisualizer::render(const QMatrix4x4& viewMatrix, const QMatrix4x4& projectionMatrix)
@@ -46,56 +54,37 @@ void FrustumVisualizer::render(const QMatrix4x4& viewMatrix, const QMatrix4x4& p
         return;
     }
     
+    // Check if we have OpenGL functions initialized
+    static bool openGLInitialized = false;
+    if (!openGLInitialized) {
+        try {
+            initializeOpenGLFunctions();
+            // Now create shaders and other OpenGL resources
+            createShaders();
+            createFrustumGeometry();
+            openGLInitialized = true;
+            qDebug() << "Initialized OpenGL functions for frustum visualizer";
+        } catch (const std::exception& e) {
+            qWarning() << "Failed to initialize OpenGL for frustum visualizer:" << e.what();
+            return;
+        } catch (...) {
+            qWarning() << "Unknown error initializing OpenGL for frustum visualizer";
+            return;
+        }
+    }
+    
+    // Check if we have a valid shader and geometry
+    if (!m_shader || !m_shader->isLinked() || !m_vao.isCreated()) {
+        qWarning() << "Frustum visualizer not properly initialized";
+        return;
+    }
+
     // Check if we have a valid current context
     if (!QOpenGLContext::currentContext()) {
         qWarning() << "No valid OpenGL context in frustum visualizer render";
         return;
     }
 
-    // Check if OpenGL functions are initialized, if not initialize them now
-    static bool openGLInitialized = false;
-    static bool geometryCreated = false;
-    
-    if (!openGLInitialized) {
-        try {
-            qDebug() << "Initializing OpenGL functions for frustum visualizer";
-            initializeOpenGLFunctions();
-            openGLInitialized = true;
-        }
-        catch (const std::exception& e) {
-            qWarning() << "Exception initializing OpenGL for frustum visualizer:" << e.what();
-            return;
-        }
-        catch (...) {
-            qWarning() << "Unknown exception initializing OpenGL for frustum visualizer";
-            return;
-        }
-    }
-    
-    // Create shader programs and geometry if not already done
-    if (!geometryCreated) {
-        try {
-            createShaders();
-            createFrustumGeometry();
-            geometryCreated = true;
-        }
-        catch (const std::exception& e) {
-            qWarning() << "Exception creating frustum geometry:" << e.what();
-            return;
-        }
-        catch (...) {
-            qWarning() << "Unknown exception creating frustum geometry";
-            return;
-        }
-    }
-    
-    // Make sure shader is created and linked
-    if (!m_shader || !m_shader->isLinked() || !m_vao.isCreated() || 
-        !m_vertexBuffer.isCreated() || !m_indexBuffer.isCreated()) {
-        qWarning() << "Frustum visualizer not properly initialized";
-        return;
-    }
-    
     // Compute the inverse view-projection matrix to transform NDC corners to world space
     QMatrix4x4 viewProjection = projectionMatrix * viewMatrix;
     QMatrix4x4 viewProjectionInverse = viewProjection.inverted();
@@ -107,9 +96,19 @@ void FrustumVisualizer::render(const QMatrix4x4& viewMatrix, const QMatrix4x4& p
     GLboolean oldDepthTest;
     glGetBooleanv(GL_DEPTH_TEST, &oldDepthTest);
     
+    GLboolean oldLineSmooth;
+    glGetBooleanv(GL_LINE_SMOOTH, &oldLineSmooth);
+    
+    GLfloat oldLineWidth;
+    glGetFloatv(GL_LINE_WIDTH, &oldLineWidth);
+    
     // Enable required OpenGL state
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LEQUAL);
+    
+    // Enable line smoothing and increase width for better visibility
+    glEnable(GL_LINE_SMOOTH);
+    glLineWidth(5.0f); // Even thicker lines
     
     // Bind shader
     m_shader->bind();
@@ -117,7 +116,9 @@ void FrustumVisualizer::render(const QMatrix4x4& viewMatrix, const QMatrix4x4& p
     // Set shader uniforms
     m_shader->setUniformValue("viewMatrix", viewMatrix);
     m_shader->setUniformValue("projectionMatrix", projectionMatrix);
-    m_shader->setUniformValue("color", QVector4D(1.0f, 0.0f, 0.0f, 0.5f)); // Red, semi-transparent
+    
+    // Brighter color for better visibility
+    m_shader->setUniformValue("color", QVector4D(1.0f, 0.1f, 0.1f, 1.0f)); // Bright red
     
     // Bind VAO
     m_vao.bind();
@@ -127,19 +128,20 @@ void FrustumVisualizer::render(const QMatrix4x4& viewMatrix, const QMatrix4x4& p
     m_vertexBuffer.write(0, m_frustumPoints.constData(), m_frustumPoints.size() * sizeof(QVector3D));
     m_vertexBuffer.release();
     
-    // Draw frustum lines - ensure index buffer is bound before drawing
-    m_indexBuffer.bind();
+    // Draw frustum lines with reduced depth test for better visibility
+    GLboolean oldDepthMask;
+    glGetBooleanv(GL_DEPTH_WRITEMASK, &oldDepthMask);
+    glDepthMask(GL_FALSE); // Don't write to depth buffer
     
-    // Double check index buffer is created and has data
-    if (m_indexBuffer.isCreated() && m_wireframeIndexCount > 0) {
-        glDrawElements(GL_LINES, m_wireframeIndexCount, GL_UNSIGNED_INT, nullptr);
-    }
-    else {
-        qWarning() << "Index buffer not ready for drawing";
-    }
+    // Draw with blend enabled for semi-transparency
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     
-    // Release index buffer
-    m_indexBuffer.release();
+    // Draw frustum lines
+    glDrawElements(GL_LINES, 24, GL_UNSIGNED_INT, nullptr);
+    
+    // Restore depth mask
+    glDepthMask(oldDepthMask);
     
     // Unbind VAO
     m_vao.release();
@@ -151,11 +153,31 @@ void FrustumVisualizer::render(const QMatrix4x4& viewMatrix, const QMatrix4x4& p
     if (!oldDepthTest) {
         glDisable(GL_DEPTH_TEST);
     }
+    
+    if (!oldLineSmooth) {
+        glDisable(GL_LINE_SMOOTH);
+    }
+    
+    glLineWidth(oldLineWidth);
+    
+    // Disable blend if it wasn't enabled before
+    GLboolean oldBlend;
+    glGetBooleanv(GL_BLEND, &oldBlend);
+    if (!oldBlend) {
+        glDisable(GL_BLEND);
+    }
+
+    // Log that the frustum was rendered (but less frequently to reduce spam)
+    static int logCounter = 0;
+    if (logCounter++ % 60 == 0) {
+        qDebug() << "Frustum visualizer rendered successfully";
+    }
 }
 
 void FrustumVisualizer::setEnabled(bool enabled)
 {
     m_enabled = enabled;
+    qDebug() << "Frustum visualizer enabled:" << m_enabled;
 }
 
 bool FrustumVisualizer::isEnabled() const
@@ -205,6 +227,8 @@ void FrustumVisualizer::createShaders()
     if (!m_shader->link()) {
         qCritical() << "Failed to link frustum visualizer shader program:" << m_shader->log();
     }
+
+    qDebug() << "Frustum visualizer shaders created and linked";
 }
 
 void FrustumVisualizer::createFrustumGeometry()
@@ -234,9 +258,6 @@ void FrustumVisualizer::createFrustumGeometry()
         0, 4, 1, 5, 2, 6, 3, 7
     };
     
-    // Store the number of indices for drawing
-    m_wireframeIndexCount = sizeof(indices) / sizeof(indices[0]);
-    
     // Create and bind index buffer
     m_indexBuffer.create();
     m_indexBuffer.bind();
@@ -246,6 +267,8 @@ void FrustumVisualizer::createFrustumGeometry()
     m_indexBuffer.release();
     m_vertexBuffer.release();
     m_vao.release();
+
+    qDebug() << "Frustum visualizer geometry created";
 }
 
 void FrustumVisualizer::updateFrustumGeometry(const QMatrix4x4& viewProjectionInverse)
@@ -256,13 +279,13 @@ void FrustumVisualizer::updateFrustumGeometry(const QMatrix4x4& viewProjectionIn
     // 0 --- 1    4 --- 5
     // |     |    |     |
     // 2 --- 3    6 --- 7
-    static const QVector4D ndcCorners[] = {
-        // Near face
+    const QVector4D ndcCorners[] = {
+        // Near face (z=-1)
         QVector4D(-1, -1, -1, 1), // Bottom left
         QVector4D( 1, -1, -1, 1), // Bottom right
         QVector4D(-1,  1, -1, 1), // Top left
         QVector4D( 1,  1, -1, 1), // Top right
-        // Far face
+        // Far face (z=1)
         QVector4D(-1, -1,  1, 1), // Bottom left
         QVector4D( 1, -1,  1, 1), // Bottom right
         QVector4D(-1,  1,  1, 1), // Top left
@@ -280,4 +303,8 @@ void FrustumVisualizer::updateFrustumGeometry(const QMatrix4x4& viewProjectionIn
         
         m_frustumPoints[i] = worldPos.toVector3D();
     }
+
+    // Log the updated frustum corners
+    qDebug() << "Frustum corners updated: Near-Bottom-Left:" << m_frustumPoints[0]
+             << "Far-Top-Right:" << m_frustumPoints[7];
 }
