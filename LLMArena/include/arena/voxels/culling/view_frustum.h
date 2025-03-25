@@ -68,6 +68,12 @@ public:
     bool isChunkInside(const ChunkCoordinate& coordinate) const;
     
     /**
+     * @brief Get the corners of the frustum
+     * @return Array of 8 corners (near-bottom-left, near-bottom-right, etc.)
+     */
+    const std::array<QVector3D, 8>& getCorners() const { return m_corners; }
+    
+    /**
      * @brief Defines a plane in 3D space with normal and distance from origin
      */
     struct Plane {
@@ -96,8 +102,14 @@ private:
     // Array of 6 planes (left, right, bottom, top, near, far)
     std::array<Plane, PlaneCount> m_planes;
     
-    // Normalized device coordinates corners (for AABB tests)
+    // Corners of the frustum for debugging and visualization
     std::array<QVector3D, 8> m_corners;
+    
+    // Calculate the corners of the frustum from the inverse view-projection matrix
+    void calculateFrustumCorners(const QMatrix4x4& invViewProjection);
+    
+    // Helper method to unproject a point from NDC to world space
+    QVector3D unprojectPoint(const QVector3D& ndc, const QMatrix4x4& invViewProjection);
 };
 
 // Create an alias in the culling namespace for compatibility

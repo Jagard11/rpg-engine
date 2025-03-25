@@ -3,10 +3,23 @@
 #include <QDebug>
 
 VoxelWorld::VoxelWorld(QObject* parent) : QObject(parent) {
-    // Initialize texture paths for voxel types
-    m_texturePaths[VoxelType::Dirt] = ":/resources/dirt.png";
-    m_texturePaths[VoxelType::Grass] = ":/resources/grass.png";
+    // Initialize the texture path map
+    m_texturePaths[VoxelType::Air] = "";
     m_texturePaths[VoxelType::Cobblestone] = ":/resources/cobblestone.png";
+    m_texturePaths[VoxelType::Grass] = ":/resources/grass.png";
+    m_texturePaths[VoxelType::Dirt] = ":/resources/dirt.png";
+    m_texturePaths[VoxelType::Solid] = "";
+    
+    // Get reference to performance settings
+    m_perfSettings = PerformanceSettings::getInstance();
+    
+    // Connect to performance settings changes to update world when needed
+    connect(m_perfSettings, &PerformanceSettings::occlusionCullingEnabledChanged,
+            this, [this](bool enabled) {
+        qDebug() << "VoxelWorld: Occlusion culling setting changed to" << (enabled ? "enabled" : "disabled");
+        // Emit world changed signal to force renderer update
+        emit worldChanged();
+    });
 }
 
 Voxel VoxelWorld::getVoxel(int x, int y, int z) const {
@@ -146,11 +159,38 @@ QVector<VoxelPos> VoxelWorld::getVisibleVoxels() const {
     // Check each voxel in our storage
     for (auto it = m_voxels.constBegin(); it != m_voxels.constEnd(); ++it) {
         const VoxelPos& pos = it.key();
+        const Voxel& voxel = it.value();
         
-        // Add to the list if the voxel is visible (has at least one empty neighbor)
-        if (isVoxelVisible(pos)) {
+        // Air voxels are never visible
+        if (voxel.type == VoxelType::Air) {
+            continue;
+        }
+        
+        // Check if occlusion culling is enabled
+        if (m_perfSettings->isOcclusionCullingEnabled()) {
+            // Only add voxels that have at least one empty neighbor
+            if (hasEmptyNeighbor(pos)) {
+                visibleVoxels.append(pos);
+            }
+        } else {
+            // If occlusion culling is disabled, add all non-air voxels
             visibleVoxels.append(pos);
         }
+    }
+    
+    // Add debug output to show the effect of occlusion culling
+    static int logCounter = 0;
+    if (logCounter++ % 60 == 0) { // Log approximately once per second at 60 FPS
+        int totalVoxels = m_voxels.size();
+        int visibleCount = visibleVoxels.size();
+        int culledVoxels = totalVoxels - visibleCount;
+        bool occlusionEnabled = m_perfSettings->isOcclusionCullingEnabled();
+        
+        qDebug() << "VoxelWorld visibility stats: "
+                 << "Total voxels:" << totalVoxels
+                 << "Visible:" << visibleCount
+                 << "(" << (totalVoxels > 0 ? (visibleCount * 100 / totalVoxels) : 0) << "%)"
+                 << "Occlusion culling:" << (occlusionEnabled ? "ON" : "OFF");
     }
     
     return visibleVoxels;

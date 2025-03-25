@@ -3,14 +3,24 @@
 #include <QDebug>
 #include <QCursor>
 
+/*
+// This implementation conflicts with gl_arena_widget_key_events.cpp
+// Comment out to avoid conflicts
 void GLArenaWidget::keyPressEvent(QKeyEvent* event) {
     // First, try debug key handling
     if (processDebugKeyEvent(event)) {
         return; // Event was handled by debug system
     }
     
-    // Check for Escape key to toggle cursor capture
+    // Check for Escape key to toggle escape menu
     if (event->key() == Qt::Key_Escape) {
+        // If escape menu exists, toggle it
+        if (m_escapeMenu) {
+            toggleEscapeMenu();
+            return;
+        }
+        
+        // Fallback behavior: toggle cursor capture
         setCursor(cursor().shape() == Qt::BlankCursor ? Qt::ArrowCursor : Qt::BlankCursor);
         return;
     }
@@ -58,6 +68,7 @@ void GLArenaWidget::keyReleaseEvent(QKeyEvent* event) {
     // Pass along to player controller
     m_playerController->handleKeyRelease(event);
 }
+*/
 
 void GLArenaWidget::mouseMoveEvent(QMouseEvent* event) {
     // Handle mouse movement for inventory if it's visible

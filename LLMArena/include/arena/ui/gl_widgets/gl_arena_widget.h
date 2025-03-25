@@ -13,6 +13,7 @@
 #include <QMap>
 #include <QTimer>
 #include <QKeyEvent>
+#include <QResizeEvent>
 #include <memory>
 
 #include "../../../character/core/character_persistence.h"
@@ -23,6 +24,7 @@
 #include "../../player/inventory/inventory.h"
 #include "../../voxels/voxel_system_integration.h"
 #include "../../player/inventory/inventory_ui.h"
+#include "../widgets/escape_menu.h"
 #include "character_sprite.h"
 
 
@@ -58,11 +60,13 @@ public:
     void mouseMoveEvent(QMouseEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
     void mouseReleaseEvent(QMouseEvent* event) override;
+    void resizeEvent(QResizeEvent* event) override;
     
 signals:
     void renderingInitialized();
     void characterPositionUpdated(const QString& characterName, double x, double y, double z);
     void playerPositionUpdated(double x, double y, double z);
+    void returnToMainMenu();
     
 protected:
     // OpenGL overrides
@@ -75,6 +79,7 @@ private slots:
     void onPlayerPositionChanged(const QVector3D& position);
     void onPlayerRotationChanged(float rotation);
     void onPlayerPitchChanged(float pitch);
+    void onReturnToMainMenu();
 
 private:
     // Initialize shaders
@@ -125,6 +130,9 @@ private:
     bool isDebugConsoleVisible() const;
     void toggleFrustumVisualization();
     
+    // Escape menu methods
+    void toggleEscapeMenu();
+    
     // Character manager for loading sprites
     CharacterManager* m_characterManager;
     
@@ -143,6 +151,9 @@ private:
     // Inventory system
     Inventory* m_inventory = nullptr;
     InventoryUI* m_inventoryUI = nullptr;
+    
+    // Escape menu
+    EscapeMenu* m_escapeMenu = nullptr;
     
     // Debug system
     std::unique_ptr<DebugSystem> m_debugSystem;

@@ -15,6 +15,7 @@
 #include <QOffscreenSurface>
 #include <QOpenGLFunctions>
 #include <QTimer>
+#include <QDialogButtonBox>
 
 #include "../include/character/ui/character_editor_ui.h"
 #include "../include/splash/ui/location_dialog.h"
@@ -22,6 +23,7 @@
 #include "../include/llm/oobabooga_bridge.h"
 #include "../include/arena/ui/views/arena_view.h"
 #include "../include/utils/crash_handler.h"
+#include "../include/arena/ui/widgets/performance_settings_widget.h"
 
 // Global crash handler to display errors and prevent immediate exit
 void globalCrashHandler() {
@@ -170,6 +172,7 @@ int main(int argc, char *argv[])
     QPushButton* manageCharactersBtn = new QPushButton("Manage Characters", homeTab);
     QPushButton* configureAPIBtn = new QPushButton("Configure API Connection", homeTab);
     QPushButton* configureLocationBtn = new QPushButton("Set Location", homeTab);
+    QPushButton* settingsBtn = new QPushButton("Game Settings", homeTab);
     QPushButton* aboutBtn = new QPushButton("About", homeTab);
     
     // Add buttons to home layout
@@ -179,6 +182,7 @@ int main(int argc, char *argv[])
     homeLayout->addWidget(manageCharactersBtn);
     homeLayout->addWidget(configureAPIBtn);
     homeLayout->addWidget(configureLocationBtn);
+    homeLayout->addWidget(settingsBtn);
     homeLayout->addWidget(aboutBtn);
     homeLayout->addStretch();
     
@@ -262,13 +266,9 @@ int main(int argc, char *argv[])
     
     // Set up button connections
     QObject::connect(manageCharactersBtn, &QPushButton::clicked, [&]() {
-        CharacterManagerDialog dialog(characterManager, &mainWindow);
-        dialog.exec();
-        
-        // Update conversation character selector
-        characterSelectorCombo->clear();
-        characterSelectorCombo->addItem("None", "");
-        characterSelectorCombo->addItems(characterManager->listCharacters());
+        CharacterEditorDialog* editorDialog = new CharacterEditorDialog(characterManager, &mainWindow);
+        editorDialog->setWindowModality(Qt::ApplicationModal);
+        editorDialog->show();
     });
     
     QObject::connect(configureAPIBtn, &QPushButton::clicked, [&]() {
@@ -295,33 +295,62 @@ int main(int argc, char *argv[])
         }
     });
     
-    // New connection for location configuration
     QObject::connect(configureLocationBtn, &QPushButton::clicked, [&]() {
         LocationDialog locationDialog(&mainWindow);
         if (locationDialog.exec() == QDialog::Accepted) {
-            LocationData selectedLocation = locationDialog.getSelectedLocation();
-            locationDialog.saveLocation(selectedLocation);
-            
-            // Show confirmation
-            QMessageBox::information(&mainWindow, "Location Updated", 
-                QString("Location set to %1\nLatitude: %2\nLongitude: %3")
-                .arg(selectedLocation.name)
-                .arg(selectedLocation.latitude)
-                .arg(selectedLocation.longitude));
+            LocationData location = locationDialog.getSelectedLocation();
+            LocationDialog::saveLocation(location);
         }
     });
     
+    QObject::connect(settingsBtn, &QPushButton::clicked, [&]() {
+        // Create a dialog that contains the performance settings widget
+        QDialog* settingsDialog = new QDialog(&mainWindow);
+        settingsDialog->setWindowTitle("Game Settings");
+        settingsDialog->setMinimumSize(500, 600);
+        
+        QVBoxLayout* dialogLayout = new QVBoxLayout(settingsDialog);
+        QTabWidget* tabWidget = new QTabWidget(settingsDialog);
+        
+        // Performance settings tab
+        QWidget* perfTab = new QWidget();
+        QVBoxLayout* perfLayout = new QVBoxLayout(perfTab);
+        PerformanceSettingsWidget* perfWidget = new PerformanceSettingsWidget(perfTab);
+        
+        // Make sure the widget is visible and not hidden by default
+        perfWidget->show();
+        
+        // Apply the preset when the dialog is shown
+        PerformanceSettings::getInstance()->applyPreset(PerformanceSettings::Preset::Medium);
+        perfWidget->updateUiFromSettings();
+        
+        perfLayout->addWidget(perfWidget);
+        tabWidget->addTab(perfTab, "Performance");
+        
+        // Controls tab (for future expansion)
+        QWidget* controlsTab = new QWidget();
+        QVBoxLayout* controlsLayout = new QVBoxLayout(controlsTab);
+        QLabel* controlsLabel = new QLabel("Game Controls (Coming Soon)", controlsTab);
+        controlsLayout->addWidget(controlsLabel);
+        tabWidget->addTab(controlsTab, "Controls");
+        
+        dialogLayout->addWidget(tabWidget);
+        
+        // Add OK button
+        QDialogButtonBox* buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok);
+        QObject::connect(buttonBox, &QDialogButtonBox::accepted, settingsDialog, &QDialog::accept);
+        dialogLayout->addWidget(buttonBox);
+        
+        // Show dialog
+        settingsDialog->exec();
+        delete settingsDialog;
+    });
+    
     QObject::connect(aboutBtn, &QPushButton::clicked, [&]() {
-        QMessageBox::about(&mainWindow, "About RPG Arena (OpenGL)",
-                          "RPG Arena (OpenGL)\n\n"
-                          "A tool for connecting LLMs with RPG mechanics.\n"
-                          "Create persistent characters with memory and roleplay with them in a game environment.\n\n"
-                          "Features:\n"
-                          "- Character persistence with memory system\n"
-                          "- Native OpenGL 3D visualization\n"
-                          "- Text-based conversation interface\n"
-                          "- Integration with Oobabooga's LLM API\n\n"
-                          "Version: 1.0.0");
+        QMessageBox::about(&mainWindow, "About RPG Arena",
+            "RPG Arena (OpenGL Edition)\n\n"
+            "A voxel-based RPG engine with LLM character integration\n"
+            "Created as a demonstration of OpenGL-based game development");
     });
     
     // Connect bridge signals
@@ -359,6 +388,11 @@ int main(int argc, char *argv[])
             try {
                 // Create ArenaView and add to tabWidget
                 ArenaView* arenaView = new ArenaView(characterManager, tabWidget);
+                
+                // Connect arena view signals
+                QObject::connect(arenaView, &ArenaView::returnToMainMenu, [&]() {
+                    tabWidget->setCurrentIndex(0); // Switch to home tab
+                });
                 
                 // Replace placeholder with actual arena view
                 tabWidget->removeTab(arenaTabIndex);  

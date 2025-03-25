@@ -3,6 +3,7 @@
 #define VOXEL_WORLD_H
 
 #include "types/voxel_types.h"
+#include "../system/performance_settings.h"
 #include <QObject>
 #include <QHash>
 #include <QVector>
@@ -43,6 +44,9 @@ private:
     
     // Map of texture paths for each voxel type
     QMap<VoxelType, QString> m_texturePaths;
+    
+    // Performance settings reference
+    PerformanceSettings* m_perfSettings;
     
     // Check if a voxel is visible (has at least one empty neighbor)
     bool hasEmptyNeighbor(const VoxelPos& pos) const;

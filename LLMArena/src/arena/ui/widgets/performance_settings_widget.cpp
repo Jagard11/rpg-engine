@@ -113,11 +113,22 @@ void PerformanceSettingsWidget::setupUi() {
     QGroupBox* cullingGroup = new QGroupBox("Culling Options");
     QVBoxLayout* cullingLayout = new QVBoxLayout(cullingGroup);
     
+    QLabel* cullingInfoLabel = new QLabel("Toggle which voxels are rendered to improve performance:");
+    cullingInfoLabel->setWordWrap(true);
+    cullingLayout->addWidget(cullingInfoLabel);
+    
     m_frustumCullingCheckBox = new QCheckBox("Frustum Culling");
+    m_frustumCullingCheckBox->setToolTip("Only render voxels that are within the camera's field of view");
+    
     m_backfaceCullingCheckBox = new QCheckBox("Backface Culling");
+    m_backfaceCullingCheckBox->setToolTip("Don't render faces of voxels that are facing away from the camera");
+    
+    m_occlusionCullingCheckBox = new QCheckBox("Occlusion Culling");
+    m_occlusionCullingCheckBox->setToolTip("Don't render voxels that are completely surrounded by other voxels");
     
     cullingLayout->addWidget(m_frustumCullingCheckBox);
     cullingLayout->addWidget(m_backfaceCullingCheckBox);
+    cullingLayout->addWidget(m_occlusionCullingCheckBox);
     
     mainLayout->addWidget(cullingGroup);
     
@@ -176,6 +187,7 @@ void PerformanceSettingsWidget::connectSignals() {
     // Connect checkboxes
     connect(m_frustumCullingCheckBox, &QCheckBox::toggled, this, &PerformanceSettingsWidget::onFrustumCullingEnabledChanged);
     connect(m_backfaceCullingCheckBox, &QCheckBox::toggled, this, &PerformanceSettingsWidget::onBackfaceCullingEnabledChanged);
+    connect(m_occlusionCullingCheckBox, &QCheckBox::toggled, this, &PerformanceSettingsWidget::onOcclusionCullingEnabledChanged);
     connect(m_chunkOptimizationCheckBox, &QCheckBox::toggled, this, &PerformanceSettingsWidget::onChunkOptimizationEnabledChanged);
     connect(m_octreeCompressionCheckBox, &QCheckBox::toggled, this, &PerformanceSettingsWidget::onOctreeCompressionEnabledChanged);
     
@@ -207,8 +219,27 @@ void PerformanceSettingsWidget::onApplyPreset() {
         m_presetComboBox->currentData().toInt()
     );
     
+    // Log preset being applied
+    QString presetName;
+    switch (preset) {
+        case PerformanceSettings::Preset::Ultra: presetName = "Ultra"; break;
+        case PerformanceSettings::Preset::High: presetName = "High"; break;
+        case PerformanceSettings::Preset::Medium: presetName = "Medium"; break;
+        case PerformanceSettings::Preset::Low: presetName = "Low"; break;
+        case PerformanceSettings::Preset::Minimal: presetName = "Minimal"; break;
+        default: presetName = "Unknown"; break;
+    }
+    
+    qDebug() << "PerformanceSettingsWidget: Applying preset" << presetName;
+    
     // Apply preset
     m_settings->applyPreset(preset);
+    
+    // Log the settings after preset is applied
+    qDebug() << "PerformanceSettingsWidget: Settings after applying preset:";
+    qDebug() << "  - Occlusion Culling:" << (m_settings->isOcclusionCullingEnabled() ? "Enabled" : "Disabled");
+    qDebug() << "  - Frustum Culling:" << (m_settings->isFrustumCullingEnabled() ? "Enabled" : "Disabled");
+    qDebug() << "  - Backface Culling:" << (m_settings->isBackfaceCullingEnabled() ? "Enabled" : "Disabled");
 }
 
 void PerformanceSettingsWidget::onViewDistanceChanged(int value) {
@@ -233,6 +264,11 @@ void PerformanceSettingsWidget::onFrustumCullingEnabledChanged(bool enabled) {
 
 void PerformanceSettingsWidget::onBackfaceCullingEnabledChanged(bool enabled) {
     m_settings->setBackfaceCullingEnabled(enabled);
+}
+
+void PerformanceSettingsWidget::onOcclusionCullingEnabledChanged(bool enabled) {
+    qDebug() << "PerformanceSettingsWidget: Occlusion culling toggled to" << (enabled ? "enabled" : "disabled");
+    m_settings->setOcclusionCullingEnabled(enabled);
 }
 
 void PerformanceSettingsWidget::onChunkOptimizationEnabledChanged(bool enabled) {
@@ -273,6 +309,7 @@ void PerformanceSettingsWidget::updateUiFromSettings() {
     // Update checkboxes
     m_frustumCullingCheckBox->setChecked(m_settings->isFrustumCullingEnabled());
     m_backfaceCullingCheckBox->setChecked(m_settings->isBackfaceCullingEnabled());
+    m_occlusionCullingCheckBox->setChecked(m_settings->isOcclusionCullingEnabled());
     m_chunkOptimizationCheckBox->setChecked(m_settings->isChunkOptimizationEnabled());
     m_octreeCompressionCheckBox->setChecked(m_settings->isOctreeCompressionEnabled());
     
@@ -280,4 +317,15 @@ void PerformanceSettingsWidget::updateUiFromSettings() {
     m_viewDistanceLabel->setText(QString("View Distance: %1 chunks").arg(m_settings->getViewDistance()));
     m_maxVisibleChunksLabel->setText(QString("Max Visible Chunks: %1").arg(m_settings->getMaxVisibleChunks()));
     m_maxTextureSizeLabel->setText(QString("Max Texture Size: %1").arg(m_settings->getMaxTextureSize()));
+    
+    // Add debug output to verify settings
+    qDebug() << "PerformanceSettingsWidget: UI updated from settings:";
+    qDebug() << "  - View Distance:" << m_settings->getViewDistance();
+    qDebug() << "  - Max Visible Chunks:" << m_settings->getMaxVisibleChunks();
+    qDebug() << "  - Frustum Culling:" << m_settings->isFrustumCullingEnabled();
+    qDebug() << "  - Backface Culling:" << m_settings->isBackfaceCullingEnabled();
+    qDebug() << "  - Occlusion Culling:" << m_settings->isOcclusionCullingEnabled();
+    qDebug() << "  - Chunk Optimization:" << m_settings->isChunkOptimizationEnabled();
+    qDebug() << "  - Octree Compression:" << m_settings->isOctreeCompressionEnabled();
+    qDebug() << "  - Max Texture Size:" << m_settings->getMaxTextureSize();
 }

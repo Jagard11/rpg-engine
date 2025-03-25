@@ -26,6 +26,7 @@ void PerformanceSettings::applyPreset(Preset preset) {
             m_maxVisibleChunks = 1024;
             m_frustumCullingEnabled = true;
             m_backfaceCullingEnabled = true;
+            m_occlusionCullingEnabled = true;
             m_chunkOptimizationEnabled = true;
             m_octreeCompressionEnabled = true;
             m_maxTextureSize = 1024;
@@ -36,6 +37,7 @@ void PerformanceSettings::applyPreset(Preset preset) {
             m_maxVisibleChunks = 512;
             m_frustumCullingEnabled = true;
             m_backfaceCullingEnabled = true;
+            m_occlusionCullingEnabled = true;
             m_chunkOptimizationEnabled = true;
             m_octreeCompressionEnabled = true;
             m_maxTextureSize = 512;
@@ -46,6 +48,7 @@ void PerformanceSettings::applyPreset(Preset preset) {
             m_maxVisibleChunks = 256;
             m_frustumCullingEnabled = true;
             m_backfaceCullingEnabled = true;
+            m_occlusionCullingEnabled = true;
             m_chunkOptimizationEnabled = true;
             m_octreeCompressionEnabled = true;
             m_maxTextureSize = 256;
@@ -56,6 +59,7 @@ void PerformanceSettings::applyPreset(Preset preset) {
             m_maxVisibleChunks = 128;
             m_frustumCullingEnabled = true;
             m_backfaceCullingEnabled = true;
+            m_occlusionCullingEnabled = false;
             m_chunkOptimizationEnabled = true;
             m_octreeCompressionEnabled = true;
             m_maxTextureSize = 128;
@@ -66,6 +70,7 @@ void PerformanceSettings::applyPreset(Preset preset) {
             m_maxVisibleChunks = 64;
             m_frustumCullingEnabled = true;
             m_backfaceCullingEnabled = true;
+            m_occlusionCullingEnabled = false;
             m_chunkOptimizationEnabled = true;
             m_octreeCompressionEnabled = true;
             m_maxTextureSize = 64;
@@ -77,6 +82,7 @@ void PerformanceSettings::applyPreset(Preset preset) {
     emit maxVisibleChunksChanged(m_maxVisibleChunks);
     emit frustumCullingEnabledChanged(m_frustumCullingEnabled);
     emit backfaceCullingEnabledChanged(m_backfaceCullingEnabled);
+    emit occlusionCullingEnabledChanged(m_occlusionCullingEnabled);
     emit chunkOptimizationEnabledChanged(m_chunkOptimizationEnabled);
     emit octreeCompressionEnabledChanged(m_octreeCompressionEnabled);
     emit maxTextureSizeChanged(m_maxTextureSize);
@@ -84,7 +90,8 @@ void PerformanceSettings::applyPreset(Preset preset) {
     // Emit generic change signal
     emit settingsChanged();
     
-    qDebug() << "Applied performance preset:" << static_cast<int>(preset);
+    qDebug() << "Applied performance preset:" << static_cast<int>(preset) 
+             << "Occlusion culling:" << (m_occlusionCullingEnabled ? "Enabled" : "Disabled");
 }
 
 int PerformanceSettings::getViewDistance() const {
@@ -135,6 +142,18 @@ void PerformanceSettings::setBackfaceCullingEnabled(bool enabled) {
     }
 }
 
+bool PerformanceSettings::isOcclusionCullingEnabled() const {
+    return m_occlusionCullingEnabled;
+}
+
+void PerformanceSettings::setOcclusionCullingEnabled(bool enabled) {
+    if (m_occlusionCullingEnabled != enabled) {
+        m_occlusionCullingEnabled = enabled;
+        emit occlusionCullingEnabledChanged(enabled);
+        emit settingsChanged();
+    }
+}
+
 bool PerformanceSettings::isChunkOptimizationEnabled() const {
     return m_chunkOptimizationEnabled;
 }
@@ -177,6 +196,7 @@ QMap<QString, QVariant> PerformanceSettings::getAllSettings() const {
     settings["maxVisibleChunks"] = m_maxVisibleChunks;
     settings["frustumCullingEnabled"] = m_frustumCullingEnabled;
     settings["backfaceCullingEnabled"] = m_backfaceCullingEnabled;
+    settings["occlusionCullingEnabled"] = m_occlusionCullingEnabled;
     settings["chunkOptimizationEnabled"] = m_chunkOptimizationEnabled;
     settings["octreeCompressionEnabled"] = m_octreeCompressionEnabled;
     settings["maxTextureSize"] = m_maxTextureSize;
@@ -192,6 +212,8 @@ void PerformanceSettings::setSetting(const QString& name, const QVariant& value)
         setFrustumCullingEnabled(value.toBool());
     } else if (name == "backfaceCullingEnabled") {
         setBackfaceCullingEnabled(value.toBool());
+    } else if (name == "occlusionCullingEnabled") {
+        setOcclusionCullingEnabled(value.toBool());
     } else if (name == "chunkOptimizationEnabled") {
         setChunkOptimizationEnabled(value.toBool());
     } else if (name == "octreeCompressionEnabled") {

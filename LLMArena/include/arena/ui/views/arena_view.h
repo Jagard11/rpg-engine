@@ -31,6 +31,10 @@ public:
     void keyPressEvent(QKeyEvent *event) override;
     void keyReleaseEvent(QKeyEvent *event) override;
     
+signals:
+    // Signal to return to the main menu
+    void returnToMainMenu();
+    
 protected:
     // Make sure widget gets focus
     void showEvent(QShowEvent *event) override;

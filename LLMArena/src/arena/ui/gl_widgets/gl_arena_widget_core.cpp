@@ -14,6 +14,7 @@ GLArenaWidget::GLArenaWidget(CharacterManager* charManager, QWidget* parent)
       m_playerController(new PlayerController(m_gameScene, this)),
       m_activeCharacter(""),
       m_voxelSystem(nullptr),
+      m_escapeMenu(nullptr),
       m_billboardProgram(nullptr),
       m_initialized(false),
       m_arenaRadius(10.0),
@@ -40,6 +41,22 @@ GLArenaWidget::GLArenaWidget(CharacterManager* charManager, QWidget* parent)
         m_voxelSystem = nullptr;
     }
     
+    // Create escape menu
+    try {
+        qDebug() << "Creating EscapeMenu...";
+        m_escapeMenu = new EscapeMenu();
+        m_escapeMenu->setParent(this);
+        m_escapeMenu->setGeometry(0, 0, width(), height());
+        connect(m_escapeMenu, &EscapeMenu::returnToMainMenu, this, &GLArenaWidget::onReturnToMainMenu);
+        qDebug() << "EscapeMenu created successfully";
+    } catch (const std::exception& e) {
+        qCritical() << "Failed to create EscapeMenu:" << e.what();
+        m_escapeMenu = nullptr;
+    } catch (...) {
+        qCritical() << "Unknown exception creating EscapeMenu";
+        m_escapeMenu = nullptr;
+    }
+    
     // Connect player signals
     connect(m_playerController, &PlayerController::positionChanged,
             this, &GLArenaWidget::onPlayerPositionChanged);
@@ -63,6 +80,8 @@ GLArenaWidget::GLArenaWidget(CharacterManager* charManager, QWidget* parent)
     } catch (...) {
         qWarning() << "Unknown exception initializing debug system";
     }
+    
+    qDebug() << "GLArenaWidget created";
 }
 
 GLArenaWidget::~GLArenaWidget() {
@@ -315,13 +334,17 @@ bool GLArenaWidget::initShaders() {
 }
 
 void GLArenaWidget::updateMouseTrackingState() {
-    // Only capture mouse if not in inventory mode and window has focus
-    if (m_inventory && m_inventoryUI && m_inventoryUI->isVisible()) {
-        // Inventory is open, release mouse
+    // Only capture mouse if not in inventory mode, escape menu is closed, and window has focus
+    bool menuVisible = (m_escapeMenu && m_escapeMenu->isVisible()) || 
+                      (m_inventoryUI && m_inventoryUI->isVisible()) ||
+                      (m_debugSystem && isDebugConsoleVisible());
+    
+    if (menuVisible) {
+        // Menu is open, release mouse
         setMouseTracking(false);
         setCursor(Qt::ArrowCursor);
     } else if (hasFocus()) {
-        // Window has focus and inventory is closed, capture mouse
+        // Window has focus and menus are closed, capture mouse
         setMouseTracking(true);
         setCursor(Qt::BlankCursor);
     } else {
@@ -454,4 +477,13 @@ void GLArenaWidget::updateCharacterPosition(const QString& characterName, float 
 
 PlayerController* GLArenaWidget::getPlayerController() const {
     return m_playerController;
+}
+
+void GLArenaWidget::resizeEvent(QResizeEvent* event) {
+    QOpenGLWidget::resizeEvent(event);
+    
+    // Resize escape menu if it exists
+    if (m_escapeMenu) {
+        m_escapeMenu->setGeometry(0, 0, width(), height());
+    }
 }

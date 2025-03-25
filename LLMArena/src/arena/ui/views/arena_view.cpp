@@ -39,6 +39,11 @@ ArenaView::ArenaView(CharacterManager *charManager, QWidget *parent)
         
         if (glWidget) {
             connect(glWidget, &GLArenaWidget::renderingInitialized, this, &ArenaView::onRendererInitialized);
+            connect(glWidget, &GLArenaWidget::characterPositionUpdated, this, 
+                    [this](const QString& characterName, double x, double y, double z) {
+                        qDebug() << "Character" << characterName << "position updated to" << x << y << z;
+                    });
+            connect(glWidget, &GLArenaWidget::returnToMainMenu, this, &ArenaView::returnToMainMenu);
         }
         
         // Use a timer to periodically re-grab focus if needed, but with a low frequency

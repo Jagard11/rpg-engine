@@ -43,6 +43,9 @@ public:
     bool isBackfaceCullingEnabled() const;
     void setBackfaceCullingEnabled(bool enabled);
     
+    bool isOcclusionCullingEnabled() const;
+    void setOcclusionCullingEnabled(bool enabled);
+    
     bool isChunkOptimizationEnabled() const;
     void setChunkOptimizationEnabled(bool enabled);
     
@@ -67,6 +70,7 @@ signals:
     void maxVisibleChunksChanged(int maxChunks);
     void frustumCullingEnabledChanged(bool enabled);
     void backfaceCullingEnabledChanged(bool enabled);
+    void occlusionCullingEnabledChanged(bool enabled);
     void chunkOptimizationEnabledChanged(bool enabled);
     void octreeCompressionEnabledChanged(bool enabled);
     void maxTextureSizeChanged(int size);
@@ -80,6 +84,7 @@ private:
     int m_maxVisibleChunks;
     bool m_frustumCullingEnabled;
     bool m_backfaceCullingEnabled;
+    bool m_occlusionCullingEnabled;
     bool m_chunkOptimizationEnabled;
     bool m_octreeCompressionEnabled;
     int m_maxTextureSize;

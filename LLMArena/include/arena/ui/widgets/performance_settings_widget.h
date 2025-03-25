@@ -37,6 +37,11 @@ public:
      */
     void toggleVisibility();
     
+    /**
+     * @brief Update the UI from current settings
+     */
+    void updateUiFromSettings();
+    
 private slots:
     /**
      * @brief Apply a preset from the preset combo box
@@ -64,6 +69,11 @@ private slots:
     void onBackfaceCullingEnabledChanged(bool enabled);
     
     /**
+     * @brief Update occlusion culling enabled from checkbox
+     */
+    void onOcclusionCullingEnabledChanged(bool enabled);
+    
+    /**
      * @brief Update chunk optimization enabled from checkbox
      */
     void onChunkOptimizationEnabledChanged(bool enabled);
@@ -82,11 +92,6 @@ private slots:
      * @brief Update FPS counter
      */
     void updateFpsCounter();
-    
-    /**
-     * @brief Update the UI from current settings
-     */
-    void updateUiFromSettings();
     
 private:
     // Performance settings reference
@@ -107,6 +112,7 @@ private:
     // Culling options
     QCheckBox* m_frustumCullingCheckBox;
     QCheckBox* m_backfaceCullingCheckBox;
+    QCheckBox* m_occlusionCullingCheckBox;
     
     // Optimization options
     QCheckBox* m_chunkOptimizationCheckBox;

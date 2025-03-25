@@ -8,47 +8,52 @@ ViewFrustum::ViewFrustum() {
         m_planes[i].normal = QVector3D(0, 0, 0);
         m_planes[i].distance = 0;
     }
+    
+    // Initialize corners to origin
+    for (int i = 0; i < 8; ++i) {
+        m_corners[i] = QVector3D(0, 0, 0);
+    }
 }
 
 void ViewFrustum::update(const QMatrix4x4& viewProjection) {
     // Extract frustum planes from the view-projection matrix
-    // This is a more robust and reliable method for extracting planes
+    // Based on the technique from "Fast Extraction of Viewing Frustum Planes from the WorldView-Projection Matrix"
     
-    // Left plane
-    m_planes[Left].normal.setX(viewProjection(0, 3) + viewProjection(0, 0));
-    m_planes[Left].normal.setY(viewProjection(1, 3) + viewProjection(1, 0));
-    m_planes[Left].normal.setZ(viewProjection(2, 3) + viewProjection(2, 0));
-    m_planes[Left].distance = viewProjection(3, 3) + viewProjection(3, 0);
+    // Extract rows from the matrix
+    QVector4D row0(viewProjection(0, 0), viewProjection(0, 1), viewProjection(0, 2), viewProjection(0, 3));
+    QVector4D row1(viewProjection(1, 0), viewProjection(1, 1), viewProjection(1, 2), viewProjection(1, 3));
+    QVector4D row2(viewProjection(2, 0), viewProjection(2, 1), viewProjection(2, 2), viewProjection(2, 3));
+    QVector4D row3(viewProjection(3, 0), viewProjection(3, 1), viewProjection(3, 2), viewProjection(3, 3));
     
-    // Right plane
-    m_planes[Right].normal.setX(viewProjection(0, 3) - viewProjection(0, 0));
-    m_planes[Right].normal.setY(viewProjection(1, 3) - viewProjection(1, 0));
-    m_planes[Right].normal.setZ(viewProjection(2, 3) - viewProjection(2, 0));
-    m_planes[Right].distance = viewProjection(3, 3) - viewProjection(3, 0);
+    // Left plane = row3 + row0
+    QVector4D leftPlane = row3 + row0;
+    m_planes[Left].normal = QVector3D(leftPlane.x(), leftPlane.y(), leftPlane.z());
+    m_planes[Left].distance = leftPlane.w();
     
-    // Bottom plane
-    m_planes[Bottom].normal.setX(viewProjection(0, 3) + viewProjection(0, 1));
-    m_planes[Bottom].normal.setY(viewProjection(1, 3) + viewProjection(1, 1));
-    m_planes[Bottom].normal.setZ(viewProjection(2, 3) + viewProjection(2, 1));
-    m_planes[Bottom].distance = viewProjection(3, 3) + viewProjection(3, 1);
+    // Right plane = row3 - row0
+    QVector4D rightPlane = row3 - row0;
+    m_planes[Right].normal = QVector3D(rightPlane.x(), rightPlane.y(), rightPlane.z());
+    m_planes[Right].distance = rightPlane.w();
     
-    // Top plane
-    m_planes[Top].normal.setX(viewProjection(0, 3) - viewProjection(0, 1));
-    m_planes[Top].normal.setY(viewProjection(1, 3) - viewProjection(1, 1));
-    m_planes[Top].normal.setZ(viewProjection(2, 3) - viewProjection(2, 1));
-    m_planes[Top].distance = viewProjection(3, 3) - viewProjection(3, 1);
+    // Bottom plane = row3 + row1
+    QVector4D bottomPlane = row3 + row1;
+    m_planes[Bottom].normal = QVector3D(bottomPlane.x(), bottomPlane.y(), bottomPlane.z());
+    m_planes[Bottom].distance = bottomPlane.w();
     
-    // Near plane
-    m_planes[Near].normal.setX(viewProjection(0, 3) + viewProjection(0, 2));
-    m_planes[Near].normal.setY(viewProjection(1, 3) + viewProjection(1, 2));
-    m_planes[Near].normal.setZ(viewProjection(2, 3) + viewProjection(2, 2));
-    m_planes[Near].distance = viewProjection(3, 3) + viewProjection(3, 2);
+    // Top plane = row3 - row1
+    QVector4D topPlane = row3 - row1;
+    m_planes[Top].normal = QVector3D(topPlane.x(), topPlane.y(), topPlane.z());
+    m_planes[Top].distance = topPlane.w();
     
-    // Far plane
-    m_planes[Far].normal.setX(viewProjection(0, 3) - viewProjection(0, 2));
-    m_planes[Far].normal.setY(viewProjection(1, 3) - viewProjection(1, 2));
-    m_planes[Far].normal.setZ(viewProjection(2, 3) - viewProjection(2, 2));
-    m_planes[Far].distance = viewProjection(3, 3) - viewProjection(3, 2);
+    // Near plane = row3 + row2
+    QVector4D nearPlane = row3 + row2;
+    m_planes[Near].normal = QVector3D(nearPlane.x(), nearPlane.y(), nearPlane.z());
+    m_planes[Near].distance = nearPlane.w();
+    
+    // Far plane = row3 - row2
+    QVector4D farPlane = row3 - row2;
+    m_planes[Far].normal = QVector3D(farPlane.x(), farPlane.y(), farPlane.z());
+    m_planes[Far].distance = farPlane.w();
     
     // Normalize all the plane equations
     for (int i = 0; i < PlaneCount; ++i) {
@@ -58,6 +63,57 @@ void ViewFrustum::update(const QMatrix4x4& viewProjection) {
             m_planes[i].distance /= length;
         }
     }
+    
+    // Try/catch to handle potential errors during frustum corner calculation
+    try {
+        // Calculate the frustum corners for debugging
+        calculateFrustumCorners(viewProjection.inverted());
+        
+        // Debug output (periodically)
+        static int debugCounter = 0;
+        if (debugCounter++ % 300 == 0) {
+            qDebug() << "View Frustum updated:";
+            qDebug() << "  - Near corners: " << m_corners[0] << m_corners[1];
+            qDebug() << "  - Far corners: " << m_corners[4] << m_corners[5];
+        }
+    } catch (const std::exception& e) {
+        qWarning() << "Error calculating frustum corners:" << e.what();
+    } catch (...) {
+        qWarning() << "Unknown error calculating frustum corners";
+    }
+}
+
+void ViewFrustum::calculateFrustumCorners(const QMatrix4x4& invViewProjection) {
+    // Safety check
+    if (invViewProjection.isIdentity()) {
+        qWarning() << "Invalid view-projection matrix for frustum corner calculation";
+        return;
+    }
+    
+    // Define the 8 corners of the frustum in NDC space (-1 to 1 cube)
+    // Near face
+    m_corners[0] = unprojectPoint(QVector3D(-1, -1, -1), invViewProjection); // Near bottom left
+    m_corners[1] = unprojectPoint(QVector3D( 1, -1, -1), invViewProjection); // Near bottom right
+    m_corners[2] = unprojectPoint(QVector3D(-1,  1, -1), invViewProjection); // Near top left
+    m_corners[3] = unprojectPoint(QVector3D( 1,  1, -1), invViewProjection); // Near top right
+    
+    // Far face
+    m_corners[4] = unprojectPoint(QVector3D(-1, -1,  1), invViewProjection); // Far bottom left
+    m_corners[5] = unprojectPoint(QVector3D( 1, -1,  1), invViewProjection); // Far bottom right
+    m_corners[6] = unprojectPoint(QVector3D(-1,  1,  1), invViewProjection); // Far top left
+    m_corners[7] = unprojectPoint(QVector3D( 1,  1,  1), invViewProjection); // Far top right
+}
+
+QVector3D ViewFrustum::unprojectPoint(const QVector3D& ndc, const QMatrix4x4& invViewProjection) {
+    // Convert from NDC to world space
+    QVector4D worldSpace = invViewProjection * QVector4D(ndc, 1.0f);
+    if (qAbs(worldSpace.w()) > 0.00001f) { // Use qAbs for more robust comparison
+        worldSpace /= worldSpace.w();
+    } else {
+        // If w is too close to zero, just return the xyz components without division
+        qWarning() << "Division by zero avoided in unprojectPoint";
+    }
+    return worldSpace.toVector3D();
 }
 
 bool ViewFrustum::isPointInside(const QVector3D& point) const {
@@ -71,6 +127,11 @@ bool ViewFrustum::isPointInside(const QVector3D& point) const {
 }
 
 bool ViewFrustum::isSphereInside(const QVector3D& center, float radius) const {
+    // Safety check for invalid radius
+    if (radius <= 0.0f) {
+        radius = 0.1f; // Fallback to a minimum radius
+    }
+    
     // Check if the sphere is on the positive side of all planes
     // or if it intersects any plane
     for (int i = 0; i < PlaneCount; ++i) {

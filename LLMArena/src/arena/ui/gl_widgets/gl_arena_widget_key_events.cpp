@@ -69,7 +69,14 @@ void GLArenaWidget::keyPressEvent(QKeyEvent* event) {
     
     // Handle escape key
     if (event->key() == Qt::Key_Escape) {
-        // Close inventory if it's open
+        // If escape menu exists, toggle it
+        if (m_escapeMenu) {
+            toggleEscapeMenu();
+            event->accept();
+            return;
+        }
+        
+        // Close inventory if it's open (fallback if escape menu doesn't exist)
         if (m_inventoryUI && m_inventoryUI->isVisible()) {
             m_inventoryUI->setVisible(false);
             updateMouseTrackingState();
@@ -104,6 +111,12 @@ void GLArenaWidget::keyReleaseEvent(QKeyEvent* event) {
         return;
     }
     
+    // Skip if escape menu is visible
+    if (m_escapeMenu && m_escapeMenu->isVisible()) {
+        event->accept();
+        return;
+    }
+    
     // Pass to player controller
     if (m_playerController) {
         m_playerController->handleKeyRelease(event);
@@ -127,6 +140,12 @@ void GLArenaWidget::mouseMoveEvent(QMouseEvent* event) {
     // Handle inventory first (highest priority)
     if (m_inventoryUI && m_inventoryUI->isVisible()) {
         m_inventoryUI->handleMouseMove(event->x(), event->y());
+        event->accept();
+        return;
+    }
+    
+    // Skip camera movement if escape menu is visible
+    if (m_escapeMenu && m_escapeMenu->isVisible()) {
         event->accept();
         return;
     }
@@ -165,6 +184,12 @@ void GLArenaWidget::mousePressEvent(QMouseEvent* event) {
     // Handle inventory first (highest priority)
     if (m_inventoryUI && m_inventoryUI->isVisible()) {
         m_inventoryUI->handleMousePress(event->x(), event->y(), event->button());
+        event->accept();
+        return;
+    }
+    
+    // Skip mouse handling if escape menu is visible
+    if (m_escapeMenu && m_escapeMenu->isVisible()) {
         event->accept();
         return;
     }
@@ -213,6 +238,12 @@ void GLArenaWidget::mouseReleaseEvent(QMouseEvent* event) {
         return;
     }
     
+    // Skip mouse handling if escape menu is visible
+    if (m_escapeMenu && m_escapeMenu->isVisible()) {
+        event->accept();
+        return;
+    }
+    
     // Skip mouse handling if debug console is visible
     if (consoleVisible) {
         event->accept();
@@ -221,4 +252,20 @@ void GLArenaWidget::mouseReleaseEvent(QMouseEvent* event) {
     
     // Default implementation
     QOpenGLWidget::mouseReleaseEvent(event);
+}
+
+// Toggle the escape menu visibility
+void GLArenaWidget::toggleEscapeMenu() {
+    if (!m_escapeMenu) {
+        return;
+    }
+    
+    m_escapeMenu->toggleVisibility();
+    updateMouseTrackingState();
+}
+
+// Handle the return to main menu signal from escape menu
+void GLArenaWidget::onReturnToMainMenu() {
+    // Forward the signal
+    emit returnToMainMenu();
 }

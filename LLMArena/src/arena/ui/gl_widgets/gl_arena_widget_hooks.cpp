@@ -6,6 +6,9 @@
 
 // This file contains input event hooks for GLArenaWidget
 
+/* 
+// This implementation conflicts with gl_arena_widget_key_events.cpp
+// Comment out to avoid conflicts
 void GLArenaWidget::keyPressEvent(QKeyEvent* event) {
     if (!event) {
         return;
@@ -92,6 +95,7 @@ void GLArenaWidget::keyReleaseEvent(QKeyEvent* event) {
         m_playerController->handleKeyRelease(event);
     }
 }
+*/
 
 void GLArenaWidget::mouseMoveEvent(QMouseEvent* event) {
     // Skip if not initialized

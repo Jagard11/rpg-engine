@@ -3,6 +3,7 @@
 #define VOXEL_RENDERER_H
 
 #include "voxel_world.h"
+#include "../system/performance_settings.h"
 #include <QObject>
 #include <QOpenGLFunctions>
 #include <QOpenGLBuffer>
@@ -54,9 +55,13 @@ public slots:
     // Update rendering data when world changes
     void updateRenderData();
     
+    // Update settings from performance settings
+    void updateSettings();
+    
 private:
     VoxelWorld* m_world;
     PlayerEntity* m_playerEntity;
+    PerformanceSettings* m_perfSettings;
     
     // Performance settings
     int m_maxVisibleChunks;
