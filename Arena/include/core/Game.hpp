@@ -1,0 +1,41 @@
+#pragma once
+
+#include <memory>
+#include <string>
+#include "../world/World.hpp"
+#include "../player/Player.hpp"
+#include "../renderer/Renderer.hpp"
+#include "../ui/SplashScreen.hpp"
+#include "Window.hpp"
+
+class Game {
+public:
+    Game();
+    ~Game();
+
+    bool initialize();
+    void run();
+    void cleanup();
+
+    // World management
+    void createNewWorld(uint64_t seed);
+    bool loadWorld(const std::string& savePath);
+    void saveWorld(const std::string& savePath);
+
+    void renderHUD();
+
+private:
+    void update(float deltaTime);
+    void render();
+    void handleInput(float deltaTime);
+
+    std::unique_ptr<Window> m_window;
+    std::unique_ptr<World> m_world;
+    std::unique_ptr<Player> m_player;
+    std::unique_ptr<Renderer> m_renderer;
+    std::unique_ptr<SplashScreen> m_splashScreen;
+    
+    bool m_isRunning;
+    bool m_isInGame;
+    int m_fps;
+}; 
