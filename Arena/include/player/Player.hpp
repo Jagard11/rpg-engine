@@ -44,6 +44,9 @@ public:
     // Enable/disable debug mode
     void setDebugMode(bool enabled) { m_collisionSystem.setDebugMode(enabled); }
 
+    // Add a method to ignore the next mouse movement
+    void ignoreNextMouseMovement() { m_ignoreNextMouseMovement = true; }
+
 private:
     void updateVectors();
 
@@ -70,4 +73,9 @@ private:
     
     // Collision system
     CollisionSystem m_collisionSystem;
+
+    // Mouse movement tracking
+    bool m_ignoreNextMouseMovement;
+    bool m_firstMouse;
+    double m_lastX, m_lastY;
 }; 

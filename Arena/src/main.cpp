@@ -1,8 +1,12 @@
 #include <iostream>
 #include <GL/glew.h>
 #include "core/Game.hpp"
+#include "core/StackTrace.hpp"
 
 int main() {
+    // Install signal handlers for better crash reporting
+    Core::StackTrace::installSignalHandlers();
+    
     try {
         Game game;
         
@@ -19,6 +23,12 @@ int main() {
     }
     catch (const std::exception& e) {
         std::cerr << "Fatal error: " << e.what() << std::endl;
+        Core::StackTrace::printStackTrace();
+        return -1;
+    }
+    catch (...) {
+        std::cerr << "Unknown fatal error occurred" << std::endl;
+        Core::StackTrace::printStackTrace();
         return -1;
     }
 } 

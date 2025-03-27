@@ -6,6 +6,7 @@
 #include "../player/Player.hpp"
 #include "../renderer/Renderer.hpp"
 #include "../ui/SplashScreen.hpp"
+#include "../debug/DebugMenu.hpp"
 #include "Window.hpp"
 
 class Game {
@@ -23,6 +24,9 @@ public:
     void saveWorld(const std::string& savePath);
 
     void renderHUD();
+    
+    // Debug menu access
+    Debug::DebugMenu* getDebugMenu() { return m_debugMenu.get(); }
 
 private:
     void update(float deltaTime);
@@ -34,6 +38,7 @@ private:
     std::unique_ptr<Player> m_player;
     std::unique_ptr<Renderer> m_renderer;
     std::unique_ptr<SplashScreen> m_splashScreen;
+    std::unique_ptr<Debug::DebugMenu> m_debugMenu;
     
     bool m_isRunning;
     bool m_isInGame;

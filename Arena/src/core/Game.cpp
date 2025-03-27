@@ -6,11 +6,22 @@
 #include <iostream>
 #include <filesystem>
 #include <thread>
+#include "debug/DebugMenu.hpp"
 
 Game::Game()
-    : m_isRunning(false)
+    : m_window(nullptr)
+    , m_renderer(nullptr)
+    , m_world(nullptr)
+    , m_player(nullptr)
+    , m_splashScreen(nullptr)
+    , m_debugMenu(nullptr)
+    , m_isRunning(false)
     , m_isInGame(false)
+    , m_fps(0)
 {
+    if (!initialize()) {
+        throw std::runtime_error("Failed to initialize game");
+    }
 }
 
 Game::~Game() {
@@ -20,7 +31,7 @@ Game::~Game() {
 bool Game::initialize() {
     try {
         // Create window
-        m_window = std::make_unique<Window>();
+        m_window = std::make_unique<Window>(1280, 720, "Voxel Game");
         if (!m_window->initialize()) {
             std::cerr << "Failed to initialize window" << std::endl;
             return false;
@@ -33,28 +44,38 @@ bool Game::initialize() {
             return false;
         }
 
-        // Initialize components
+        // Initialize renderer
         m_renderer = std::make_unique<Renderer>();
         if (!m_renderer->initialize()) {
             std::cerr << "Failed to initialize renderer" << std::endl;
             return false;
         }
 
+        // Initialize splash screen
         m_splashScreen = std::make_unique<SplashScreen>();
-        
-        // Setup splash screen callbacks
-        m_splashScreen->setNewGameCallback([this](uint64_t seed) {
+        m_splashScreen->initialize(m_window->getHandle(), this);
+        m_window->setActiveSplashScreen(m_splashScreen.get());
+        m_renderer->setSplashScreen(m_splashScreen.get());
+
+        // Set up splash screen callbacks
+        m_splashScreen->setNewGameCallback([this](long seed) {
+            std::cout << "Creating new world with seed: " << seed << std::endl;
             createNewWorld(seed);
+            m_isInGame = true;
         });
-        
+
         m_splashScreen->setLoadGameCallback([this](const std::string& path) {
-            loadWorld(path);
+            std::cout << "Loading world from: " << path << std::endl;
+            if (loadWorld(path)) {
+                m_isInGame = true;
+            }
         });
-        
+
         m_splashScreen->setSaveGameCallback([this](const std::string& path) {
+            std::cout << "Saving world to: " << path << std::endl;
             saveWorld(path);
         });
-        
+
         m_splashScreen->setQuitCallback([this](bool quitToDesktop) {
             if (quitToDesktop) {
                 m_isRunning = false;
@@ -66,31 +87,24 @@ bool Game::initialize() {
             }
         });
 
-        m_splashScreen->initialize(m_window->getHandle(), this);
-        
-        // Register the splash screen with the window for character callbacks
-        m_window->setActiveSplashScreen(m_splashScreen.get());
-        
-        // Ensure saves directory exists
-        std::filesystem::path savesDir = "saves";
-        if (!std::filesystem::exists(savesDir)) {
-            std::filesystem::create_directory(savesDir);
-        }
-        
-        // Enable depth testing
-        glEnable(GL_DEPTH_TEST);
-        glEnable(GL_CULL_FACE);
-        glCullFace(GL_BACK);
-        
-        // Set clear color
-        glClearColor(0.2f, 0.3f, 0.8f, 1.0f);
-        
+        // Initialize debug menu
+        m_debugMenu = std::make_unique<Debug::DebugMenu>();
+        m_debugMenu->initialize(m_window->getHandle(), this);
+        m_window->setActiveDebugMenu(m_debugMenu.get());
+        m_renderer->setDebugMenu(m_debugMenu.get());
+
+        // Initialize player
+        m_player = std::make_unique<Player>();
+        m_player->setPosition(glm::vec3(0.0f, 65.0f, 0.0f));
+
+        // Initialize world with a default seed
+        m_world = std::make_unique<World>(12345);
+        m_world->generateChunk(glm::ivec3(0, 0, 0)); // Generate initial chunk
+
         m_isRunning = true;
-        std::cout << "Game initialized successfully" << std::endl;
         return true;
-    }
-    catch (const std::exception& e) {
-        std::cerr << "Error during initialization: " << e.what() << std::endl;
+    } catch (const std::exception& e) {
+        std::cerr << "Exception during initialization: " << e.what() << std::endl;
         return false;
     }
 }
@@ -135,6 +149,11 @@ void Game::run() {
 }
 
 void Game::update(float deltaTime) {
+    // Update debug menu
+    if (m_debugMenu) {
+        m_debugMenu->update(deltaTime);
+    }
+    
     if (m_isInGame && m_world && m_player && !m_splashScreen->isActive()) {
         m_player->update(deltaTime, m_world.get());
         m_world->updateChunks(m_player->getPosition());
@@ -151,50 +170,64 @@ void Game::render() {
         return;
     }
     
-    // Render game world or splash screen
+    // Save OpenGL state
+    GLint currentProgram;
+    glGetIntegerv(GL_CURRENT_PROGRAM, &currentProgram);
+    GLboolean depthTestEnabled = glIsEnabled(GL_DEPTH_TEST);
+    GLboolean cullFaceEnabled = glIsEnabled(GL_CULL_FACE);
+    GLboolean blendEnabled = glIsEnabled(GL_BLEND);
+    GLint currentVAO;
+    glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &currentVAO);
+    
+    // Game world rendering - This should be first (3D content)
     if (m_isInGame && m_world && m_player) {
+        // Set up for 3D rendering
+        glEnable(GL_DEPTH_TEST);
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
+        glFrontFace(GL_CCW);
+        
         // Render world and player view
         m_renderer->render(m_world.get(), m_player.get());
-        
-        // Render HUD elements
+    }
+    
+    // Set up for 2D UI rendering
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_CULL_FACE);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    
+    // Render HUD elements
+    if (m_isInGame && m_player) {
         renderHUD();
     }
     
-    // Render UI elements on top
+    // UI elements come next
     if (m_splashScreen && m_splashScreen->isActive()) {
         m_splashScreen->render();
     }
+    
+    // Debug menu is rendered last
+    if (m_debugMenu && m_debugMenu->isActive()) {
+        m_debugMenu->render();
+    }
+    
+    // Restore OpenGL state
+    glUseProgram(currentProgram);
+    if (depthTestEnabled) glEnable(GL_DEPTH_TEST);
+    if (cullFaceEnabled) glEnable(GL_CULL_FACE);
+    if (!blendEnabled) glDisable(GL_BLEND);
+    glBindVertexArray(currentVAO);
 }
 
 void Game::renderHUD() {
     if (!m_player) return;
     
-    // Debug output to confirm HUD is being called
-    static bool firstHudRender = true;
-    if (firstHudRender) {
-        std::cout << "HUD rendering started" << std::endl;
-        firstHudRender = false;
-    }
+    // Get window dimensions
+    int width = m_window->getWidth();
+    int height = m_window->getHeight();
     
-    // Set up for 2D rendering
-    glDisable(GL_DEPTH_TEST);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    
-    // Use legacy OpenGL for simpler drawing
-    glMatrixMode(GL_PROJECTION);
-    glPushMatrix();
-    glLoadIdentity();
-    int width, height;
-    width = m_window->getWidth();
-    height = m_window->getHeight();
-    glOrtho(0.0, width, 0.0, height, -1.0, 1.0);
-    
-    glMatrixMode(GL_MODELVIEW);
-    glPushMatrix();
-    glLoadIdentity();
-    
-    // Render crosshair
+    // Render crosshair at screen center
     float crosshairSize = 10.0f;
     glColor4f(1.0f, 1.0f, 1.0f, 0.8f);
     glLineWidth(2.0f);
@@ -205,7 +238,7 @@ void Game::renderHUD() {
     glVertex2f(width/2, height/2 + crosshairSize);
     glEnd();
     
-    // Render jetpack indicator
+    // Render jetpack indicator in bottom left corner
     float indicatorSize = 30.0f;
     float padding = 20.0f;
     float boxWidth = 120.0f;
@@ -220,7 +253,7 @@ void Game::renderHUD() {
     glVertex2f(padding, padding + boxHeight);
     glEnd();
     
-    // Jetpack status indicator (red when off, white when on)
+    // Jetpack status indicator
     if (m_player->isJetpackEnabled()) {
         glColor4f(1.0f, 1.0f, 1.0f, 1.0f); // White when on
     } else {
@@ -278,7 +311,7 @@ void Game::renderHUD() {
     glVertex2f(barX, barY + barHeight);
     glEnd();
     
-    // Render flying mode status (simple square indicators)
+    // Render flying mode status
     float statusSize = 10.0f;
     float statusY = padding + boxHeight + 15.0f;
     
@@ -295,21 +328,39 @@ void Game::renderHUD() {
     glVertex2f(padding + statusSize, statusY + statusSize);
     glVertex2f(padding, statusY + statusSize);
     glEnd();
-    
-    // Restore OpenGL state
-    glMatrixMode(GL_PROJECTION);
-    glPopMatrix();
-    glMatrixMode(GL_MODELVIEW);
-    glPopMatrix();
-    
-    glEnable(GL_DEPTH_TEST);
-    glDisable(GL_BLEND);
 }
 
 void Game::handleInput(float deltaTime) {
-    // Check for the escape key to toggle in-game menu
+    // Check for F8 key to toggle debug menu
+    if (m_debugMenu && m_window->isKeyJustPressed(GLFW_KEY_F8)) {
+        // Call handleKeyPress on the debug menu to toggle it
+        m_debugMenu->handleKeyPress(GLFW_KEY_F8, GLFW_PRESS);
+        
+        // If the player exists and we're toggling the debug menu off, prevent camera jump
+        if (m_player && !m_debugMenu->isActive()) {
+            m_player->ignoreNextMouseMovement();
+        }
+    }
+    
+    // Forward keys to debug menu if it's active
+    if (m_debugMenu && m_debugMenu->isActive()) {
+        // Character input will be handled through the window's character callback
+        
+        // Handle special keys
+        for (int key : {GLFW_KEY_ENTER, GLFW_KEY_BACKSPACE, GLFW_KEY_ESCAPE, 
+                       GLFW_KEY_UP, GLFW_KEY_DOWN}) {
+            if (m_window->isKeyJustPressed(key)) {
+                if (m_debugMenu->handleKeyPress(key, GLFW_PRESS)) {
+                    return; // Key was handled by debug menu
+                }
+            }
+        }
+    }
+    
+    // Check for the escape key to toggle in-game menu, but only if debug menu is not active
     if (m_isInGame && m_window->isKeyPressed(GLFW_KEY_ESCAPE) && 
-        m_window->isKeyJustPressed(GLFW_KEY_ESCAPE)) {
+        m_window->isKeyJustPressed(GLFW_KEY_ESCAPE) && 
+        (!m_debugMenu || !m_debugMenu->isActive())) {
         
         if (m_splashScreen->isActive()) {
             m_splashScreen->setInactive();
@@ -320,13 +371,15 @@ void Game::handleInput(float deltaTime) {
         }
     }
     
-    // Handle normal game input when we're playing
-    if (m_isInGame && m_player && !m_splashScreen->isActive()) {
+    // Handle normal game input when we're playing and debug menu is not active
+    if (m_isInGame && m_player && !m_splashScreen->isActive() && 
+        (!m_debugMenu || !m_debugMenu->isActive())) {
+        
         m_player->handleInput(deltaTime, m_world.get());
         
         // Let window capture cursor for camera
         m_window->setInputMode(GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-    } else {
+    } else if (!m_debugMenu || !m_debugMenu->isActive()) {
         // When in menus, let the cursor be visible
         m_window->setInputMode(GLFW_CURSOR, GLFW_CURSOR_NORMAL);
         

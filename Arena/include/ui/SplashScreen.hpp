@@ -5,6 +5,8 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <vector>
+#include <memory>
+#include "render/TextRenderer.hpp"
 
 // Forward declarations
 class Game;
@@ -63,7 +65,6 @@ private:
     void renderBox(float x, float y, float width, float height);
     void renderText(const std::string& text, float x, float y, float scale);
     void renderTextAtCenter(const std::string& text, float centerX, float centerY, float scale);
-    void renderCharacter(char c, float x, float y, float width, float height, float scale);
     void handleMenuNavigation(int key);
     
     // Game state management
@@ -98,4 +99,6 @@ private:
     std::function<void(const std::string&)> m_loadGameCallback;
     std::function<void(const std::string&)> m_saveGameCallback;
     std::function<void(bool)> m_quitCallback;
+
+    std::unique_ptr<Render::TextRenderer> m_textRenderer;
 }; 

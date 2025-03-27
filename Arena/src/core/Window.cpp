@@ -2,15 +2,29 @@
 #include "core/Window.hpp"
 #include <stdexcept>
 #include "ui/SplashScreen.hpp"
+#include "debug/DebugMenu.hpp"
+#include <iostream>
 
-// Global variable to store the active SplashScreen
+// Global variables to store active UI components
 static SplashScreen* g_activeSplashScreen = nullptr;
+static Debug::DebugMenu* g_activeDebugMenu = nullptr;
 
 // GLFW character callback
 static void character_callback(GLFWwindow* window, unsigned int codepoint) {
-    if (g_activeSplashScreen) {
+    // First try to handle with debug menu if active
+    if (g_activeDebugMenu && g_activeDebugMenu->isActive()) {
+        g_activeDebugMenu->characterCallback(codepoint);
+        std::cout << "Character sent to debug menu: " << (char)codepoint << std::endl;
+    }
+    // Otherwise forward to splash screen if available
+    else if (g_activeSplashScreen) {
         g_activeSplashScreen->characterCallback(codepoint);
     }
+}
+
+// Add this before Window::initialize()
+static void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
+    glViewport(0, 0, width, height);
 }
 
 Window::Window(int width, int height, const std::string& title)
@@ -18,6 +32,8 @@ Window::Window(int width, int height, const std::string& title)
     , m_width(width)
     , m_height(height)
     , m_title(title)
+    , m_activeSplashScreen(nullptr)
+    , m_activeDebugMenu(nullptr)
 {}
 
 Window::~Window() {
@@ -45,8 +61,18 @@ bool Window::initialize() {
 
     glfwMakeContextCurrent(m_window);
     
-    // Setup character callback
+    // Initialize GLEW
+    GLenum err = glewInit();
+    if (err != GLEW_OK) {
+        std::cerr << "GLEW initialization failed: " << glewGetErrorString(err) << std::endl;
+        glfwDestroyWindow(m_window);
+        glfwTerminate();
+        return false;
+    }
+    
+    // Setup callbacks
     glfwSetCharCallback(m_window, character_callback);
+    glfwSetFramebufferSizeCallback(m_window, framebuffer_size_callback);
     
     return true;
 }
@@ -103,4 +129,10 @@ void Window::setInputMode(int mode, int value) {
 
 void Window::setActiveSplashScreen(SplashScreen* splashScreen) {
     g_activeSplashScreen = splashScreen;
+    m_activeSplashScreen = splashScreen;
+}
+
+void Window::setActiveDebugMenu(Debug::DebugMenu* debugMenu) {
+    g_activeDebugMenu = debugMenu;
+    m_activeDebugMenu = debugMenu;
 } 

@@ -23,6 +23,10 @@ Player::Player()
     , m_canDoubleJump(false)
     , m_width(0.8f)
     , m_height(1.8f)
+    , m_ignoreNextMouseMovement(false)
+    , m_firstMouse(true)
+    , m_lastX(0.0)
+    , m_lastY(0.0)
 {
     updateVectors();
     m_collisionSystem.init(m_width, m_height);
@@ -351,14 +355,26 @@ void Player::handleInput(float deltaTime, World* world) {
     double mouseX, mouseY;
     glfwGetCursorPos(window, &mouseX, &mouseY);
     
-    static double lastX = mouseX;
-    static double lastY = mouseY;
+    if (m_ignoreNextMouseMovement) {
+        // If this is the first movement after re-capturing the cursor,
+        // just update the last position without changing the camera
+        m_lastX = mouseX;
+        m_lastY = mouseY;
+        m_ignoreNextMouseMovement = false;
+        return;
+    }
     
-    double xOffset = mouseX - lastX;
-    double yOffset = lastY - mouseY;
+    if (m_firstMouse) {
+        m_lastX = mouseX;
+        m_lastY = mouseY;
+        m_firstMouse = false;
+    }
     
-    lastX = mouseX;
-    lastY = mouseY;
+    double xOffset = mouseX - m_lastX;
+    double yOffset = m_lastY - mouseY;
+    
+    m_lastX = mouseX;
+    m_lastY = mouseY;
     
     const float mouseSensitivity = 0.1f;
     xOffset *= mouseSensitivity;
@@ -372,7 +388,7 @@ void Player::handleInput(float deltaTime, World* world) {
         m_pitch = 89.0f;
     if (m_pitch < -89.0f)
         m_pitch = -89.0f;
-        
+    
     updateVectors();
 }
 
@@ -384,7 +400,7 @@ void Player::updateVectors() {
     m_forward = glm::normalize(m_forward);
     
     // Calculate right and up vectors
-    m_right = glm::normalize(glm::cross(m_forward, glm::vec3(0.0f, 1.0f, 0.0f)));
+    m_right = glm::normalize(glm::cross(m_forward, m_up));
     m_up = glm::normalize(glm::cross(m_right, m_forward));
     
     // For movement, only flatten the vectors when not flying

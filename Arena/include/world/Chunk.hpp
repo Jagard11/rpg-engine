@@ -15,12 +15,15 @@ struct AABB {
     AABB(const glm::vec3& min, const glm::vec3& max) : min(min), max(max) {}
 };
 
+class World; // Forward declaration
+
 class Chunk {
 public:
     static const int CHUNK_SIZE = 16;
-    static const int CHUNK_HEIGHT = 256;
+    static const int CHUNK_HEIGHT = 16; // Changed from 256 to 16 for cubic chunks
 
-    Chunk(int x, int z);
+    // Updated constructor to take y coordinate
+    Chunk(int x, int y, int z);
     ~Chunk();
 
     void setBlock(int x, int y, int z, int blockType);
@@ -34,25 +37,36 @@ public:
     bool serialize(const std::string& filename) const;
     bool deserialize(const std::string& filename);
 
-    glm::ivec2 getPosition() const { return glm::ivec2(m_x, m_z); }
+    // Update to return 3D position
+    glm::ivec3 getPosition() const { return glm::ivec3(m_x, m_y, m_z); }
     
     // Generate a collision mesh using greedy meshing algorithm
     std::vector<AABB> buildColliderMesh() const;
     
     // Check if a block type is solid (for collision purposes)
     bool isBlockSolid(int blockType) const { return blockType > 0; }
+    
+    // Set the world pointer for cross-chunk queries
+    void setWorld(World* world) { m_world = world; }
 
 private:
     bool shouldRenderFace(int x, int y, int z, const glm::vec3& normal) const;
+    int getAdjacentBlock(int x, int y, int z, const glm::vec3& normal) const;
     void addFace(const std::vector<float>& vertices, const glm::vec3& position, const glm::vec3& normal);
+    // Helper method for greedy meshing
+    void addGreedyFace(const std::vector<float>& faceTemplate, const glm::ivec3& normal, 
+                       int uStart, int vStart, int wPos, int width, int height, 
+                       int uAxis, int vAxis, int wAxis);
 
     std::array<std::array<std::array<int, CHUNK_SIZE>, CHUNK_HEIGHT>, CHUNK_SIZE> m_blocks;
     std::vector<float> m_meshVertices;
     std::vector<unsigned int> m_meshIndices;
-    int m_x, m_z;
+    int m_x, m_y, m_z; // Updated to store 3D position
     bool m_isDirty;
     
     // Caching collision mesh for performance
     mutable std::vector<AABB> m_collisionMesh;
     mutable bool m_collisionMeshDirty = true;
+    
+    World* m_world;
 }; 

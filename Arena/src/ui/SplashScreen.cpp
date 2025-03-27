@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <fstream>
 #include "core/Game.hpp"
+#include "render/TextRenderer.hpp"
 
 SplashScreen::SplashScreen()
     : m_window(nullptr)
@@ -29,7 +30,9 @@ SplashScreen::SplashScreen()
     , m_loadGameCallback(nullptr)
     , m_saveGameCallback(nullptr)
     , m_quitCallback(nullptr)
+    , m_textRenderer(nullptr)
 {
+    // TextRenderer will be initialized in the initialize method when we have a valid OpenGL context
 }
 
 SplashScreen::~SplashScreen() {
@@ -44,6 +47,47 @@ void SplashScreen::initialize(GLFWwindow* window, Game* game) {
     glDisable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    
+    // Initialize the text renderer now that we have a valid OpenGL context
+    std::cout << "Creating TextRenderer in SplashScreen::initialize" << std::endl;
+    
+    if (!m_textRenderer) {
+        std::cout << "Creating new TextRenderer instance..." << std::endl;
+        m_textRenderer = std::make_unique<Render::TextRenderer>();
+    }
+    
+    if (!m_textRenderer->isInitialized()) {
+        std::cerr << "ERROR: TextRenderer failed to initialize in SplashScreen::initialize" << std::endl;
+        std::cerr << "Falling back to legacy text rendering" << std::endl;
+        
+        // Check OpenGL errors
+        GLenum err = glGetError();
+        if (err != GL_NO_ERROR) {
+            std::cerr << "OpenGL error during TextRenderer initialization: " << err << std::endl;
+        }
+    } else {
+        std::cout << "TextRenderer successfully initialized in SplashScreen" << std::endl;
+        
+        // Update projection matrix with current window dimensions
+        int width, height;
+        glfwGetFramebufferSize(window, &width, &height);
+        std::cout << "Updating TextRenderer projection with dimensions: " << width << "x" << height << std::endl;
+        m_textRenderer->updateProjection(width, height);
+        
+        // Test text rendering immediately with a smaller scale
+        std::cout << "Testing initial text rendering..." << std::endl;
+        try {
+            m_textRenderer->renderText("INITIALIZATION TEST", width/2.0f, height/2.0f, 0.5f, glm::vec3(1.0f, 1.0f, 1.0f));
+            
+            // Check for OpenGL errors
+            GLenum err = glGetError();
+            if (err != GL_NO_ERROR) {
+                std::cerr << "OpenGL error during initial text rendering: " << err << std::endl;
+            }
+        } catch (const std::exception& e) {
+            std::cerr << "Exception during initial text rendering: " << e.what() << std::endl;
+        }
+    }
     
     // Initialize save games list
     refreshSaveList();
@@ -69,7 +113,6 @@ void SplashScreen::render() {
     
     int width, height;
     glfwGetFramebufferSize(m_window, &width, &height);
-    std::cout << "Window dimensions: " << width << "x" << height << std::endl;
     
     // Update mouse position
     double mouseX, mouseY;
@@ -86,26 +129,37 @@ void SplashScreen::render() {
     m_lastEscapePressed = m_escapePressed;
     m_escapePressed = glfwGetKey(m_window, GLFW_KEY_ESCAPE) == GLFW_PRESS;
     
+    // Save current OpenGL state
+    GLint currentProgram;
+    glGetIntegerv(GL_CURRENT_PROGRAM, &currentProgram);
+    GLboolean depthTestEnabled = glIsEnabled(GL_DEPTH_TEST);
+    GLboolean cullFaceEnabled = glIsEnabled(GL_CULL_FACE);
+    GLboolean blendEnabled = glIsEnabled(GL_BLEND);
+    GLint currentVAO;
+    glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &currentVAO);
+    
     // Set up proper OpenGL state for UI rendering
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     
-    // Use legacy OpenGL for simpler drawing
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    // Change to bottom-to-top coordinates to fix upside-down text
-    glOrtho(0.0, width, 0.0, height, -1.0, 1.0);
-    
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-    
     // Clear with a more vibrant background color
     glClearColor(0.2f, 0.3f, 0.8f, 1.0f); // Blue background
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
-    // Render different screens based on state
+    // Update TextRenderer projection if available
+    if (m_textRenderer && m_textRenderer->isInitialized()) {
+        m_textRenderer->updateProjection(width, height);
+    } else {
+        static bool loggedWarning = false;
+        if (!loggedWarning) {
+            std::cerr << "Warning: TextRenderer not initialized or not available!" << std::endl;
+            loggedWarning = true;
+        }
+    }
+    
+    // Render based on current state
     switch (m_currentState) {
         case UIState::SPLASH_SCREEN:
             renderSplashScreen();
@@ -122,8 +176,11 @@ void SplashScreen::render() {
     }
     
     // Restore OpenGL state
-    glEnable(GL_DEPTH_TEST);
-    glDisable(GL_BLEND);
+    glUseProgram(currentProgram);
+    if (depthTestEnabled) glEnable(GL_DEPTH_TEST);
+    if (cullFaceEnabled) glEnable(GL_CULL_FACE);
+    if (!blendEnabled) glDisable(GL_BLEND);
+    glBindVertexArray(currentVAO);
 }
 
 void SplashScreen::renderSplashScreen() {
@@ -131,11 +188,19 @@ void SplashScreen::renderSplashScreen() {
     int width, height;
     glfwGetFramebufferSize(m_window, &width, &height);
     
-    // Draw a game title at the top
-    float titleY = height * 0.8f; // Adjusted Y position
+    // Draw a prominent game title at the top
+    float titleY = height * 0.85f; // Position title higher up
+    float titleScale = 3.0f; // Larger scale for the title
     
-    glColor3f(1.0f, 1.0f, 1.0f); // Bright white for maximum visibility
-    renderTextAtCenter("VOXEL ENGINE", width/2, titleY, 12.0f); // Larger text
+    // Use TextRenderer for the title
+    if (m_textRenderer && m_textRenderer->isInitialized()) {
+        // Calculate text width for centering
+        float titleWidth = m_textRenderer->getTextWidth("VOXEL GAME", titleScale);
+        float titleX = (width - titleWidth) / 2.0f;
+        
+        // Render the title with a bright color
+        m_textRenderer->renderText("VOXEL GAME", titleX, titleY, titleScale, glm::vec3(0.0f, 0.8f, 1.0f));
+    }
     
     // BUTTONS - Make them extra large and easy to see
     float buttonWidth = width * 0.6f; // Wider buttons
@@ -144,10 +209,6 @@ void SplashScreen::renderSplashScreen() {
     float newGameY = height * 0.6f; // Adjusted Y position
     float loadGameY = height * 0.4f; // Adjusted Y position
     float quitY = height * 0.2f; // Adjusted Y position
-    
-    // Output debug info about button positions
-    std::cout << "New Game Button: x=" << buttonX << ", y=" << newGameY 
-              << ", width=" << buttonWidth << ", height=" << buttonHeight << std::endl;
     
     // Check if mouse is over buttons
     bool highlightNewGame = isMouseOverButton(buttonX, newGameY, buttonWidth, buttonHeight);
@@ -163,24 +224,16 @@ void SplashScreen::renderSplashScreen() {
     // QUIT BUTTON
     renderButton("QUIT", buttonX, quitY, buttonWidth, buttonHeight, highlightQuit);
     
-    // Version info at the bottom
-    glColor3f(1.0f, 1.0f, 1.0f); // Bright white for maximum visibility
-    renderTextAtCenter("VOXEL ENGINE v0.1", width/2, height * 0.05f, 5.0f); // Adjusted Y position
-    
-    // Check for button clicks
+    // Handle button clicks
     if (m_mousePressed && !m_lastMousePressed) {
         if (highlightNewGame) {
             m_currentState = UIState::NEW_GAME_SCREEN;
-            std::cout << "New Game button clicked" << std::endl;
         } else if (highlightLoadGame) {
             m_currentState = UIState::LOAD_GAME_SCREEN;
-            refreshSaveList();
-            std::cout << "Load Game button clicked" << std::endl;
         } else if (highlightQuit) {
             if (m_quitCallback) {
                 m_quitCallback(true);
             }
-            std::cout << "Quit button clicked" << std::endl;
         }
     }
 }
@@ -192,9 +245,9 @@ void SplashScreen::renderNewGameScreen() {
     
     // No need to set up projection - done in render method
     
-    // Title
+    // Title - reduce scale from 6.0f to 2.5f
     glColor3f(0.8f, 0.8f, 0.8f);
-    renderTextAtCenter("NEW GAME", width/2, height * 0.8f, 6.0f); // Adjusted Y position
+    renderTextAtCenter("NEW GAME", width/2, height * 0.8f, 2.5f);
     
     // Seed input field
     float inputWidth = width * 0.6f;
@@ -206,12 +259,14 @@ void SplashScreen::renderNewGameScreen() {
     glColor3f(0.2f, 0.2f, 0.2f);
     renderBox(inputX, inputY, inputWidth, inputHeight);
     
+    // Reduce input text scale from 3.0f to 1.5f
     glColor3f(1.0f, 1.0f, 1.0f);
     renderText(m_isTyping ? m_seedInput + "_" : m_seedInput, 
-               inputX + 10, inputY + inputHeight/2, 3.0f);
+               inputX + 10, inputY + inputHeight/2, 1.5f);
     
+    // Reduce help text scale from 3.0f to 1.2f
     glColor3f(0.7f, 0.7f, 0.7f);
-    renderTextAtCenter("SEED (leave empty for random)", width/2, inputY + inputHeight + 20, 3.0f); // Adjusted Y position
+    renderTextAtCenter("SEED (leave empty for random)", width/2, inputY + inputHeight + 20, 1.2f);
     
     // Create button
     float buttonWidth = width * 0.3f;
@@ -252,9 +307,9 @@ void SplashScreen::renderLoadGameScreen() {
     
     // No need to set up projection - done in render method
     
-    // Title
+    // Title - reduce scale from 6.0f to 2.5f
     glColor3f(0.8f, 0.8f, 0.8f);
-    renderTextAtCenter("LOAD GAME", width/2, height * 0.9f, 6.0f); // Adjusted Y position
+    renderTextAtCenter("LOAD GAME", width/2, height * 0.9f, 2.5f);
     
     // List of save games
     float listWidth = width * 0.7f;
@@ -269,7 +324,7 @@ void SplashScreen::renderLoadGameScreen() {
     
     if (m_saveGames.empty()) {
         glColor3f(0.8f, 0.8f, 0.8f);
-        renderTextAtCenter("No saved games found", width/2, listY + entryHeight/2, 3.0f);
+        renderTextAtCenter("No saved games found", width/2, listY + entryHeight/2, 1.5f);
     } else {
         // Render save entries
         for (size_t i = 0; i < m_saveGames.size(); i++) {
@@ -289,12 +344,12 @@ void SplashScreen::renderLoadGameScreen() {
             }
             renderBox(listX, entryY, listWidth, entryHeight);
             
-            // Save name and date
+            // Save name and date - reduce scales
             glColor3f(0.8f, 0.8f, 0.8f);
-            renderText(m_saveGames[i].name, listX + 10, entryY + entryHeight/2, 2.8f);
+            renderText(m_saveGames[i].name, listX + 10, entryY + entryHeight/2, 1.4f);
             
             glColor3f(0.6f, 0.6f, 0.6f);
-            renderText(m_saveGames[i].date, listX + listWidth - 200, entryY + entryHeight/2, 2.0f);
+            renderText(m_saveGames[i].date, listX + listWidth - 200, entryY + entryHeight/2, 1.0f);
             
             // Delete button
             float deleteWidth = 80;
@@ -309,7 +364,7 @@ void SplashScreen::renderLoadGameScreen() {
             renderBox(deleteX, entryY + 5, deleteWidth, entryHeight - 10);
             
             glColor3f(0.9f, 0.9f, 0.9f);
-            renderTextAtCenter("DELETE", deleteX + deleteWidth/2, entryY + entryHeight/2, 2.0f);
+            renderTextAtCenter("DELETE", deleteX + deleteWidth/2, entryY + entryHeight/2, 1.0f);
             
             // Handle clicking on delete
             if (m_mousePressed && !m_lastMousePressed && deleteHighlight) {
@@ -343,7 +398,7 @@ void SplashScreen::renderLoadGameScreen() {
         glColor3f(0.4f, 0.4f, 0.4f);
         renderBox(buttonX, loadY, buttonWidth, buttonHeight);
         glColor3f(0.6f, 0.6f, 0.6f);
-        renderTextAtCenter("LOAD SELECTED", buttonX + buttonWidth/2, loadY + buttonHeight/2, 3.0f);
+        renderTextAtCenter("LOAD SELECTED", buttonX + buttonWidth/2, loadY + buttonHeight/2, 1.5f);
     }
     
     // Back button
@@ -374,9 +429,9 @@ void SplashScreen::renderInGameMenu() {
     renderBox(0, 0, width, height);
     glDisable(GL_BLEND);
     
-    // Title
+    // Title - reduce scale from 6.0f to 2.5f
     glColor3f(0.9f, 0.9f, 0.9f);
-    renderTextAtCenter("GAME MENU", width/2, height * 0.8f, 6.0f); // Adjusted Y position
+    renderTextAtCenter("GAME MENU", width/2, height * 0.8f, 2.5f);
     
     // Menu buttons
     float buttonWidth = width * 0.4f;
@@ -413,13 +468,13 @@ void SplashScreen::renderInGameMenu() {
         glColor3f(0.2f, 0.2f, 0.2f);
         renderBox(inputX, inputY, inputWidth, inputHeight);
         
-        // Text
+        // Text - reduce scale from 3.0f to 1.5f
         glColor3f(1.0f, 1.0f, 1.0f);
-        renderText(m_saveName + "_", inputX + 10, inputY + inputHeight/2, 3.0f);
+        renderText(m_saveName + "_", inputX + 10, inputY + inputHeight/2, 1.5f);
         
-        // Label
+        // Label - reduce scale from 3.0f to 1.2f
         glColor3f(0.9f, 0.9f, 0.9f);
-        renderTextAtCenter("ENTER SAVE NAME", width/2, inputY + inputHeight + 20, 3.0f);
+        renderTextAtCenter("ENTER SAVE NAME", width/2, inputY + inputHeight + 20, 1.2f);
     }
     
     // Other buttons
@@ -466,382 +521,40 @@ void SplashScreen::renderInGameMenu() {
 }
 
 void SplashScreen::renderTextAtCenter(const std::string& text, float centerX, float centerY, float scale) {
-    // Very simple line-based text rendering
-    // For each letter, we draw it centered at the given position
-    glLineWidth(scale);
-    float letterSpacing = scale * 3.0f;
-    float letterWidth = scale * 5.0f;
-    float letterHeight = scale * 10.0f;
-    
-    float startX = centerX - (text.length() * (letterWidth + letterSpacing)) / 2;
-    float y = centerY - letterHeight / 2;
-    
-    for (size_t i = 0; i < text.length(); i++) {
-        float x = startX + i * (letterWidth + letterSpacing);
-        renderCharacter(text[i], x, y, letterWidth, letterHeight, scale);
+    if (m_textRenderer && m_textRenderer->isInitialized()) {
+        // Calculate text width for centering
+        float width = m_textRenderer->getTextWidth(text, scale);
+        
+        // Calculate x position for centering
+        float x = centerX - (width / 2.0f);
+        
+        // Render the text
+        m_textRenderer->renderText(text, x, centerY, scale, glm::vec3(1.0f, 1.0f, 1.0f));
     }
+    // No fallback rendering - if TextRenderer isn't available, nothing will be rendered
 }
 
-void SplashScreen::renderCharacter(char c, float x, float y, float width, float height, float scale) {
-    glLineWidth(scale);
-    
-    switch (c) {
-        case 'A':
-            glBegin(GL_LINES);
-            glVertex2f(x, y + height);
-            glVertex2f(x + width/2, y);
-            glVertex2f(x + width/2, y);
-            glVertex2f(x + width, y + height);
-            glVertex2f(x + width*0.25f, y + height*0.5f);
-            glVertex2f(x + width*0.75f, y + height*0.5f);
-            glEnd();
-            break;
-        case 'B':
-            glBegin(GL_LINES);
-            glVertex2f(x, y);
-            glVertex2f(x, y + height);
-            glVertex2f(x, y);
-            glVertex2f(x + width*0.75f, y);
-            glVertex2f(x + width*0.75f, y);
-            glVertex2f(x + width, y + height*0.25f);
-            glVertex2f(x + width, y + height*0.25f);
-            glVertex2f(x + width*0.75f, y + height*0.5f);
-            glVertex2f(x, y + height*0.5f);
-            glVertex2f(x + width*0.75f, y + height*0.5f);
-            glVertex2f(x + width*0.75f, y + height*0.5f);
-            glVertex2f(x + width, y + height*0.75f);
-            glVertex2f(x + width, y + height*0.75f);
-            glVertex2f(x + width*0.75f, y + height);
-            glVertex2f(x + width*0.75f, y + height);
-            glVertex2f(x, y + height);
-            glEnd();
-            break;
-        case 'C':
-            glBegin(GL_LINES);
-            glVertex2f(x + width, y + height*0.25f);
-            glVertex2f(x + width*0.5f, y);
-            glVertex2f(x + width*0.5f, y);
-            glVertex2f(x, y + height*0.25f);
-            glVertex2f(x, y + height*0.25f);
-            glVertex2f(x, y + height*0.75f);
-            glVertex2f(x, y + height*0.75f);
-            glVertex2f(x + width*0.5f, y + height);
-            glVertex2f(x + width*0.5f, y + height);
-            glVertex2f(x + width, y + height*0.75f);
-            glEnd();
-            break;
-        case 'D':
-            glBegin(GL_LINES);
-            glVertex2f(x, y);
-            glVertex2f(x, y + height);
-            glVertex2f(x, y);
-            glVertex2f(x + width*0.5f, y);
-            glVertex2f(x + width*0.5f, y);
-            glVertex2f(x + width, y + height*0.25f);
-            glVertex2f(x + width, y + height*0.25f);
-            glVertex2f(x + width, y + height*0.75f);
-            glVertex2f(x + width, y + height*0.75f);
-            glVertex2f(x + width*0.5f, y + height);
-            glVertex2f(x + width*0.5f, y + height);
-            glVertex2f(x, y + height);
-            glEnd();
-            break;
-        case 'E':
-            glBegin(GL_LINES);
-            glVertex2f(x + width, y);
-            glVertex2f(x, y);
-            glVertex2f(x, y);
-            glVertex2f(x, y + height);
-            glVertex2f(x, y + height);
-            glVertex2f(x + width, y + height);
-            glVertex2f(x, y + height*0.5f);
-            glVertex2f(x + width*0.75f, y + height*0.5f);
-            glEnd();
-            break;
-        case 'G':
-            glBegin(GL_LINES);
-            glVertex2f(x + width, y + height*0.25f);
-            glVertex2f(x + width*0.5f, y);
-            glVertex2f(x + width*0.5f, y);
-            glVertex2f(x, y + height*0.25f);
-            glVertex2f(x, y + height*0.25f);
-            glVertex2f(x, y + height*0.75f);
-            glVertex2f(x, y + height*0.75f);
-            glVertex2f(x + width*0.5f, y + height);
-            glVertex2f(x + width*0.5f, y + height);
-            glVertex2f(x + width, y + height*0.75f);
-            glVertex2f(x + width, y + height*0.75f);
-            glVertex2f(x + width, y + height*0.5f);
-            glVertex2f(x + width, y + height*0.5f);
-            glVertex2f(x + width*0.5f, y + height*0.5f);
-            glEnd();
-            break;
-        case 'L':
-            glBegin(GL_LINES);
-            glVertex2f(x, y);
-            glVertex2f(x, y + height);
-            glVertex2f(x, y);
-            glVertex2f(x + width, y);
-            glEnd();
-            break;
-        case 'M':
-            glBegin(GL_LINES);
-            glVertex2f(x, y);
-            glVertex2f(x, y + height);
-            glVertex2f(x, y + height);
-            glVertex2f(x + width*0.5f, y + height*0.5f);
-            glVertex2f(x + width*0.5f, y + height*0.5f);
-            glVertex2f(x + width, y + height);
-            glVertex2f(x + width, y + height);
-            glVertex2f(x + width, y);
-            glEnd();
-            break;
-        case 'N':
-            glBegin(GL_LINES);
-            glVertex2f(x, y);
-            glVertex2f(x, y + height);
-            glVertex2f(x, y + height);
-            glVertex2f(x + width, y);
-            glVertex2f(x + width, y);
-            glVertex2f(x + width, y + height);
-            glEnd();
-            break;
-        case 'O':
-            glBegin(GL_LINES);
-            glVertex2f(x + width*0.5f, y);
-            glVertex2f(x, y + height*0.25f);
-            glVertex2f(x, y + height*0.25f);
-            glVertex2f(x, y + height*0.75f);
-            glVertex2f(x, y + height*0.75f);
-            glVertex2f(x + width*0.5f, y + height);
-            glVertex2f(x + width*0.5f, y + height);
-            glVertex2f(x + width, y + height*0.75f);
-            glVertex2f(x + width, y + height*0.75f);
-            glVertex2f(x + width, y + height*0.25f);
-            glVertex2f(x + width, y + height*0.25f);
-            glVertex2f(x + width*0.5f, y);
-            glEnd();
-            break;
-        case 'P':
-            glBegin(GL_LINES);
-            glVertex2f(x, y);
-            glVertex2f(x, y + height);
-            glVertex2f(x, y + height);
-            glVertex2f(x + width*0.75f, y + height);
-            glVertex2f(x + width*0.75f, y + height);
-            glVertex2f(x + width, y + height*0.75f);
-            glVertex2f(x + width, y + height*0.75f);
-            glVertex2f(x + width*0.75f, y + height*0.5f);
-            glVertex2f(x + width*0.75f, y + height*0.5f);
-            glVertex2f(x, y + height*0.5f);
-            glEnd();
-            break;
-        case 'R':
-            glBegin(GL_LINES);
-            glVertex2f(x, y);
-            glVertex2f(x, y + height);
-            glVertex2f(x, y + height);
-            glVertex2f(x + width*0.75f, y + height);
-            glVertex2f(x + width*0.75f, y + height);
-            glVertex2f(x + width, y + height*0.75f);
-            glVertex2f(x + width, y + height*0.75f);
-            glVertex2f(x + width*0.75f, y + height*0.5f);
-            glVertex2f(x + width*0.75f, y + height*0.5f);
-            glVertex2f(x, y + height*0.5f);
-            glVertex2f(x + width*0.5f, y + height*0.5f);
-            glVertex2f(x + width, y);
-            glEnd();
-            break;
-        case 'S':
-            glBegin(GL_LINES);
-            glVertex2f(x + width, y + height*0.75f);
-            glVertex2f(x + width*0.5f, y + height);
-            glVertex2f(x + width*0.5f, y + height);
-            glVertex2f(x, y + height*0.75f);
-            glVertex2f(x, y + height*0.75f);
-            glVertex2f(x, y + height*0.5f);
-            glVertex2f(x, y + height*0.5f);
-            glVertex2f(x + width, y + height*0.25f);
-            glVertex2f(x + width, y + height*0.25f);
-            glVertex2f(x + width, y);
-            glVertex2f(x + width, y);
-            glVertex2f(x, y);
-            glEnd();
-            break;
-        case 'T':
-            glBegin(GL_LINES);
-            glVertex2f(x, y + height);
-            glVertex2f(x + width, y + height);
-            glVertex2f(x + width*0.5f, y + height);
-            glVertex2f(x + width*0.5f, y);
-            glEnd();
-            break;
-        case 'V':
-            glBegin(GL_LINES);
-            glVertex2f(x, y + height);
-            glVertex2f(x + width*0.5f, y);
-            glVertex2f(x + width*0.5f, y);
-            glVertex2f(x + width, y + height);
-            glEnd();
-            break;
-        case 'W':
-            glBegin(GL_LINES);
-            glVertex2f(x, y + height);
-            glVertex2f(x + width*0.25f, y);
-            glVertex2f(x + width*0.25f, y);
-            glVertex2f(x + width*0.5f, y + height*0.5f);
-            glVertex2f(x + width*0.5f, y + height*0.5f);
-            glVertex2f(x + width*0.75f, y);
-            glVertex2f(x + width*0.75f, y);
-            glVertex2f(x + width, y + height);
-            glEnd();
-            break;
-        case 'X':
-            glBegin(GL_LINES);
-            glVertex2f(x, y);
-            glVertex2f(x + width, y + height);
-            glVertex2f(x, y + height);
-            glVertex2f(x + width, y);
-            glEnd();
-            break;
-        case 'Y':
-            glBegin(GL_LINES);
-            glVertex2f(x, y + height);
-            glVertex2f(x + width*0.5f, y + height*0.5f);
-            glVertex2f(x + width*0.5f, y + height*0.5f);
-            glVertex2f(x + width, y + height);
-            glVertex2f(x + width*0.5f, y + height*0.5f);
-            glVertex2f(x + width*0.5f, y);
-            glEnd();
-            break;
-        case 'Z':
-            glBegin(GL_LINES);
-            glVertex2f(x, y + height);
-            glVertex2f(x + width, y + height);
-            glVertex2f(x + width, y + height);
-            glVertex2f(x, y);
-            glVertex2f(x, y);
-            glVertex2f(x + width, y);
-            glEnd();
-            break;
-        case '0':
-            glBegin(GL_LINES);
-            glVertex2f(x + width*0.5f, y);
-            glVertex2f(x, y + height*0.25f);
-            glVertex2f(x, y + height*0.25f);
-            glVertex2f(x, y + height*0.75f);
-            glVertex2f(x, y + height*0.75f);
-            glVertex2f(x + width*0.5f, y + height);
-            glVertex2f(x + width*0.5f, y + height);
-            glVertex2f(x + width, y + height*0.75f);
-            glVertex2f(x + width, y + height*0.75f);
-            glVertex2f(x + width, y + height*0.25f);
-            glVertex2f(x + width, y + height*0.25f);
-            glVertex2f(x + width*0.5f, y);
-            glEnd();
-            break;
-        case '1':
-            glBegin(GL_LINES);
-            glVertex2f(x + width*0.5f, y);
-            glVertex2f(x + width*0.5f, y + height);
-            glVertex2f(x, y + height*0.75f);
-            glVertex2f(x + width*0.5f, y + height);
-            glEnd();
-            break;
-        case '.':
-            glBegin(GL_POINTS);
-            glVertex2f(x + width*0.5f, y);
-            glEnd();
-            break;
-        case ' ':
-            // Space - nothing to draw
-            break;
-        case '-':
-            glBegin(GL_LINES);
-            glVertex2f(x, y + height*0.5f);
-            glVertex2f(x + width, y + height*0.5f);
-            glEnd();
-            break;
-        default:
-            // For unhandled characters, draw a square
-            glBegin(GL_LINE_LOOP);
-            glVertex2f(x, y);
-            glVertex2f(x + width, y);
-            glVertex2f(x + width, y + height);
-            glVertex2f(x, y + height);
-            glEnd();
-            break;
+void SplashScreen::renderText(const std::string& text, float x, float y, float scale) {
+    if (m_textRenderer && m_textRenderer->isInitialized()) {
+        m_textRenderer->renderText(text, x, y, scale, glm::vec3(1.0f, 1.0f, 1.0f));
     }
-}
-
-bool SplashScreen::isMouseOverButton(float x, float y, float width, float height) const {
-    return (m_mouseX >= x && m_mouseX <= x + width &&
-            m_mouseY >= y && m_mouseY <= y + height);
-}
-
-void SplashScreen::refreshSaveList() {
-    m_saveGames.clear();
-    
-    // Get all files in the save directory
-    const std::string saveDir = "saves/";
-    
-    // Create the directory if it doesn't exist
-    std::filesystem::create_directories(saveDir);
-    
-    for (const auto& entry : std::filesystem::directory_iterator(saveDir)) {
-        if (entry.path().extension() == ".sav") {
-            SaveGame saveInfo;
-            saveInfo.filename = entry.path().string();
-            
-            // Extract name from filename (remove path and extension)
-            std::string filename = entry.path().filename().string();
-            saveInfo.name = filename.substr(0, filename.find_last_of('.'));
-            
-            // Get last modified time
-            try {
-                // Get last modified time using C functions for compatibility
-                auto lwt = std::filesystem::last_write_time(entry.path());
-                auto now = std::filesystem::file_time_type::clock::now();
-                if (lwt < now) {
-                    // Convert to a string representation
-                    std::time_t ctime = std::time(nullptr);
-                    std::tm* timeinfo = std::localtime(&ctime);
-                    
-                    char buffer[32];
-                    std::strftime(buffer, 32, "%Y-%m-%d %H:%M:%S", timeinfo);
-                    saveInfo.date = buffer;
-                } else {
-                    saveInfo.date = "Invalid date";
-                }
-            } catch (const std::exception& e) {
-                saveInfo.date = "Unknown date";
-            }
-            
-            m_saveGames.push_back(saveInfo);
-        }
-    }
-    
-    // Sort by most recent (alphabetically for now since we are not handling dates properly)
-    std::sort(m_saveGames.begin(), m_saveGames.end(), [](const SaveGame& a, const SaveGame& b) {
-        return a.name > b.name;
-    });
-    
-    // Reset selection
-    m_selectedSaveIndex = m_saveGames.empty() ? -1 : 0;
+    // No fallback rendering - if TextRenderer isn't available, nothing will be rendered
 }
 
 void SplashScreen::renderButton(const std::string& text, float x, float y, float width, float height, bool highlight) {
-    // Background - use bright contrasting colors
+    // Draw button background
+    glColor4f(0.2f, 0.2f, 0.2f, 0.8f); // Semi-transparent dark background
     if (highlight) {
-        glColor3f(1.0f, 0.5f, 0.0f); // Bright orange for highlighted buttons
-    } else {
-        glColor3f(0.0f, 0.7f, 0.0f); // Bright green for normal buttons
+        glColor4f(0.3f, 0.3f, 0.3f, 0.9f); // Slightly lighter when highlighted
     }
     renderBox(x, y, width, height);
     
-    // Border - very visible black border
-    glColor3f(0.0f, 0.0f, 0.0f); // Black border
-    glLineWidth(5.0f); // Extra thick border
+    // Draw button border
+    glColor4f(0.8f, 0.8f, 0.8f, 1.0f); // Light border
+    if (highlight) {
+        glColor4f(1.0f, 1.0f, 1.0f, 1.0f); // Brighter border when highlighted
+    }
+    glLineWidth(2.0f);
     glBegin(GL_LINE_LOOP);
     glVertex2f(x, y);
     glVertex2f(x + width, y);
@@ -849,22 +562,16 @@ void SplashScreen::renderButton(const std::string& text, float x, float y, float
     glVertex2f(x, y + height);
     glEnd();
     
-    // Text - bold black text on the colored background
-    glColor3f(0.0f, 0.0f, 0.0f); // Black text
-    
-    // Make text large and centered
-    float textScale = 5.0f; // Larger text
-    renderTextAtCenter(text, x + width/2, y + height/2, textScale);
-    
-    // Add a debug outline to verify the text rendering area
-    glColor3f(1.0f, 1.0f, 1.0f); // White outline
-    glLineWidth(1.0f);
-    glBegin(GL_LINE_LOOP);
-    glVertex2f(x + width/2 - text.length()*textScale*2, y + height/2 - textScale*5);
-    glVertex2f(x + width/2 + text.length()*textScale*2, y + height/2 - textScale*5);
-    glVertex2f(x + width/2 + text.length()*textScale*2, y + height/2 + textScale*5);
-    glVertex2f(x + width/2 - text.length()*textScale*2, y + height/2 + textScale*5);
-    glEnd();
+    // Render button text - reduce scale from 1.5f to 1.0f
+    if (m_textRenderer && m_textRenderer->isInitialized()) {
+        float textScale = 1.0f;
+        float textWidth = m_textRenderer->getTextWidth(text, textScale);
+        float textX = x + (width - textWidth) / 2.0f;
+        float textY = y + (height + textScale * 20.0f) / 2.0f; // Center text vertically
+        
+        glm::vec3 textColor = highlight ? glm::vec3(1.0f, 1.0f, 1.0f) : glm::vec3(0.8f, 0.8f, 0.8f);
+        m_textRenderer->renderText(text, textX, textY, textScale, textColor);
+    }
 }
 
 void SplashScreen::renderBox(float x, float y, float width, float height) {
@@ -874,17 +581,6 @@ void SplashScreen::renderBox(float x, float y, float width, float height) {
     glVertex2f(x + width, y + height);
     glVertex2f(x, y + height);
     glEnd();
-}
-
-void SplashScreen::renderText(const std::string& text, float x, float y, float scale) {
-    float letterSpacing = scale * 3.0f;
-    float letterWidth = scale * 5.0f;
-    float letterHeight = scale * 10.0f;
-    
-    for (size_t i = 0; i < text.length(); i++) {
-        float charX = x + i * (letterWidth + letterSpacing);
-        renderCharacter(text[i], charX, y, letterWidth, letterHeight, scale);
-    }
 }
 
 void SplashScreen::handleInput(int key, int action) {
@@ -1169,4 +865,60 @@ void SplashScreen::handleMenuNavigation(int key) {
             }
             break;
     }
+}
+
+bool SplashScreen::isMouseOverButton(float x, float y, float width, float height) const {
+    return (m_mouseX >= x && m_mouseX <= x + width &&
+            m_mouseY >= y && m_mouseY <= y + height);
+}
+
+void SplashScreen::refreshSaveList() {
+    m_saveGames.clear();
+    
+    // Get all files in the save directory
+    const std::string saveDir = "saves/";
+    
+    // Create the directory if it doesn't exist
+    std::filesystem::create_directories(saveDir);
+    
+    for (const auto& entry : std::filesystem::directory_iterator(saveDir)) {
+        if (entry.path().extension() == ".sav") {
+            SaveGame saveInfo;
+            saveInfo.filename = entry.path().string();
+            
+            // Extract name from filename (remove path and extension)
+            std::string filename = entry.path().filename().string();
+            saveInfo.name = filename.substr(0, filename.find_last_of('.'));
+            
+            // Get last modified time
+            try {
+                // Get last modified time using C functions for compatibility
+                auto lwt = std::filesystem::last_write_time(entry.path());
+                auto now = std::filesystem::file_time_type::clock::now();
+                if (lwt < now) {
+                    // Convert to a string representation
+                    std::time_t ctime = std::time(nullptr);
+                    std::tm* timeinfo = std::localtime(&ctime);
+                    
+                    char buffer[32];
+                    std::strftime(buffer, 32, "%Y-%m-%d %H:%M:%S", timeinfo);
+                    saveInfo.date = buffer;
+                } else {
+                    saveInfo.date = "Invalid date";
+                }
+            } catch (const std::exception& e) {
+                saveInfo.date = "Unknown date";
+            }
+            
+            m_saveGames.push_back(saveInfo);
+        }
+    }
+    
+    // Sort by most recent (alphabetically for now since we are not handling dates properly)
+    std::sort(m_saveGames.begin(), m_saveGames.end(), [](const SaveGame& a, const SaveGame& b) {
+        return a.name > b.name;
+    });
+    
+    // Reset selection
+    m_selectedSaveIndex = m_saveGames.empty() ? -1 : 0;
 } 

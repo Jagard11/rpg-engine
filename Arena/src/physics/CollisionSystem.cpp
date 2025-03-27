@@ -606,84 +606,94 @@ bool CollisionSystem::collidesWithBlocksGreedy(const glm::vec3& pos, const glm::
         if (verboseDebug) {
             std::cout << "Player below world bottom, collision detected" << std::endl;
         }
+        
+        // Force the player to be above y=0
+        const_cast<glm::vec3&>(pos).y = 0.1f;
         return true;
     }
     
     // Track the highest ground position for positioning the player properly
     float highestGroundY = -1.0f;
     
-    // Determine which chunks intersect with the player's collision box
+    // Calculate min/max chunk coordinates for checking collisions
     int minChunkX = static_cast<int>(std::floor(min.x / world->CHUNK_SIZE));
     int maxChunkX = static_cast<int>(std::floor(max.x / world->CHUNK_SIZE));
+    int minChunkY = static_cast<int>(std::floor(min.y / world->CHUNK_HEIGHT));
+    int maxChunkY = static_cast<int>(std::floor(max.y / world->CHUNK_HEIGHT));
     int minChunkZ = static_cast<int>(std::floor(min.z / world->CHUNK_SIZE));
     int maxChunkZ = static_cast<int>(std::floor(max.z / world->CHUNK_SIZE));
     
     if (verboseDebug) {
-        std::cout << "Checking chunks from (" << minChunkX << ", " << minChunkZ << ") to ("
-                  << maxChunkX << ", " << maxChunkZ << ")" << std::endl;
+        std::cout << "Checking chunks from (" << minChunkX << ", " << minChunkY << ", " << minChunkZ << ") to ("
+                  << maxChunkX << ", " << maxChunkY << ", " << maxChunkZ << ")" << std::endl;
     }
     
     // Count collision volumes checked and collisions found for debugging
     int volumesChecked = 0;
     int collisionsFound = 0;
     
-    // Check collision with each chunk's collision mesh
+    // OPTIMIZATION: Cache chunk access for better performance
+    std::vector<const Chunk*> chunksToCheck;
+    chunksToCheck.reserve((maxChunkX - minChunkX + 1) * (maxChunkY - minChunkY + 1) * (maxChunkZ - minChunkZ + 1));
+    
+    // First gather all chunks that need to be checked
+    const std::unordered_map<glm::ivec3, std::unique_ptr<Chunk>, ChunkPosHash>& chunks = world->getChunks();
     for (int chunkX = minChunkX; chunkX <= maxChunkX; chunkX++) {
         for (int chunkZ = minChunkZ; chunkZ <= maxChunkZ; chunkZ++) {
-            glm::ivec2 chunkPos(chunkX, chunkZ);
-            
-            // Get the chunk at this position
-            const std::unordered_map<glm::ivec2, std::unique_ptr<Chunk>, ChunkPosHash>& chunks = world->getChunks();
-            auto it = chunks.find(chunkPos);
-            
-            if (it == chunks.end()) {
-                // Chunk not loaded, skip
-                continue;
-            }
-            
-            // Get collision mesh for this chunk
-            const Chunk* chunk = it->second.get();
-            std::vector<AABB> collisionMesh = chunk->buildColliderMesh();
-            
-            if (verboseDebug) {
-                std::cout << "Chunk (" << chunkX << ", " << chunkZ << ") has " 
-                          << collisionMesh.size() << " collision volumes" << std::endl;
-            }
-            
-            // Test collision against each volume in the mesh
-            volumesChecked += collisionMesh.size();
-            
-            for (const AABB& volume : collisionMesh) {
-                // Special case for ground detection - improved to be more precise
-                if (velocity.y <= 0 && min.y <= volume.max.y && pos.y >= volume.min.y && pos.y <= volume.max.y + 0.2f) {
-                    // Check if we're over this volume - use a slightly larger area for stability
-                    if (min.x - 0.1f <= volume.max.x && max.x + 0.1f >= volume.min.x && 
-                        min.z - 0.1f <= volume.max.z && max.z + 0.1f >= volume.min.z) {
-                        // This is a potential ground - track the highest one
-                        if (volume.max.y > highestGroundY) {
-                            highestGroundY = volume.max.y;
-                        }
-                        
-                        if (verboseDebug) {
-                            std::cout << "Ground detection: Volume at (" << volume.min.x << ", " << volume.min.y << ", " << volume.min.z 
-                                    << ") to (" << volume.max.x << ", " << volume.max.y << ", " << volume.max.z << ")" << std::endl;
-                        }
-                    }
+            for (int chunkY = minChunkY; chunkY <= maxChunkY; chunkY++) {
+                glm::ivec3 chunkPos(chunkX, chunkY, chunkZ);
+                auto it = chunks.find(chunkPos);
+                if (it != chunks.end()) {
+                    chunksToCheck.push_back(it->second.get());
                 }
-                
-                // Check for collision with this volume
-                if (intersectsWithAABB(min, max, volume.min, volume.max)) {
-                    collisionsFound++;
+            }
+        }
+    }
+    
+    // Check collision with each chunk's collision mesh
+    for (const Chunk* chunk : chunksToCheck) {
+        // Get collision mesh for this chunk
+        std::vector<AABB> collisionMesh = chunk->buildColliderMesh();
+        
+        if (verboseDebug && !collisionMesh.empty()) {
+            glm::ivec3 chunkPos = chunk->getPosition();
+            std::cout << "Chunk (" << chunkPos.x << ", " << chunkPos.y << ", " << chunkPos.z << ") has " 
+                      << collisionMesh.size() << " collision volumes" << std::endl;
+        }
+        
+        // Test collision against each volume in the mesh
+        volumesChecked += collisionMesh.size();
+        
+        for (const AABB& volume : collisionMesh) {
+            // Special case for ground detection - improved to be more precise
+            if (velocity.y <= 0 && min.y <= volume.max.y && pos.y >= volume.min.y && pos.y <= volume.max.y + 0.2f) {
+                // Check if we're over this volume - use a slightly larger area for stability
+                if (min.x - 0.1f <= volume.max.x && max.x + 0.1f >= volume.min.x && 
+                    min.z - 0.1f <= volume.max.z && max.z + 0.1f >= volume.min.z) {
+                    // This is a potential ground - track the highest one
+                    if (volume.max.y > highestGroundY) {
+                        highestGroundY = volume.max.y;
+                    }
                     
                     if (verboseDebug) {
-                        std::cout << "Collision with volume at (" << volume.min.x << ", " << volume.min.y << ", " << volume.min.z 
+                        std::cout << "Ground detection: Volume at (" << volume.min.x << ", " << volume.min.y << ", " << volume.min.z 
                                 << ") to (" << volume.max.x << ", " << volume.max.y << ", " << volume.max.z << ")" << std::endl;
                     }
-                    
-                    // If we found a collision, we can stop here unless we need to check ground
-                    if (velocity.y > 0 || highestGroundY == -1.0f) {
-                        return true;
-                    }
+                }
+            }
+            
+            // Check for collision with this volume
+            if (intersectsWithAABB(min, max, volume.min, volume.max)) {
+                collisionsFound++;
+                
+                if (verboseDebug) {
+                    std::cout << "Collision with volume at (" << volume.min.x << ", " << volume.min.y << ", " << volume.min.z 
+                            << ") to (" << volume.max.x << ", " << volume.max.y << ", " << volume.max.z << ")" << std::endl;
+                }
+                
+                // If we found a collision, we can stop here unless we need to check ground
+                if (velocity.y > 0 || highestGroundY == -1.0f) {
+                    return true;
                 }
             }
         }
@@ -700,6 +710,20 @@ bool CollisionSystem::collidesWithBlocksGreedy(const glm::vec3& pos, const glm::
         // Place the player's feet exactly on top of the highest ground with a significant offset
         // This prevents sinking through the surface due to floating point precision issues
         mutablePos.y = highestGroundY + 0.01f; // Increased from 0.001f to provide more clearance
+    }
+    
+    // FAILSAFE: If no chunks were checked, assume we're falling through the world
+    if (chunksToCheck.empty() && velocity.y < 0 && pos.y < 100) {
+        // Prevent falling through the world when chunks haven't loaded yet
+        glm::vec3& mutablePos = const_cast<glm::vec3&>(pos);
+        // Keep player at current height until chunks load
+        mutablePos.y = std::max(mutablePos.y, 0.1f); 
+        
+        if (verboseDebug) {
+            std::cout << "FAILSAFE: No chunks loaded, preventing fall-through at y=" << mutablePos.y << std::endl;
+        }
+        
+        return true;
     }
     
     if (verboseDebug) {

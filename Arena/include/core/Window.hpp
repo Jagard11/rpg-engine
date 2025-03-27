@@ -7,6 +7,9 @@
 
 // Forward declaration
 class SplashScreen;
+namespace Debug {
+    class DebugMenu;
+}
 
 class Window {
 public:
@@ -33,6 +36,9 @@ public:
     
     // Set the active splash screen for character input
     void setActiveSplashScreen(SplashScreen* splashScreen);
+    
+    // Set the active debug menu for character input
+    void setActiveDebugMenu(Debug::DebugMenu* debugMenu);
 
 private:
     GLFWwindow* m_window;
@@ -42,4 +48,8 @@ private:
     
     // Key state tracking
     std::unordered_map<int, bool> m_prevKeyState;
+    
+    // UI references for forwarding character events
+    SplashScreen* m_activeSplashScreen;
+    Debug::DebugMenu* m_activeDebugMenu;
 }; 

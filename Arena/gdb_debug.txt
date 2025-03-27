@@ -1,0 +1,30 @@
+set pagination off
+set logging file gdb_output.log
+set logging on
+set print pretty on
+set print elements 0
+set confirm off
+
+# Break on errors
+catch throw
+
+# Break on OpenGL errors
+break glGetError
+
+# Break on specific functions
+break Debug::DebugMenu::toggleVisibility
+break Debug::DebugMenu::render
+break Debug::TextRenderer::renderText
+
+# Print backtraces on segfault
+handle SIGSEGV nostop print pass
+break handle_segfault
+
+# Run the game
+run
+
+# Just in case it doesn't crash immediately
+continue 20
+
+# Quit if we get here without crashing
+quit 

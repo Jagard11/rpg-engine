@@ -14,6 +14,7 @@ TextureManager::~TextureManager() {
 bool TextureManager::initialize() {
     // Load textures
     const std::string textureFiles[] = {
+        "resources/debug.png",  // Debug texture with colored faces
         "resources/dirt.png",
         "resources/grass.png",
         "resources/cobblestone.png"
@@ -36,9 +37,9 @@ bool TextureManager::loadTexture(const std::string& filename, GLuint& textureID)
     glGenTextures(1, &textureID);
     glBindTexture(GL_TEXTURE_2D, textureID);
 
-    // Set texture parameters
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    // Set texture parameters - change to CLAMP_TO_EDGE to prevent texture repeating
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
@@ -51,6 +52,9 @@ bool TextureManager::loadTexture(const std::string& filename, GLuint& textureID)
         std::cerr << "Failed to load texture: " << filename << std::endl;
         return false;
     }
+
+    std::cout << "Loaded texture: " << filename << " (" << width << "x" << height 
+              << ", " << channels << " channels)" << std::endl;
 
     // Upload texture data
     GLenum format = channels == 4 ? GL_RGBA : GL_RGB;
