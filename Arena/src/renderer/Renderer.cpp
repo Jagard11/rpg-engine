@@ -22,14 +22,14 @@ const char* vertexShaderSource = R"(
         gl_Position = viewProjection * model * vec4(aPos, 1.0);
         TexCoord = aTexCoord;
         
-        // Calculate normal based on face orientation - always pointing outward
+        // Calculate normal based on face orientation - inverted to point outward correctly
         vec3 faceNormals[6] = vec3[6](
-            vec3(0.0, 0.0, 1.0),   // Front (+Z)
-            vec3(0.0, 0.0, -1.0),  // Back (-Z)
-            vec3(-1.0, 0.0, 0.0),  // Left (-X)
-            vec3(1.0, 0.0, 0.0),   // Right (+X)
-            vec3(0.0, 1.0, 0.0),   // Top (+Y)
-            vec3(0.0, -1.0, 0.0)   // Bottom (-Y)
+            vec3(0.0, 0.0, -1.0),   // Front (+Z) - inverted
+            vec3(0.0, 0.0, 1.0),    // Back (-Z) - inverted
+            vec3(1.0, 0.0, 0.0),    // Left (-X) - inverted
+            vec3(-1.0, 0.0, 0.0),   // Right (+X) - inverted
+            vec3(0.0, -1.0, 0.0),   // Top (+Y) - inverted
+            vec3(0.0, 1.0, 0.0)     // Bottom (-Y) - inverted
         );
         
         // Determine face from texture coordinates
@@ -113,7 +113,10 @@ bool Renderer::initialize() {
     m_textureLoc = glGetUniformLocation(m_shaderProgram, "textureSampler");
     
     // Configure OpenGL settings for rendering
-    // Note: Backface culling is disabled as requested
+    // Enable backface culling by default
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glFrontFace(GL_CW);  // Clockwise for front faces - consistent with our winding order
     
     // Enable depth testing for proper 3D rendering
     glEnable(GL_DEPTH_TEST);
@@ -427,7 +430,7 @@ void Renderer::renderWorld(World* world, Player* player) {
         // Enable backface culling with correct winding order
         glEnable(GL_CULL_FACE);
         glCullFace(GL_BACK);
-        glFrontFace(GL_CW); // Clockwise for front faces to match our index order
+        glFrontFace(GL_CW); // Clockwise for front faces - consistent with our winding order
     } else {
         // Disable backface culling if requested
         glDisable(GL_CULL_FACE);

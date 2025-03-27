@@ -45,9 +45,6 @@ int Chunk::getBlock(int x, int y, int z) const {
 void Chunk::generateMesh(bool disableGreedyMeshing) {
     m_meshVertices.clear();
     m_meshIndices.clear();
-
-    // Create a 3D visited array to track merged faces
-    bool visited[CHUNK_SIZE][CHUNK_HEIGHT][CHUNK_SIZE][6] = {false};
     
     // Define the six face directions
     const glm::ivec3 directions[6] = {
@@ -59,13 +56,13 @@ void Chunk::generateMesh(bool disableGreedyMeshing) {
         glm::ivec3(0, -1, 0)   // Bottom (-Y)
     };
     
-    // First scan the entire chunk to identify faces that need rendering
-    // This helps prevent z-fighting at chunk boundaries
-    bool needsRender[CHUNK_SIZE][CHUNK_HEIGHT][CHUNK_SIZE][6] = {false};
-    int faceCount = 0;
-    
     std::cout << "Generating mesh for chunk (" << m_x << ", " << m_y << ", " << m_z 
               << ") with greedy meshing " << (disableGreedyMeshing ? "DISABLED" : "ENABLED") << std::endl;
+    
+    // STEP 1: FACE CULLING - Determine which faces need to be rendered
+    // This is done BEFORE any greedy meshing - we determine visibility first
+    bool needsRender[CHUNK_SIZE][CHUNK_HEIGHT][CHUNK_SIZE][6] = {false};
+    int faceCount = 0;
     
     for (int x = 0; x < CHUNK_SIZE; x++) {
         for (int y = 0; y < CHUNK_HEIGHT; y++) {
@@ -73,28 +70,43 @@ void Chunk::generateMesh(bool disableGreedyMeshing) {
                 if (getBlock(x, y, z) == 0) continue; // Skip air blocks
                 
                 for (int faceIndex = 0; faceIndex < 6; faceIndex++) {
-                    // When greedy meshing is disabled, we need to render all faces of all blocks
-                    // to ensure complete rendering of the interior voxels
-                    if (disableGreedyMeshing) {
-                        // For non-greedy meshing, render all faces except those adjacent to solid blocks
-                        // that are completely within the same chunk (allows cross-chunk visibility)
-                        int checkX = x + static_cast<int>(directions[faceIndex].x);
-                        int checkY = y + static_cast<int>(directions[faceIndex].y);
-                        int checkZ = z + static_cast<int>(directions[faceIndex].z);
-                        
-                        // If we're at a chunk boundary, always render the face
-                        bool isChunkBoundary = checkX < 0 || checkX >= CHUNK_SIZE || 
-                                              checkY < 0 || checkY >= CHUNK_HEIGHT || 
-                                              checkZ < 0 || checkZ >= CHUNK_SIZE;
-                        
-                        if (isChunkBoundary || m_blocks[checkX][checkY][checkZ] == 0) {
+                    // Get the adjacent block position
+                    int checkX = x + static_cast<int>(directions[faceIndex].x);
+                    int checkY = y + static_cast<int>(directions[faceIndex].y);
+                    int checkZ = z + static_cast<int>(directions[faceIndex].z);
+                    
+                    // Determine if face is at a chunk boundary
+                    bool isChunkBoundary = checkX < 0 || checkX >= CHUNK_SIZE || 
+                                         checkY < 0 || checkY >= CHUNK_HEIGHT || 
+                                         checkZ < 0 || checkZ >= CHUNK_SIZE;
+                    
+                    // Only render faces adjacent to air or at chunk boundaries
+                    // This is the key change - we ONLY render a face if the adjacent block is air
+                    if (isChunkBoundary) {
+                        // For chunk boundaries, check neighboring chunks
+                        if (m_world) {
+                            // Convert to world coordinates
+                            int worldX = m_x * CHUNK_SIZE + checkX;
+                            int worldY = m_y * CHUNK_HEIGHT + checkY;
+                            int worldZ = m_z * CHUNK_SIZE + checkZ;
+                            
+                            // Query the world for the block at this position
+                            int adjacentBlock = m_world->getBlock(glm::ivec3(worldX, worldY, worldZ));
+                            if (adjacentBlock == 0) { // Only render if adjacent to air
+                                needsRender[x][y][z][faceIndex] = true;
+                                faceCount++;
+                            }
+                        } else {
+                            // No world reference, treat as air
                             needsRender[x][y][z][faceIndex] = true;
                             faceCount++;
                         }
-                    } else if (shouldRenderFace(x, y, z, directions[faceIndex])) {
-                        // For greedy meshing, use the standard visibility check
-                        needsRender[x][y][z][faceIndex] = true;
-                        faceCount++;
+                    } else {
+                        // Within chunk, check directly
+                        if (m_blocks[checkX][checkY][checkZ] == 0) { // Only render if adjacent to air
+                            needsRender[x][y][z][faceIndex] = true;
+                            faceCount++;
+                        }
                     }
                 }
             }
@@ -104,10 +116,6 @@ void Chunk::generateMesh(bool disableGreedyMeshing) {
     std::cout << "Found " << faceCount << " faces to render in chunk (" << m_x << ", " << m_y << ", " << m_z << ")" << std::endl;
     
     // Vertex data for each face type (scaled to unit size)
-    // For a 48x32 texture atlas with 6 tiles (16x16 each)
-    // Layout:
-    // White (0,0)     | Green (0.333,0)  | Yellow (0.667,0)
-    // Black (0,0.5)   | Red (0.333,0.5)  | Purple (0.667,0.5)
     std::vector<std::vector<float>> faceVertices = {
         // Front face (+Z) - Purple
         {
@@ -158,8 +166,9 @@ void Chunk::generateMesh(bool disableGreedyMeshing) {
         }
     };
 
-    // If greedy meshing is disabled, use simple per-block face generation
+    // STEP 2: MESH GENERATION - Now that we know all visible faces, apply appropriate meshing strategy
     if (disableGreedyMeshing) {
+        // Simple per-block face generation - no merging, just add each visible face
         for (int x = 0; x < CHUNK_SIZE; x++) {
             for (int y = 0; y < CHUNK_HEIGHT; y++) {
                 for (int z = 0; z < CHUNK_SIZE; z++) {
@@ -175,7 +184,11 @@ void Chunk::generateMesh(bool disableGreedyMeshing) {
             }
         }
     } else {
-        // Apply greedy meshing algorithm for each face direction
+        // Apply greedy meshing algorithm to the PRE-CULLED faces
+        // Create a 3D visited array to track merged faces
+        bool visited[CHUNK_SIZE][CHUNK_HEIGHT][CHUNK_SIZE][6] = {false};
+        
+        // Process each face direction separately
         for (int faceIndex = 0; faceIndex < 6; faceIndex++) {
             const glm::ivec3& normal = directions[faceIndex];
             
@@ -194,6 +207,18 @@ void Chunk::generateMesh(bool disableGreedyMeshing) {
             
             // For each slice along the normal direction
             for (int wPos = 0; wPos < CHUNK_SIZE; wPos++) {
+                // Skip slices at the edge of chunks for the appropriate direction
+                // unless we're exactly on the boundary
+                if ((normal.x < 0 && wPos == 0) ||
+                    (normal.x > 0 && wPos == CHUNK_SIZE - 1) ||
+                    (normal.y < 0 && wPos == 0) ||
+                    (normal.y > 0 && wPos == CHUNK_HEIGHT - 1) ||
+                    (normal.z < 0 && wPos == 0) ||
+                    (normal.z > 0 && wPos == CHUNK_SIZE - 1)) {
+                    // We're at a chunk boundary in the normal direction, so we handle this specially
+                    // Continue processing this slice, but be aware it's at a boundary
+                }
+                
                 // Initialize a mask for this slice
                 bool mask[CHUNK_SIZE][CHUNK_HEIGHT] = {false};
                 int blockTypes[CHUNK_SIZE][CHUNK_HEIGHT] = {0};
@@ -219,11 +244,11 @@ void Chunk::generateMesh(bool disableGreedyMeshing) {
                 }
                 
                 // Now apply greedy meshing to the mask
-                bool visited[CHUNK_SIZE][CHUNK_HEIGHT] = {false};
+                bool sliceVisited[CHUNK_SIZE][CHUNK_HEIGHT] = {false};
                 
                 for (int uPos = 0; uPos < CHUNK_SIZE; uPos++) {
                     for (int vPos = 0; vPos < CHUNK_HEIGHT; vPos++) {
-                        if (!mask[uPos][vPos] || visited[uPos][vPos]) {
+                        if (!mask[uPos][vPos] || sliceVisited[uPos][vPos]) {
                             continue;
                         }
                         
@@ -235,7 +260,7 @@ void Chunk::generateMesh(bool disableGreedyMeshing) {
                         // Expand horizontally (in U direction) as far as possible
                         while (uPos + width < CHUNK_SIZE && 
                               mask[uPos + width][vPos] && 
-                              !visited[uPos + width][vPos] &&
+                              !sliceVisited[uPos + width][vPos] &&
                               blockTypes[uPos + width][vPos] == blockType) {
                             width++;
                         }
@@ -246,7 +271,7 @@ void Chunk::generateMesh(bool disableGreedyMeshing) {
                             // Check if the entire row can be expanded
                             for (int u = 0; u < width; u++) {
                                 if (!mask[uPos + u][vPos + height] || 
-                                    visited[uPos + u][vPos + height] ||
+                                    sliceVisited[uPos + u][vPos + height] ||
                                     blockTypes[uPos + u][vPos + height] != blockType) {
                                     canExpandVertical = false;
                                     break;
@@ -261,7 +286,13 @@ void Chunk::generateMesh(bool disableGreedyMeshing) {
                         // Mark all merged faces as visited
                         for (int v = 0; v < height; v++) {
                             for (int u = 0; u < width; u++) {
-                                visited[uPos + u][vPos + v] = true;
+                                sliceVisited[uPos + u][vPos + v] = true;
+                                
+                                // Convert back to xyz to mark in the main visited array
+                                int x = (u == 0) ? (uPos + u) : ((w == 0) ? wPos : (vPos + v));
+                                int y = (u == 1) ? (uPos + u) : ((w == 1) ? wPos : (vPos + v));
+                                int z = (u == 2) ? (uPos + u) : ((w == 2) ? wPos : (vPos + v));
+                                visited[x][y][z][faceIndex] = true;
                             }
                         }
                         
@@ -303,7 +334,7 @@ void Chunk::addGreedyFace(const std::vector<float>& faceTemplate, const glm::ive
     glm::vec3 pos;
     pos[wAxis] = wPos;
     
-    // Add a very slight offset in the normal direction to prevent z-fighting at chunk boundaries
+    // Add a slight offset in the normal direction to prevent z-fighting at chunk boundaries
     // This is especially important at the edges of chunks
     bool isEdgeOfChunk = (wPos == 0 || wPos == CHUNK_SIZE - 1);
     float normalOffset = 0.0f;
@@ -332,7 +363,7 @@ void Chunk::addGreedyFace(const std::vector<float>& faceTemplate, const glm::ive
         glm::vec3 vertPos;
         vertPos[uAxis] = uStart + scaledU;
         vertPos[vAxis] = vStart + scaledV;
-        vertPos[wAxis] = pos[wAxis];
+        vertPos[wAxis] = pos[wAxis] + (normal[wAxis] > 0 ? 1.0f : 0.0f); // Position face properly based on normal
         
         // Apply the normal offset to prevent z-fighting
         if (isEdgeOfChunk) {
@@ -369,48 +400,6 @@ void Chunk::addGreedyFace(const std::vector<float>& faceTemplate, const glm::ive
     m_meshIndices.push_back(indexOffset + 2); // Top-right
 }
 
-bool Chunk::shouldRenderFace(int x, int y, int z, const glm::vec3& normal) const {
-    // Only check if the block itself is valid and not air
-    if (x < 0 || x >= CHUNK_SIZE || y < 0 || y >= CHUNK_HEIGHT || z < 0 || z >= CHUNK_SIZE || 
-        m_blocks[x][y][z] == 0) {
-        return false;
-    }
-    
-    // With backface culling disabled, we should still only render faces that are
-    // adjacent to air or transparent blocks to avoid internal faces.
-    
-    // Get the adjacent block position
-    int checkX = x + static_cast<int>(normal.x);
-    int checkY = y + static_cast<int>(normal.y);
-    int checkZ = z + static_cast<int>(normal.z);
-    
-    // If the adjacent position is within this chunk, check directly
-    if (checkX >= 0 && checkX < CHUNK_SIZE && 
-        checkY >= 0 && checkY < CHUNK_HEIGHT && 
-        checkZ >= 0 && checkZ < CHUNK_SIZE) {
-        // Only render face if adjacent block is air
-        return m_blocks[checkX][checkY][checkZ] == 0;
-    }
-    
-    // If we have a world reference and the block is outside this chunk,
-    // convert to world coordinates and query the world
-    if (m_world) {
-        // Convert to world coordinates
-        int worldX = m_x * CHUNK_SIZE + checkX;
-        int worldY = m_y * CHUNK_HEIGHT + checkY;
-        int worldZ = m_z * CHUNK_SIZE + checkZ;
-        
-        // Query the world for the block at this position
-        int adjacentBlock = m_world->getBlock(glm::ivec3(worldX, worldY, worldZ));
-        
-        // Only render face if adjacent block is air
-        return adjacentBlock == 0;
-    }
-    
-    // Always render edges of the world where there's no neighboring chunk
-    return true;
-}
-
 int Chunk::getAdjacentBlock(int x, int y, int z, const glm::vec3& normal) const {
     // Calculate adjacent block position
     int checkX = x + static_cast<int>(normal.x);
@@ -444,12 +433,21 @@ int Chunk::getAdjacentBlock(int x, int y, int z, const glm::vec3& normal) const 
 void Chunk::addFace(const std::vector<float>& vertices, const glm::vec3& position, const glm::vec3& normal) {
     unsigned int indexOffset = m_meshVertices.size() / 5; // 5 floats per vertex (3 position + 2 UV)
 
+    // Create a modified position that accounts for face orientation
+    glm::vec3 modPosition = position;
+    
+    // For positive facing normals, we need to offset the face by 1.0
+    // This ensures consistency with how addGreedyFace positions vertices
+    if (normal.x > 0) modPosition.x += 1.0f;
+    if (normal.y > 0) modPosition.y += 1.0f;
+    if (normal.z > 0) modPosition.z += 1.0f;
+
     // Add vertices
     for (size_t i = 0; i < vertices.size(); i += 5) {
         // Position
-        m_meshVertices.push_back(vertices[i] + position.x);
-        m_meshVertices.push_back(vertices[i + 1] + position.y);
-        m_meshVertices.push_back(vertices[i + 2] + position.z);
+        m_meshVertices.push_back(vertices[i] + modPosition.x);
+        m_meshVertices.push_back(vertices[i + 1] + modPosition.y);
+        m_meshVertices.push_back(vertices[i + 2] + modPosition.z);
         // UV coordinates
         m_meshVertices.push_back(vertices[i + 3]);
         m_meshVertices.push_back(vertices[i + 4]);

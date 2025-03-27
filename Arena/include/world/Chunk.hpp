@@ -53,7 +53,6 @@ public:
     void setWorld(World* world) { m_world = world; }
 
 private:
-    bool shouldRenderFace(int x, int y, int z, const glm::vec3& normal) const;
     int getAdjacentBlock(int x, int y, int z, const glm::vec3& normal) const;
     void addFace(const std::vector<float>& vertices, const glm::vec3& position, const glm::vec3& normal);
     // Helper method for greedy meshing

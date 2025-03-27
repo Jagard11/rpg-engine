@@ -7,6 +7,7 @@
 World::World(uint64_t seed)
     : m_seed(seed)
     , m_viewDistance(8)
+    , m_disableGreedyMeshing(false)  // Enable greedy meshing by default
 {
     m_worldGenerator = std::make_unique<WorldGenerator>(seed);
     std::cout << "World created with seed: " << seed << std::endl;
