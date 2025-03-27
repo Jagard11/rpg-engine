@@ -31,6 +31,12 @@ public:
     // Buffer management
     bool isBuffersInitialized() const { return m_buffersInitialized; }
     void setupBuffers();
+    
+    // Debug toggle methods
+    void setDisableGreedyMeshing(bool disable) { m_disableGreedyMeshing = disable; }
+    void setDisableBackfaceCulling(bool disable) { m_disableBackfaceCulling = disable; }
+    bool isGreedyMeshingDisabled() const { return m_disableGreedyMeshing; }
+    bool isBackfaceCullingDisabled() const { return m_disableBackfaceCulling; }
 
 private:
     void setupShaders();
@@ -57,4 +63,8 @@ private:
     
     // Buffer state tracking
     bool m_buffersInitialized;
+    
+    // Debug toggles
+    bool m_disableGreedyMeshing = false;
+    bool m_disableBackfaceCulling = false;
 }; 

@@ -28,7 +28,10 @@ public:
 
     void setBlock(int x, int y, int z, int blockType);
     int getBlock(int x, int y, int z) const;
-    void generateMesh();
+    
+    // Add parameter to allow disabling greedy meshing
+    void generateMesh(bool disableGreedyMeshing = false);
+    
     const std::vector<float>& getMeshVertices() const { return m_meshVertices; }
     const std::vector<unsigned int>& getMeshIndices() const { return m_meshIndices; }
     bool isDirty() const { return m_isDirty; }
@@ -57,6 +60,9 @@ private:
     void addGreedyFace(const std::vector<float>& faceTemplate, const glm::ivec3& normal, 
                        int uStart, int vStart, int wPos, int width, int height, 
                        int uAxis, int vAxis, int wAxis);
+
+    // Helper function to calculate face normal from vertices
+    glm::vec3 calculateFaceNormal(const std::vector<float>& vertices, int startIndex);
 
     std::array<std::array<std::array<int, CHUNK_SIZE>, CHUNK_HEIGHT>, CHUNK_SIZE> m_blocks;
     std::vector<float> m_meshVertices;

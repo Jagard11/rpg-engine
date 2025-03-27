@@ -88,10 +88,7 @@ bool Game::initialize() {
         });
 
         // Initialize debug menu
-        m_debugMenu = std::make_unique<Debug::DebugMenu>();
-        m_debugMenu->initialize(m_window->getHandle(), this);
-        m_window->setActiveDebugMenu(m_debugMenu.get());
-        m_renderer->setDebugMenu(m_debugMenu.get());
+        initializeDebugMenu();
 
         // Initialize player
         m_player = std::make_unique<Player>();
@@ -530,4 +527,106 @@ void Game::cleanup() {
     if (m_world && m_player && m_isInGame) {
         saveWorld("saves/autosave.sav");
     }
+}
+
+void Game::initializeDebugMenu() {
+    // Create debug menu
+    m_debugMenu = std::make_unique<Debug::DebugMenu>();
+    m_debugMenu->initialize(m_window->getHandle(), this);
+    
+    // Register debug commands
+    m_debugMenu->registerCommand("tp", "Teleport player to x y z coordinates",
+        [this](const std::vector<std::string>& args) {
+            if (args.size() < 4) {
+                m_debugMenu->commandOutput("Usage: tp <x> <y> <z>");
+                return;
+            }
+            
+            try {
+                float x = std::stof(args[1]);
+                float y = std::stof(args[2]);
+                float z = std::stof(args[3]);
+                
+                if (m_player) {
+                    m_player->setPosition(glm::vec3(x, y, z));
+                    m_debugMenu->commandOutput("Teleported to (" + args[1] + ", " + args[2] + ", " + args[3] + ")");
+                } else {
+                    m_debugMenu->commandOutput("ERROR: Player not initialized");
+                }
+            } catch (const std::exception& e) {
+                m_debugMenu->commandOutput("ERROR: Invalid coordinates");
+            }
+        });
+    
+    m_debugMenu->registerCommand("fly", "Toggle player flying mode",
+        [this](const std::vector<std::string>& args) {
+            if (m_player) {
+                bool isFlying = m_player->isFlying();
+                m_player->setFlying(!isFlying);
+                m_debugMenu->commandOutput(std::string("Flying mode ") + (!isFlying ? "ENABLED" : "DISABLED"));
+            } else {
+                m_debugMenu->commandOutput("ERROR: Player not initialized");
+            }
+        });
+    
+    m_debugMenu->registerCommand("noclip", "Toggle player collision",
+        [this](const std::vector<std::string>& args) {
+            if (m_player) {
+                bool hasCollision = m_player->hasCollision();
+                m_player->setCollision(!hasCollision);
+                m_debugMenu->commandOutput(std::string("Collision ") + (!hasCollision ? "ENABLED" : "DISABLED"));
+            } else {
+                m_debugMenu->commandOutput("ERROR: Player not initialized");
+            }
+        });
+        
+    // Add renderer debug commands
+    m_debugMenu->registerCommand("toggle_backface", "Toggle backface culling",
+        [this](const std::vector<std::string>& args) {
+            if (m_renderer) {
+                bool isDisabled = m_renderer->isBackfaceCullingDisabled();
+                m_renderer->setDisableBackfaceCulling(!isDisabled);
+                m_debugMenu->commandOutput(std::string("Backface culling ") + 
+                    (isDisabled ? "ENABLED" : "DISABLED"));
+            } else {
+                m_debugMenu->commandOutput("ERROR: Renderer not initialized");
+            }
+        });
+    
+    m_debugMenu->registerCommand("toggle_greedy", "Toggle greedy meshing",
+        [this](const std::vector<std::string>& args) {
+            if (m_renderer && m_world) {
+                bool isDisabled = m_renderer->isGreedyMeshingDisabled();
+                m_renderer->setDisableGreedyMeshing(!isDisabled);
+                m_debugMenu->commandOutput(std::string("Greedy meshing ") + 
+                    (isDisabled ? "ENABLED" : "DISABLED"));
+                
+                // Regenerate meshes for all visible chunks
+                glm::ivec3 playerChunkPos = m_world->worldToChunkPos(m_player->getPosition());
+                m_debugMenu->commandOutput("Regenerating meshes for visible chunks...");
+                
+                // Update chunks around player with new greedy meshing setting
+                const int REGEN_RADIUS = 2;
+                for (int x = -REGEN_RADIUS; x <= REGEN_RADIUS; x++) {
+                    for (int y = -REGEN_RADIUS; y <= REGEN_RADIUS; y++) {
+                        for (int z = -REGEN_RADIUS; z <= REGEN_RADIUS; z++) {
+                            glm::ivec3 chunkPos = playerChunkPos + glm::ivec3(x, y, z);
+                            m_world->updateChunkMeshes(chunkPos, !isDisabled);
+                        }
+                    }
+                }
+                
+                m_debugMenu->commandOutput("Mesh regeneration complete");
+            } else {
+                m_debugMenu->commandOutput("ERROR: Renderer or World not initialized");
+            }
+        });
+    
+    // Pass the debug menu to the renderer
+    if (m_renderer) {
+        m_renderer->setDebugMenu(m_debugMenu.get());
+    }
+
+    // Set the debug menu as active in the window for character input
+    m_window->setActiveDebugMenu(m_debugMenu.get());
 } 

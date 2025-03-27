@@ -11,6 +11,7 @@ CollisionSystem::CollisionSystem()
     , m_verticalStepSize(0.02f)
     , m_debugMode(true)
     , m_useGreedyMeshing(true) // Enable greedy meshing by default
+    , m_collisionEnabled(true)
 {
     // Additional initialization can go here if needed
 }
@@ -187,10 +188,15 @@ bool CollisionSystem::isPositionSafe(const glm::vec3& pos, World* world) {
     return true;
 }
 
-glm::vec3 CollisionSystem::moveWithCollision(const glm::vec3& position, const glm::vec3& movement, 
-                                        const glm::vec3& velocity, World* world, 
-                                        bool isFlying, bool& isOnGround) {
-    if (!world) return position;
+glm::vec3 CollisionSystem::moveWithCollision(const glm::vec3& currentPos, const glm::vec3& movement, 
+                              const glm::vec3& velocity, World* world, bool isFlying, bool& isOnGround) {
+    // If collision is disabled, just move freely
+    if (!m_collisionEnabled) {
+        isOnGround = false;
+        return currentPos + movement;
+    }
+    
+    if (!world) return currentPos;
     
     // Debug flag
     static int debugCounter = 0;
@@ -200,14 +206,14 @@ glm::vec3 CollisionSystem::moveWithCollision(const glm::vec3& position, const gl
     if (glm::length(movement) < 0.0001f) {
         if (verboseDebug) {
             std::cout << "==== MOVE WITH COLLISION ====" << std::endl;
-            std::cout << "Starting position: (" << position.x << ", " << position.y << ", " << position.z << ")" << std::endl;
+            std::cout << "Starting position: (" << currentPos.x << ", " << currentPos.y << ", " << currentPos.z << ")" << std::endl;
             std::cout << "Movement vector: (" << movement.x << ", " << movement.y << ", " << movement.z << ")" << std::endl;
-            std::cout << "Final position after movement: (" << position.x << ", " << position.y << ", " << position.z << ")" << std::endl;
+            std::cout << "Final position after movement: (" << currentPos.x << ", " << currentPos.y << ", " << currentPos.z << ")" << std::endl;
             std::cout << "Movement iterations: 0" << std::endl;
             std::cout << "Collisions encountered: 0" << std::endl;
             std::cout << "===========================" << std::endl;
         }
-        return position;
+        return currentPos;
     }
     
     // Split movement into horizontal and vertical components for better collision handling
@@ -215,8 +221,8 @@ glm::vec3 CollisionSystem::moveWithCollision(const glm::vec3& position, const gl
     glm::vec3 verticalMovement(0.0f, movement.y, 0.0f);
     
     // Capture starting position for debug and rollback
-    glm::vec3 startPos = position;
-    glm::vec3 currentPos = position;
+    glm::vec3 startPos = currentPos;
+    glm::vec3 newPos = currentPos;
     
     // Variables to track iterations and collisions
     int movementIterations = 0;
@@ -224,7 +230,7 @@ glm::vec3 CollisionSystem::moveWithCollision(const glm::vec3& position, const gl
     
     if (verboseDebug) {
         std::cout << "==== MOVE WITH COLLISION ====" << std::endl;
-        std::cout << "Starting position: (" << position.x << ", " << position.y << ", " << position.z << ")" << std::endl;
+        std::cout << "Starting position: (" << currentPos.x << ", " << currentPos.y << ", " << currentPos.z << ")" << std::endl;
         std::cout << "Movement vector: (" << movement.x << ", " << movement.y << ", " << movement.z << ")" << std::endl;
     }
     
@@ -238,7 +244,7 @@ glm::vec3 CollisionSystem::moveWithCollision(const glm::vec3& position, const gl
                 std::cout << "Adjusted starting position to avoid being inside a block: " 
                          << "(" << adjustedPos.x << ", " << adjustedPos.y << ", " << adjustedPos.z << ")" << std::endl;
             }
-            currentPos = adjustedPos;
+            newPos = adjustedPos;
         } else if (verboseDebug) {
             std::cout << "WARNING: Starting inside a block and couldn't adjust position" << std::endl;
         }
@@ -257,7 +263,7 @@ glm::vec3 CollisionSystem::moveWithCollision(const glm::vec3& position, const gl
             
             // Calculate the next step position
             glm::vec3 step = normalizedHorizontal * std::min(stepSize, totalHorizontalDistance - distanceMoved);
-            glm::vec3 nextPos = currentPos + step;
+            glm::vec3 nextPos = newPos + step;
             
             // Check for collisions at the next position
             if (collidesWithBlocks(nextPos, velocity, world)) {
@@ -267,17 +273,17 @@ glm::vec3 CollisionSystem::moveWithCollision(const glm::vec3& position, const gl
                 glm::vec3 slideX(step.x, 0, 0);
                 glm::vec3 slideZ(0, 0, step.z);
                 
-                glm::vec3 nextPosX = currentPos + slideX;
-                glm::vec3 nextPosZ = currentPos + slideZ;
+                glm::vec3 nextPosX = newPos + slideX;
+                glm::vec3 nextPosZ = newPos + slideZ;
                 
                 bool canMoveX = !collidesWithBlocks(nextPosX, velocity, world);
                 bool canMoveZ = !collidesWithBlocks(nextPosZ, velocity, world);
                 
                 if (canMoveX) {
-                    currentPos = nextPosX;
+                    newPos = nextPosX;
                     distanceMoved += glm::length(slideX);
                 } else if (canMoveZ) {
-                    currentPos = nextPosZ;
+                    newPos = nextPosZ;
                     distanceMoved += glm::length(slideZ);
                 } else {
                     // Can't move in either direction, stop horizontal movement
@@ -285,7 +291,7 @@ glm::vec3 CollisionSystem::moveWithCollision(const glm::vec3& position, const gl
                 }
             } else {
                 // No collision, proceed with the step
-                currentPos = nextPos;
+                newPos = nextPos;
                 distanceMoved += stepSize;
             }
             
@@ -299,7 +305,7 @@ glm::vec3 CollisionSystem::moveWithCollision(const glm::vec3& position, const gl
     
     // Now handle vertical movement
     if (std::abs(verticalMovement.y) > 0.0001f) {
-        glm::vec3 nextPos = currentPos + verticalMovement;
+        glm::vec3 nextPos = newPos + verticalMovement;
         
         // Check for vertical collisions
         if (collidesWithBlocks(nextPos, velocity, world)) {
@@ -323,42 +329,42 @@ glm::vec3 CollisionSystem::moveWithCollision(const glm::vec3& position, const gl
             }
         } else {
             // No collision, complete the vertical movement
-            currentPos = nextPos;
+            newPos = nextPos;
             
             // Check if we're on ground after the movement
-            isOnGround = checkGroundCollision(currentPos, velocity, world);
+            isOnGround = checkGroundCollision(newPos, velocity, world);
         }
     } else {
         // Even if no vertical movement, check if we're on ground
-        isOnGround = checkGroundCollision(currentPos, velocity, world);
+        isOnGround = checkGroundCollision(newPos, velocity, world);
     }
     
     // Final position check
-    if (isInsideBlock(currentPos, world)) {
+    if (isInsideBlock(newPos, world)) {
         // This shouldn't happen with proper collision detection, but just in case
         if (verboseDebug) {
             std::cout << "WARNING: Player inside block after movement. Attempting to adjust position." << std::endl;
         }
         
         // Try to adjust position to be outside of blocks
-        glm::vec3 adjustedPos = adjustPositionOutOfBlock(currentPos, world);
+        glm::vec3 adjustedPos = adjustPositionOutOfBlock(newPos, world);
         
         // Only use adjusted position if it's actually not inside a block
         if (!isInsideBlock(adjustedPos, world)) {
-            currentPos = adjustedPos;
+            newPos = adjustedPos;
             if (verboseDebug) {
                 std::cout << "Successfully adjusted position to avoid blocks" << std::endl;
             }
         } else {
             // If we can't fix it, revert to start position
             std::cout << "WARNING: Player inside block after movement. Reverting to start position." << std::endl;
-            currentPos = startPos;
+            newPos = startPos;
         }
     }
     
     // Add redundant checks after movement
-    if (currentPos.y < 0.0f) {
-        currentPos.y = 0.01f; // Place slightly above 0
+    if (newPos.y < 0.0f) {
+        newPos.y = 0.01f; // Place slightly above 0
         isOnGround = true;
         if (verboseDebug) {
             std::cout << "Prevented falling below y=0 after movement" << std::endl;
@@ -366,14 +372,14 @@ glm::vec3 CollisionSystem::moveWithCollision(const glm::vec3& position, const gl
     }
     
     if (verboseDebug) {
-        std::cout << "Final position after movement: (" << currentPos.x << ", " << currentPos.y << ", " << currentPos.z << ")" << std::endl;
+        std::cout << "Final position after movement: (" << newPos.x << ", " << newPos.y << ", " << newPos.z << ")" << std::endl;
         std::cout << "Movement iterations: " << movementIterations << std::endl;
         std::cout << "Collisions encountered: " << collisionCount << std::endl;
         std::cout << "Is on ground: " << (isOnGround ? "YES" : "NO") << std::endl;
         std::cout << "===========================" << std::endl;
     }
     
-    return currentPos;
+    return newPos;
 }
 
 glm::vec3 CollisionSystem::getMinBounds(const glm::vec3& pos) const {

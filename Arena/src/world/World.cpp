@@ -76,7 +76,7 @@ void World::generateChunk(const glm::ivec3& chunkPos) {
     m_chunks[chunkPos] = std::move(chunk);
     
     // Update meshes for this chunk and adjacent chunks
-    updateChunkMeshes(chunkPos);
+    updateChunkMeshes(chunkPos, false);
 }
 
 void World::loadChunk(const glm::ivec3& chunkPos) {
@@ -101,7 +101,7 @@ void World::loadChunk(const glm::ivec3& chunkPos) {
     }
     
     // After loading/generating a chunk, update meshes for this chunk and adjacent chunks
-    updateChunkMeshes(chunkPos);
+    updateChunkMeshes(chunkPos, false);
 }
 
 void World::unloadChunk(const glm::ivec3& chunkPos) {
@@ -357,13 +357,13 @@ Chunk* World::getChunkAt(const glm::ivec3& chunkPos) {
 }
 
 // Add this new method to update meshes for a chunk and its neighbors
-void World::updateChunkMeshes(const glm::ivec3& chunkPos) {
+void World::updateChunkMeshes(const glm::ivec3& chunkPos, bool disableGreedyMeshing) {
     // Force regenerate this chunk's mesh and mark it for update
     Chunk* chunk = getChunkAt(chunkPos);
     if (chunk) {
         std::cout << "Regenerating mesh for chunk " << chunkPos.x << "," << chunkPos.y << "," << chunkPos.z << std::endl;
         chunk->setDirty(true);
-        chunk->generateMesh();
+        chunk->generateMesh(disableGreedyMeshing);
         
         // Log confirmation that mesh was generated
         const auto& vertices = chunk->getMeshVertices();
@@ -387,7 +387,7 @@ void World::updateChunkMeshes(const glm::ivec3& chunkPos) {
         if (neighbor) {
             std::cout << "Regenerating mesh for neighbor chunk " << neighborPos.x << "," << neighborPos.y << "," << neighborPos.z << std::endl;
             neighbor->setDirty(true);
-            neighbor->generateMesh();
+            neighbor->generateMesh(disableGreedyMeshing);
             
             // Log confirmation that mesh was generated
             const auto& vertices = neighbor->getMeshVertices();
@@ -395,5 +395,15 @@ void World::updateChunkMeshes(const glm::ivec3& chunkPos) {
             std::cout << "Generated mesh for chunk (" << neighborPos.x << ", " << neighborPos.y << ", " << neighborPos.z 
                       << ") with " << vertices.size() / 5 << " vertices and " << indices.size() << " indices" << std::endl;
         }
+    }
+}
+
+void World::removeChunk(const glm::ivec3& chunkPos) {
+    auto it = m_chunks.find(chunkPos);
+    if (it != m_chunks.end()) {
+        m_chunks.erase(it);
+        
+        // Update adjacent chunks' meshes
+        updateChunkMeshes(chunkPos, false);
     }
 } 

@@ -32,6 +32,7 @@ private:
     void update(float deltaTime);
     void render();
     void handleInput(float deltaTime);
+    void initializeDebugMenu();
 
     std::unique_ptr<Window> m_window;
     std::unique_ptr<World> m_world;

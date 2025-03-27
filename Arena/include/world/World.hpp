@@ -28,6 +28,7 @@ public:
     void generateChunk(const glm::ivec3& chunkPos);
     void loadChunk(const glm::ivec3& chunkPos);
     void unloadChunk(const glm::ivec3& chunkPos);
+    void removeChunk(const glm::ivec3& chunkPos);
     
     // Block manipulation
     int getBlock(const glm::ivec3& worldPos) const;
@@ -40,12 +41,16 @@ public:
     // Chunk management
     void updateChunks(const glm::vec3& playerPos);
     const std::unordered_map<glm::ivec3, std::unique_ptr<Chunk>, ChunkPosHash>& getChunks() const { return m_chunks; }
+    
+    // Coordinate conversion
+    glm::ivec3 worldToChunkPos(const glm::vec3& worldPos) const;
+    
+    // Mesh management
+    void updateChunkMeshes(const glm::ivec3& chunkPos, bool disableGreedyMeshing = false);
 
 private:
-    glm::ivec3 worldToChunkPos(const glm::vec3& worldPos) const;
     glm::ivec3 worldToLocalPos(const glm::vec3& worldPos) const;
     Chunk* getChunkAt(const glm::ivec3& chunkPos);
-    void updateChunkMeshes(const glm::ivec3& chunkPos);
 
     std::unordered_map<glm::ivec3, std::unique_ptr<Chunk>, ChunkPosHash> m_chunks;
     std::unique_ptr<WorldGenerator> m_worldGenerator;

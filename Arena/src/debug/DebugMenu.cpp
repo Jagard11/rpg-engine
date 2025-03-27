@@ -371,7 +371,7 @@ void TextRenderer::renderText(const std::string& text, float x, float y, float s
     glUniform3f(textColorUniformLoc, color.x, color.y, color.z);
     glUniformMatrix4fv(projectionUniformLoc, 1, GL_FALSE, glm::value_ptr(projection));
 
-    // Pre-allocate vertex data buffer for text rendering
+    // Pre-allocate vertex data for all characters
     std::vector<GLfloat> vertices;
     vertices.reserve(text.length() * 6 * 4);  // 6 vertices per char, 4 floats per vertex
     
@@ -391,15 +391,17 @@ void TextRenderer::renderText(const std::string& text, float x, float y, float s
         GLfloat w = ch.Size.x * scale;
         GLfloat h = ch.Size.y * scale;
 
-        // Add vertices for this character
+        // Add vertices for this character - FIXED to match Render::TextRenderer implementation
+        // Using correct texture coordinates that don't flip the characters horizontally
+        vertices.clear();
         vertices.insert(vertices.end(), {
-            xpos,     ypos + h, 0.0f, 0.0f,            
-            xpos,     ypos,     0.0f, 1.0f,
-            xpos + w, ypos,     1.0f, 1.0f,
+            xpos,     ypos,     0.0f, 0.0f,            // Top-left vertex, top-left texture coord
+            xpos,     ypos + h, 0.0f, 1.0f,            // Bottom-left vertex, bottom-left texture
+            xpos + w, ypos + h, 1.0f, 1.0f,            // Bottom-right vertex, bottom-right texture
 
-            xpos,     ypos + h, 0.0f, 0.0f,
-            xpos + w, ypos,     1.0f, 1.0f,
-            xpos + w, ypos + h, 1.0f, 0.0f           
+            xpos,     ypos,     0.0f, 0.0f,            // Top-left vertex, top-left texture coord
+            xpos + w, ypos + h, 1.0f, 1.0f,            // Bottom-right vertex, bottom-right texture
+            xpos + w, ypos,     1.0f, 0.0f             // Top-right vertex, top-right texture
         });
 
         // Bind texture and update buffer
@@ -907,9 +909,11 @@ void TextRenderer::renderFallbackText(const std::string& text, float x, float y,
 }
 
 void TextRenderer::updateProjection(float width, float height) {
-    // Update projection matrix to use screen coordinates
-    projection = glm::ortho(0.0f, width, 0.0f, height);
-    std::cout << "Updated text renderer projection matrix for dimensions: " << width << "x" << height << std::endl;
+    // Update projection matrix to use screen coordinates with (0,0) at top-left corner
+    // to match GLFW window coordinates and the Render::TextRenderer implementation
+    projection = glm::ortho(0.0f, width, height, 0.0f);
+    std::cout << "Updated text renderer projection matrix for dimensions: " << width << "x" << height 
+              << " with top-left origin (y-flipped)" << std::endl;
 }
 
 void TextRenderer::renderTestText() {
@@ -968,6 +972,11 @@ void DebugMenu::initialize(GLFWwindow* window, Game* game) {
         std::cerr << "ERROR: TextRenderer failed to initialize in DebugMenu::initialize" << std::endl;
     } else {
         std::cout << "TextRenderer successfully initialized in DebugMenu" << std::endl;
+        
+        // Update the projection to use screen coordinates with Y flipped (0,0 at top-left)
+        int width, height;
+        glfwGetFramebufferSize(m_window, &width, &height);
+        m_textRenderer->updateProjection(width, height);
     }
     
     // Register built-in commands
@@ -1103,6 +1112,11 @@ void DebugMenu::render() {
     glfwGetFramebufferSize(m_window, &width, &height);
     std::cout << "===== DEBUG MENU RENDER START =====" << std::endl;
     std::cout << "Window dimensions: " << width << "x" << height << std::endl;
+    
+    // Update TextRenderer projection for proper coordinates
+    if (m_textRenderer && m_textRenderer->isInitialized()) {
+        m_textRenderer->updateProjection(width, height);
+    }
     
     // Save current OpenGL state
     GLfloat prevColor[4];

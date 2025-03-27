@@ -47,6 +47,11 @@ public:
     // Add a method to ignore the next mouse movement
     void ignoreNextMouseMovement() { m_ignoreNextMouseMovement = true; }
 
+    // New methods
+    void setFlying(bool flying) { m_isFlying = flying; }
+    bool hasCollision() const { return m_collisionSystem.hasCollision(); }
+    void setCollision(bool collision) { m_collisionSystem.setCollision(collision); }
+
 private:
     void updateVectors();
 

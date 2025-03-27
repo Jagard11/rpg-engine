@@ -43,6 +43,10 @@ public:
     void setUseGreedyMeshing(bool enabled) { m_useGreedyMeshing = enabled; }
     bool isUsingGreedyMeshing() const { return m_useGreedyMeshing; }
     
+    // Collision enabling/disabling
+    bool hasCollision() const { return m_collisionEnabled; }
+    void setCollision(bool enabled) { m_collisionEnabled = enabled; }
+    
 private:
     // Entity dimensions for collision
     float m_width;
@@ -59,6 +63,9 @@ private:
     
     // Use greedy meshing for collision detection
     bool m_useGreedyMeshing;
+    
+    // Is collision enabled
+    bool m_collisionEnabled = true;
     
     // Internal helper methods
     bool isBlockSolid(int blockType) const;

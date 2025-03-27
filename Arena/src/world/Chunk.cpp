@@ -42,7 +42,7 @@ int Chunk::getBlock(int x, int y, int z) const {
     return m_blocks[x][y][z];
 }
 
-void Chunk::generateMesh() {
+void Chunk::generateMesh(bool disableGreedyMeshing) {
     m_meshVertices.clear();
     m_meshIndices.clear();
 
@@ -64,7 +64,8 @@ void Chunk::generateMesh() {
     bool needsRender[CHUNK_SIZE][CHUNK_HEIGHT][CHUNK_SIZE][6] = {false};
     int faceCount = 0;
     
-    std::cout << "Generating mesh for chunk (" << m_x << ", " << m_y << ", " << m_z << ")" << std::endl;
+    std::cout << "Generating mesh for chunk (" << m_x << ", " << m_y << ", " << m_z 
+              << ") with greedy meshing " << (disableGreedyMeshing ? "DISABLED" : "ENABLED") << std::endl;
     
     for (int x = 0; x < CHUNK_SIZE; x++) {
         for (int y = 0; y < CHUNK_HEIGHT; y++) {
@@ -88,137 +89,164 @@ void Chunk::generateMesh() {
     // Layout:
     // White (0,0)     | Green (0.333,0)  | Yellow (0.667,0)
     // Black (0,0.5)   | Red (0.333,0.5)  | Purple (0.667,0.5)
-    const std::vector<float> faceVertices[6] = {
-        // Front face (+Z) - Purple (0.667,0.5 to 1.0,1.0)
+    std::vector<std::vector<float>> faceVertices = {
+        // Front face (+Z) - Purple
         {
-            0.0f, 0.0f, 1.0f,  0.667f, 0.5f,  // Bottom-left
-            1.0f, 0.0f, 1.0f,  1.0f, 0.5f,    // Bottom-right
-            1.0f, 1.0f, 1.0f,  1.0f, 1.0f,    // Top-right
-            0.0f, 1.0f, 1.0f,  0.667f, 1.0f   // Top-left
+            0.0f, 0.0f, 1.0f,  0.667f, 0.5f,    // Bottom-left
+            1.0f, 0.0f, 1.0f,  1.0f, 0.5f,      // Bottom-right
+            1.0f, 1.0f, 1.0f,  1.0f, 1.0f,      // Top-right
+            0.0f, 1.0f, 1.0f,  0.667f, 1.0f     // Top-left
         },
-        // Back face (-Z) - Yellow (0.667,0.0 to 1.0,0.5)
-        // Flipped so normals point outward
+        
+        // Back face (-Z) - Yellow
         {
-            1.0f, 0.0f, 0.0f,  0.667f, 0.0f,  // Bottom-right (flipped)
-            0.0f, 0.0f, 0.0f,  1.0f, 0.0f,    // Bottom-left (flipped)
-            0.0f, 1.0f, 0.0f,  1.0f, 0.5f,    // Top-left (flipped)
-            1.0f, 1.0f, 0.0f,  0.667f, 0.5f   // Top-right (flipped)
+            1.0f, 0.0f, 0.0f,  1.0f, 0.0f,      // Bottom-right
+            0.0f, 0.0f, 0.0f,  0.667f, 0.0f,    // Bottom-left
+            0.0f, 1.0f, 0.0f,  0.667f, 0.5f,    // Top-left
+            1.0f, 1.0f, 0.0f,  1.0f, 0.5f       // Top-right
         },
-        // Left face (-X) - Green (0.333,0.0 to 0.667,0.5)
+        
+        // Left face (-X) - Green
         {
-            0.0f, 0.0f, 0.0f,  0.333f, 0.0f,  // Bottom-left back
-            0.0f, 0.0f, 1.0f,  0.667f, 0.0f,  // Bottom-right front
-            0.0f, 1.0f, 1.0f,  0.667f, 0.5f,  // Top-right front
-            0.0f, 1.0f, 0.0f,  0.333f, 0.5f   // Top-left back
+            0.0f, 0.0f, 0.0f,  0.333f, 0.0f,    // Bottom-back
+            0.0f, 0.0f, 1.0f,  0.667f, 0.0f,    // Bottom-front
+            0.0f, 1.0f, 1.0f,  0.667f, 0.5f,    // Top-front
+            0.0f, 1.0f, 0.0f,  0.333f, 0.5f     // Top-back
         },
-        // Right face (+X) - Black (0.0,0.5 to 0.333,1.0)
-        // Flipped so normals point outward
+        
+        // Right face (+X) - Black
         {
-            1.0f, 0.0f, 0.0f,  0.0f, 0.5f,    // Bottom-right back (flipped)
-            1.0f, 0.0f, 1.0f,  0.333f, 0.5f,  // Bottom-left front (flipped)
-            1.0f, 1.0f, 1.0f,  0.333f, 1.0f,  // Top-left front (flipped)
-            1.0f, 1.0f, 0.0f,  0.0f, 1.0f     // Top-right back (flipped)
+            1.0f, 0.0f, 1.0f,  0.333f, 0.5f,    // Bottom-front
+            1.0f, 0.0f, 0.0f,  0.0f, 0.5f,      // Bottom-back
+            1.0f, 1.0f, 0.0f,  0.0f, 1.0f,      // Top-back
+            1.0f, 1.0f, 1.0f,  0.333f, 1.0f     // Top-front
         },
-        // Top face (+Y) - Red (0.333,0.5 to 0.667,1.0)
+        
+        // Top face (+Y) - Red
         {
-            0.0f, 1.0f, 1.0f,  0.333f, 0.5f,  // Bottom-left front
-            1.0f, 1.0f, 1.0f,  0.667f, 0.5f,  // Bottom-right front
-            1.0f, 1.0f, 0.0f,  0.667f, 1.0f,  // Top-right back
-            0.0f, 1.0f, 0.0f,  0.333f, 1.0f   // Top-left back
+            0.0f, 1.0f, 1.0f,  0.333f, 0.5f,    // Front-left
+            1.0f, 1.0f, 1.0f,  0.667f, 0.5f,    // Front-right
+            1.0f, 1.0f, 0.0f,  0.667f, 1.0f,    // Back-right
+            0.0f, 1.0f, 0.0f,  0.333f, 1.0f     // Back-left
         },
-        // Bottom face (-Y) - White (0.0,0.0 to 0.333,0.5)
-        // Flipped so normals point outward
+        
+        // Bottom face (-Y) - White
         {
-            0.0f, 0.0f, 1.0f,  0.0f, 0.0f,    // Bottom-right front (flipped)
-            1.0f, 0.0f, 1.0f,  0.333f, 0.0f,  // Bottom-left front (flipped)
-            1.0f, 0.0f, 0.0f,  0.333f, 0.5f,  // Top-left back (flipped)
-            0.0f, 0.0f, 0.0f,  0.0f, 0.5f     // Top-right back (flipped)
+            0.0f, 0.0f, 0.0f,  0.0f, 0.0f,    // Bottom-left back
+            1.0f, 0.0f, 0.0f,  0.333f, 0.0f,  // Bottom-right back
+            1.0f, 0.0f, 1.0f,  0.333f, 0.5f,  // Top-right front
+            0.0f, 0.0f, 1.0f,  0.0f, 0.5f     // Top-left front
         }
     };
 
-    // Apply greedy meshing algorithm for each face direction
-    for (int faceIndex = 0; faceIndex < 6; faceIndex++) {
-        const glm::ivec3& normal = directions[faceIndex];
-        
-        // Determine which dimensions to iterate for this face direction
-        int u, v, w;
-        if (normal.x != 0) {
-            // X-axis faces (left/right)
-            u = 1; v = 2; w = 0; // u=y, v=z, w=x
-        } else if (normal.y != 0) {
-            // Y-axis faces (top/bottom)
-            u = 0; v = 2; w = 1; // u=x, v=z, w=y
-        } else {
-            // Z-axis faces (front/back)
-            u = 0; v = 1; w = 2; // u=x, v=y, w=z
-        }
-        
-        // For each slice along the normal direction
-        for (int wPos = 0; wPos < CHUNK_SIZE; wPos++) {
-            // Initialize a mask for this slice
-            bool mask[CHUNK_SIZE][CHUNK_HEIGHT] = {false};
-            int blockTypes[CHUNK_SIZE][CHUNK_HEIGHT] = {0};
-            
-            // Set up the mask based on pre-computed face visibility
-            for (int uPos = 0; uPos < CHUNK_SIZE; uPos++) {
-                for (int vPos = 0; vPos < CHUNK_HEIGHT; vPos++) {
-                    // Convert uvw coordinates to xyz
-                    int x = (u == 0) ? uPos : ((w == 0) ? wPos : vPos);
-                    int y = (u == 1) ? uPos : ((w == 1) ? wPos : vPos);
-                    int z = (u == 2) ? uPos : ((w == 2) ? wPos : vPos);
+    // If greedy meshing is disabled, use simple per-block face generation
+    if (disableGreedyMeshing) {
+        for (int x = 0; x < CHUNK_SIZE; x++) {
+            for (int y = 0; y < CHUNK_HEIGHT; y++) {
+                for (int z = 0; z < CHUNK_SIZE; z++) {
+                    if (getBlock(x, y, z) == 0) continue; // Skip air blocks
                     
-                    // Check if this face needs rendering using pre-computed results
-                    if (needsRender[x][y][z][faceIndex]) {
-                        // Set mask if the block is not air
-                        int blockType = getBlock(x, y, z);
-                        if (blockType != 0) {
-                            mask[uPos][vPos] = true;
-                            blockTypes[uPos][vPos] = blockType;
+                    for (int faceIndex = 0; faceIndex < 6; faceIndex++) {
+                        if (needsRender[x][y][z][faceIndex]) {
+                            // Add simple face for this block
+                            addFace(faceVertices[faceIndex], glm::vec3(x, y, z), directions[faceIndex]);
                         }
                     }
                 }
             }
+        }
+    } else {
+        // Apply greedy meshing algorithm for each face direction
+        for (int faceIndex = 0; faceIndex < 6; faceIndex++) {
+            const glm::ivec3& normal = directions[faceIndex];
             
-            // Now apply greedy meshing to the mask
-            for (int uPos = 0; uPos < CHUNK_SIZE; uPos++) {
-                for (int vPos = 0; vPos < CHUNK_HEIGHT; vPos++) {
-                    if (mask[uPos][vPos]) {
-                        // Start with a single cell
+            // Determine which dimensions to iterate for this face direction
+            int u, v, w;
+            if (normal.x != 0) {
+                // X-axis faces (left/right)
+                u = 1; v = 2; w = 0; // u=y, v=z, w=x
+            } else if (normal.y != 0) {
+                // Y-axis faces (top/bottom)
+                u = 0; v = 2; w = 1; // u=x, v=z, w=y
+            } else {
+                // Z-axis faces (front/back)
+                u = 0; v = 1; w = 2; // u=x, v=y, w=z
+            }
+            
+            // For each slice along the normal direction
+            for (int wPos = 0; wPos < CHUNK_SIZE; wPos++) {
+                // Initialize a mask for this slice
+                bool mask[CHUNK_SIZE][CHUNK_HEIGHT] = {false};
+                int blockTypes[CHUNK_SIZE][CHUNK_HEIGHT] = {0};
+                
+                // Set up the mask based on pre-computed face visibility
+                for (int uPos = 0; uPos < CHUNK_SIZE; uPos++) {
+                    for (int vPos = 0; vPos < CHUNK_HEIGHT; vPos++) {
+                        // Convert uvw coordinates to xyz
+                        int x = (u == 0) ? uPos : ((w == 0) ? wPos : vPos);
+                        int y = (u == 1) ? uPos : ((w == 1) ? wPos : vPos);
+                        int z = (u == 2) ? uPos : ((w == 2) ? wPos : vPos);
+                        
+                        // Check if this face needs rendering using pre-computed results
+                        if (needsRender[x][y][z][faceIndex]) {
+                            // Set mask if the block is not air
+                            int blockType = getBlock(x, y, z);
+                            if (blockType != 0) {
+                                mask[uPos][vPos] = true;
+                                blockTypes[uPos][vPos] = blockType;
+                            }
+                        }
+                    }
+                }
+                
+                // Now apply greedy meshing to the mask
+                bool visited[CHUNK_SIZE][CHUNK_HEIGHT] = {false};
+                
+                for (int uPos = 0; uPos < CHUNK_SIZE; uPos++) {
+                    for (int vPos = 0; vPos < CHUNK_HEIGHT; vPos++) {
+                        if (!mask[uPos][vPos] || visited[uPos][vPos]) {
+                            continue;
+                        }
+                        
+                        // Found an unvisited face, start greedy merging
                         int width = 1;
                         int height = 1;
-                        int currBlockType = blockTypes[uPos][vPos];
+                        int blockType = blockTypes[uPos][vPos];
                         
-                        // Expand width (u-direction) as far as possible
+                        // Expand horizontally (in U direction) as far as possible
                         while (uPos + width < CHUNK_SIZE && 
-                               mask[uPos + width][vPos] && 
-                               blockTypes[uPos + width][vPos] == currBlockType) {
+                              mask[uPos + width][vPos] && 
+                              !visited[uPos + width][vPos] &&
+                              blockTypes[uPos + width][vPos] == blockType) {
                             width++;
                         }
                         
-                        // Expand height (v-direction) as far as possible
-                        bool canExpandHeight = true;
-                        while (canExpandHeight && vPos + height < CHUNK_HEIGHT) {
-                            // Check if the entire width can be expanded in height
-                            for (int i = 0; i < width; i++) {
-                                if (!mask[uPos + i][vPos + height] || 
-                                    blockTypes[uPos + i][vPos + height] != currBlockType) {
-                                    canExpandHeight = false;
+                        // Expand vertically (in V direction) as far as possible
+                        bool canExpandVertical = true;
+                        while (canExpandVertical && vPos + height < CHUNK_HEIGHT) {
+                            // Check if the entire row can be expanded
+                            for (int u = 0; u < width; u++) {
+                                if (!mask[uPos + u][vPos + height] || 
+                                    visited[uPos + u][vPos + height] ||
+                                    blockTypes[uPos + u][vPos + height] != blockType) {
+                                    canExpandVertical = false;
                                     break;
                                 }
                             }
-                            if (canExpandHeight) {
+                            
+                            if (canExpandVertical) {
                                 height++;
                             }
                         }
                         
-                        // Mark the area as visited in the mask
-                        for (int i = 0; i < width; i++) {
-                            for (int j = 0; j < height; j++) {
-                                mask[uPos + i][vPos + j] = false;
+                        // Mark all merged faces as visited
+                        for (int v = 0; v < height; v++) {
+                            for (int u = 0; u < width; u++) {
+                                visited[uPos + u][vPos + v] = true;
                             }
                         }
                         
-                        // Generate the quad for this merged area with appropriate depth bias
+                        // Add the greedy-meshed face to the mesh
                         addGreedyFace(faceVertices[faceIndex], normal, uPos, vPos, wPos, width, height, u, v, w);
                     }
                 }
@@ -229,11 +257,28 @@ void Chunk::generateMesh() {
     m_isDirty = false;
 }
 
+// Helper function to calculate the normal for a face based on vertex positions
+glm::vec3 Chunk::calculateFaceNormal(const std::vector<float>& vertices, int startIndex) {
+    // Get three of the vertices to calculate cross product
+    glm::vec3 v1(vertices[startIndex], vertices[startIndex + 1], vertices[startIndex + 2]);
+    glm::vec3 v2(vertices[startIndex + 5], vertices[startIndex + 6], vertices[startIndex + 7]);
+    glm::vec3 v3(vertices[startIndex + 10], vertices[startIndex + 11], vertices[startIndex + 12]);
+    
+    // Calculate vectors along two edges
+    glm::vec3 edge1 = v2 - v1;
+    glm::vec3 edge2 = v3 - v1;
+    
+    // Calculate normal with cross product
+    glm::vec3 normal = glm::normalize(glm::cross(edge1, edge2));
+    
+    return normal;
+}
+
 // Helper method to add a greedy-meshed face
 void Chunk::addGreedyFace(const std::vector<float>& faceTemplate, const glm::ivec3& normal, 
                           int uStart, int vStart, int wPos, int width, int height, 
                           int uAxis, int vAxis, int wAxis) {
-    unsigned int indexOffset = m_meshVertices.size() / 5; // 5 floats per vertex (3 position + 2 UV)
+    unsigned int indexOffset = m_meshVertices.size() / 5; // 5 floats per vertex (3 pos + 2 UV)
     
     // Calculate the world coordinates of the face corners
     glm::vec3 pos;
@@ -293,16 +338,16 @@ void Chunk::addGreedyFace(const std::vector<float>& faceTemplate, const glm::ive
         m_meshVertices.push_back(value);
     }
     
-    // REVERSED winding order - this flips all face normals
-    // First triangle: Bottom-left -> Top-left -> Top-right
-    m_meshIndices.push_back(indexOffset);     // Bottom-left
-    m_meshIndices.push_back(indexOffset + 3); // Top-left
-    m_meshIndices.push_back(indexOffset + 2); // Top-right
-    
-    // Second triangle: Bottom-left -> Top-right -> Bottom-right
+    // Correct winding order for exterior faces
+    // First triangle: Bottom-left -> Top-right -> Bottom-right
     m_meshIndices.push_back(indexOffset);     // Bottom-left
     m_meshIndices.push_back(indexOffset + 2); // Top-right
     m_meshIndices.push_back(indexOffset + 1); // Bottom-right
+    
+    // Second triangle: Bottom-left -> Top-left -> Top-right
+    m_meshIndices.push_back(indexOffset);     // Bottom-left
+    m_meshIndices.push_back(indexOffset + 3); // Top-left
+    m_meshIndices.push_back(indexOffset + 2); // Top-right
 }
 
 bool Chunk::shouldRenderFace(int x, int y, int z, const glm::vec3& normal) const {
@@ -391,16 +436,16 @@ void Chunk::addFace(const std::vector<float>& vertices, const glm::vec3& positio
         m_meshVertices.push_back(vertices[i + 4]);
     }
 
-    // Add indices for two triangles with REVERSED winding order to match addGreedyFace
-    // First triangle: Bottom-left -> Top-left -> Top-right
-    m_meshIndices.push_back(indexOffset);     // Bottom-left
-    m_meshIndices.push_back(indexOffset + 3); // Top-left
-    m_meshIndices.push_back(indexOffset + 2); // Top-right
-    
-    // Second triangle: Bottom-left -> Top-right -> Bottom-right
+    // Correct winding order for exterior faces (match addGreedyFace)
+    // First triangle: Bottom-left -> Top-right -> Bottom-right
     m_meshIndices.push_back(indexOffset);     // Bottom-left
     m_meshIndices.push_back(indexOffset + 2); // Top-right
     m_meshIndices.push_back(indexOffset + 1); // Bottom-right
+    
+    // Second triangle: Bottom-left -> Top-left -> Top-right
+    m_meshIndices.push_back(indexOffset);     // Bottom-left
+    m_meshIndices.push_back(indexOffset + 3); // Top-left
+    m_meshIndices.push_back(indexOffset + 2); // Top-right
 }
 
 bool Chunk::serialize(const std::string& filename) const {

@@ -5,7 +5,7 @@
 #include <iostream>
 #include <GLFW/glfw3.h>
 
-// Vertex shader source
+// Vertex shader source with normals support
 const char* vertexShaderSource = R"(
     #version 330 core
     layout (location = 0) in vec3 aPos;
@@ -15,24 +15,68 @@ const char* vertexShaderSource = R"(
     uniform mat4 viewProjection;
 
     out vec2 TexCoord;
+    out vec3 Normal;
+    out vec3 FragPos;
 
     void main() {
         gl_Position = viewProjection * model * vec4(aPos, 1.0);
         TexCoord = aTexCoord;
+        
+        // Calculate normal based on face orientation - always pointing outward
+        vec3 faceNormals[6] = vec3[6](
+            vec3(0.0, 0.0, 1.0),   // Front (+Z)
+            vec3(0.0, 0.0, -1.0),  // Back (-Z)
+            vec3(-1.0, 0.0, 0.0),  // Left (-X)
+            vec3(1.0, 0.0, 0.0),   // Right (+X)
+            vec3(0.0, 1.0, 0.0),   // Top (+Y)
+            vec3(0.0, -1.0, 0.0)   // Bottom (-Y)
+        );
+        
+        // Determine face from texture coordinates
+        // This uses the texture atlas layout to identify the face type
+        int faceIndex = 0;
+        if (TexCoord.x >= 0.667 && TexCoord.y >= 0.5) faceIndex = 0;      // Purple - Front
+        else if (TexCoord.x >= 0.667 && TexCoord.y < 0.5) faceIndex = 1;  // Yellow - Back
+        else if (TexCoord.x >= 0.333 && TexCoord.x < 0.667 && TexCoord.y < 0.5) faceIndex = 2;  // Green - Left
+        else if (TexCoord.x < 0.333 && TexCoord.y >= 0.5) faceIndex = 3;  // Black - Right
+        else if (TexCoord.x >= 0.333 && TexCoord.x < 0.667 && TexCoord.y >= 0.5) faceIndex = 4; // Red - Top
+        else if (TexCoord.x < 0.333 && TexCoord.y < 0.5) faceIndex = 5;   // White - Bottom
+        
+        Normal = faceNormals[faceIndex];
+        FragPos = vec3(model * vec4(aPos, 1.0));
     }
 )";
 
-// Fragment shader source
+// Fragment shader source with basic lighting
 const char* fragmentShaderSource = R"(
     #version 330 core
     in vec2 TexCoord;
+    in vec3 Normal;
+    in vec3 FragPos;
 
     uniform sampler2D textureSampler;
 
     out vec4 FragColor;
 
     void main() {
-        FragColor = texture(textureSampler, TexCoord);
+        // Simple directional light from above-right-front diagonal
+        vec3 lightDir = normalize(vec3(0.5, 0.7, 0.5));
+        
+        // Calculate diffuse lighting with normalized normal
+        vec3 norm = normalize(Normal);
+        float diff = max(dot(norm, lightDir), 0.0);
+        
+        // Add ambient light to ensure nothing is completely dark
+        float ambient = 0.4;
+        
+        // Final lighting factor with stronger diffuse component
+        float lighting = ambient + diff * 0.8;
+        
+        // Get base color from texture
+        vec4 texColor = texture(textureSampler, TexCoord);
+        
+        // Apply lighting
+        FragColor = vec4(texColor.rgb * lighting, texColor.a);
     }
 )";
 
@@ -42,6 +86,8 @@ Renderer::Renderer()
     , m_vbo(0)
     , m_ebo(0)
     , m_buffersInitialized(false)
+    , m_disableBackfaceCulling(false)
+    , m_disableGreedyMeshing(false)
 {
 }
 
@@ -375,7 +421,18 @@ void Renderer::renderWorld(World* world, Player* player) {
     // Set up OpenGL state for 3D rendering
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
-    // Removed backface culling as requested
+    
+    // Apply backface culling based on debug setting
+    if (!m_disableBackfaceCulling) {
+        // Enable backface culling with correct winding order
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
+        glFrontFace(GL_CW); // Clockwise for front faces to match our index order
+    } else {
+        // Disable backface culling if requested
+        glDisable(GL_CULL_FACE);
+    }
+    
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
     // Set texture for all chunks
@@ -456,6 +513,8 @@ void Renderer::renderWorld(World* world, Player* player) {
     if (renderDebugCounter++ % 300 == 0) { // Every 5 seconds at 60fps
         std::cout << "Rendering " << visibleChunks << " visible chunks of " 
                   << world->getChunks().size() << " total chunks" << std::endl;
+        std::cout << "Backface culling: " << (m_disableBackfaceCulling ? "DISABLED" : "ENABLED") << std::endl;
+        std::cout << "Greedy meshing: " << (m_disableGreedyMeshing ? "DISABLED" : "ENABLED") << std::endl;
     }
     
     // Render sorted chunks
@@ -468,7 +527,7 @@ void Renderer::renderWorld(World* world, Player* player) {
     glBindVertexArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-    // Removed disabling of GL_CULL_FACE since we're not enabling it
+    glDisable(GL_CULL_FACE);
     glDisable(GL_DEPTH_TEST);
 }
 
