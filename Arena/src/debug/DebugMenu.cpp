@@ -609,12 +609,12 @@ void TextRenderer::renderFallbackText(const std::string& text, float x, float y,
                 glVertex2f(xpos + charWidth * 0.7f, y + charHeight * 0.7f);
                 glVertex2f(xpos + charWidth * 0.3f, y + charHeight * 0.7f);
                 glVertex2f(xpos + charWidth * 0.3f, y + charHeight * 0.7f);
-                glVertex2f(xpos + charWidth * 0.3f, y + charHeight * 0.3f);
-                glVertex2f(xpos + charWidth * 0.3f, y + charHeight * 0.3f);
-                glVertex2f(xpos + charWidth * 0.7f, y + charHeight * 0.3f);
-                glVertex2f(xpos + charWidth * 0.7f, y + charHeight * 0.3f);
+                glVertex2f(xpos + charWidth * 0.3f, y + charHeight * 0.5f);
+                glVertex2f(xpos + charWidth * 0.3f, y + charHeight * 0.5f);
                 glVertex2f(xpos + charWidth * 0.7f, y + charHeight * 0.5f);
                 glVertex2f(xpos + charWidth * 0.7f, y + charHeight * 0.5f);
+                glVertex2f(xpos + charWidth * 0.7f, y + charHeight * 0.3f);
+                glVertex2f(xpos + charWidth * 0.7f, y + charHeight * 0.3f);
                 glVertex2f(xpos + charWidth * 0.5f, y + charHeight * 0.5f);
                 break;
             case 'H':
@@ -1112,7 +1112,9 @@ void DebugMenu::render() {
     glMatrixMode(GL_PROJECTION);
     glPushMatrix();
     glLoadIdentity();
-    glOrtho(0.0, width, 0.0, height, -1.0, 1.0);
+    // Change to use same coordinates as UI and Renderer 
+    // (0,0 at top-left instead of bottom-left)
+    glOrtho(0.0, width, height, 0.0, -1.0, 1.0);
     
     glMatrixMode(GL_MODELVIEW);
     glPushMatrix();

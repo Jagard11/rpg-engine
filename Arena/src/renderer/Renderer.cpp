@@ -249,24 +249,14 @@ void Renderer::setupBuffers() {
 }
 
 void Renderer::render(World* world, Player* player) {
-    // Report buffer state at the start of each frame to help debug
-    std::cout << "Renderer::render - Buffer state: VAO=" << m_vao << " VBO=" << m_vbo 
-              << " EBO=" << m_ebo << " initialized=" << (m_buffersInitialized ? "YES" : "NO") << std::endl;
-    
-    // Ensure buffer initialization
-    if (!m_buffersInitialized) {
-        setupBuffers();
-        m_buffersInitialized = (m_vao != 0 && m_vbo != 0 && m_ebo != 0);
-        std::cout << "Re-initialized buffers: VAO=" << m_vao << " VBO=" << m_vbo 
-                  << " EBO=" << m_ebo << " Success=" << (m_buffersInitialized ? "YES" : "NO") << std::endl;
-    }
-    
-    // Start with clean state for this frame
+    // Track if we need to restore GPU state between renders
     bool stateModified = false;
+    
+    // Get current window dimensions
     int width, height;
     glfwGetFramebufferSize(glfwGetCurrentContext(), &width, &height);
-
-    // 1. Render 3D world with modern shaders
+    
+    // 1. First render the 3D game world
     if (world && m_buffersInitialized) {
         stateModified = true;
         glEnable(GL_DEPTH_TEST);
@@ -291,6 +281,9 @@ void Renderer::render(World* world, Player* player) {
     glMatrixMode(GL_PROJECTION);
     glPushMatrix();
     glLoadIdentity();
+    // Use top-left as origin (0,0) for consistency with all UI elements
+    std::cout << "Renderer: Setting up orthographic projection with dimensions " 
+              << width << "x" << height << " and top-left origin (0,0)" << std::endl;
     glOrtho(0, width, height, 0, -1, 1);
 
     glMatrixMode(GL_MODELVIEW);
@@ -739,12 +732,31 @@ void Renderer::setupCamera(const Player* player) {
                   << " voxels above player position: " << position.y << std::endl;
     }
 }
+
 void Renderer::renderHUD() {
     // Get window dimensions
     int width, height;
     glfwGetFramebufferSize(glfwGetCurrentContext(), &width, &height);
     
-    // Render crosshair at screen center
+    // Save matrices and set up 2D projection
+    glMatrixMode(GL_PROJECTION);
+    glPushMatrix();
+    glLoadIdentity();
+    
+    // Use top-left as origin (0,0) for consistency with all UI elements
+    std::cout << "RenderHUD: Setting up orthographic projection with dimensions " 
+              << width << "x" << height << " and top-left origin (0,0)" << std::endl;
+    glOrtho(0, width, height, 0, -1, 1);
+    
+    glMatrixMode(GL_MODELVIEW);
+    glPushMatrix();
+    glLoadIdentity();
+    
+    // Disable depth testing for HUD
+    GLboolean depthTestEnabled = glIsEnabled(GL_DEPTH_TEST);
+    if (depthTestEnabled) glDisable(GL_DEPTH_TEST);
+    
+    // Render crosshair at screen center with top-left origin
     float crosshairSize = 10.0f;
     glColor4f(1.0f, 1.0f, 1.0f, 0.8f);
     glLineWidth(2.0f);
@@ -754,4 +766,14 @@ void Renderer::renderHUD() {
     glVertex2f(width/2, height/2 - crosshairSize);
     glVertex2f(width/2, height/2 + crosshairSize);
     glEnd();
+    
+    // Restore matrices
+    glMatrixMode(GL_PROJECTION);
+    glPopMatrix();
+    
+    glMatrixMode(GL_MODELVIEW);
+    glPopMatrix();
+    
+    // Restore depth testing if it was enabled
+    if (depthTestEnabled) glEnable(GL_DEPTH_TEST);
 } 

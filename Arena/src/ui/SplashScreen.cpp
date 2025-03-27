@@ -118,10 +118,9 @@ void SplashScreen::render() {
     double mouseX, mouseY;
     glfwGetCursorPos(m_window, &mouseX, &mouseY);
     
-    // Convert mouse coordinates to match OpenGL's coordinate system
-    // GLFW gives coordinates with (0,0) at top-left, we need (0,0) at bottom-left
+    // Store mouse coordinates directly using top-left origin (0,0) to match our UI rendering
     m_mouseX = mouseX;
-    m_mouseY = height - mouseY; // Invert Y coordinate
+    m_mouseY = mouseY; // Don't invert Y anymore since we're using top-left origin for everything
     
     m_lastMousePressed = m_mousePressed;
     m_mousePressed = glfwGetMouseButton(m_window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
@@ -144,6 +143,21 @@ void SplashScreen::render() {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     
+    // Set up orthographic projection for UI rendering
+    glMatrixMode(GL_PROJECTION);
+    glPushMatrix();
+    glLoadIdentity();
+    
+    // Use consistent top-left origin for UI coordinates
+    // Print the projection setup for debugging
+    std::cout << "SplashScreen: Setting up orthographic projection with dimensions " 
+              << width << "x" << height << " and top-left origin (0,0)" << std::endl;
+    glOrtho(0, width, height, 0, -1, 1); // Top-left origin (0,0) at top-left of screen
+    
+    glMatrixMode(GL_MODELVIEW);
+    glPushMatrix();
+    glLoadIdentity();
+    
     // Clear with a more vibrant background color
     glClearColor(0.2f, 0.3f, 0.8f, 1.0f); // Blue background
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -151,6 +165,10 @@ void SplashScreen::render() {
     // Update TextRenderer projection if available
     if (m_textRenderer && m_textRenderer->isInitialized()) {
         m_textRenderer->updateProjection(width, height);
+        
+        // Debug - print the TextRenderer coordinates
+        std::cout << "TextRenderer projection updated for " << width << "x" << height 
+                  << " with top-left origin" << std::endl;
     } else {
         static bool loggedWarning = false;
         if (!loggedWarning) {
@@ -175,6 +193,13 @@ void SplashScreen::render() {
             break;
     }
     
+    // Restore matrices
+    glMatrixMode(GL_PROJECTION);
+    glPopMatrix();
+    
+    glMatrixMode(GL_MODELVIEW);
+    glPopMatrix();
+    
     // Restore OpenGL state
     glUseProgram(currentProgram);
     if (depthTestEnabled) glEnable(GL_DEPTH_TEST);
@@ -189,7 +214,7 @@ void SplashScreen::renderSplashScreen() {
     glfwGetFramebufferSize(m_window, &width, &height);
     
     // Draw a prominent game title at the top
-    float titleY = height * 0.85f; // Position title higher up
+    float titleY = height * 0.15f; // Position title near the top
     float titleScale = 3.0f; // Larger scale for the title
     
     // Use TextRenderer for the title
@@ -206,9 +231,10 @@ void SplashScreen::renderSplashScreen() {
     float buttonWidth = width * 0.6f; // Wider buttons
     float buttonHeight = height * 0.15f; // Taller buttons
     float buttonX = (width - buttonWidth) / 2;
-    float newGameY = height * 0.6f; // Adjusted Y position
-    float loadGameY = height * 0.4f; // Adjusted Y position
-    float quitY = height * 0.2f; // Adjusted Y position
+    float buttonSpacing = height * 0.05f; // Space between buttons
+    float newGameY = height * 0.3f; // Start buttons after the title
+    float loadGameY = newGameY + buttonHeight + buttonSpacing;
+    float quitY = loadGameY + buttonHeight + buttonSpacing;
     
     // Check if mouse is over buttons
     bool highlightNewGame = isMouseOverButton(buttonX, newGameY, buttonWidth, buttonHeight);
@@ -247,13 +273,13 @@ void SplashScreen::renderNewGameScreen() {
     
     // Title - reduce scale from 6.0f to 2.5f
     glColor3f(0.8f, 0.8f, 0.8f);
-    renderTextAtCenter("NEW GAME", width/2, height * 0.8f, 2.5f);
+    renderTextAtCenter("NEW GAME", width/2, height * 0.15f, 2.5f);
     
     // Seed input field
     float inputWidth = width * 0.6f;
     float inputHeight = height * 0.08f;
     float inputX = (width - inputWidth) / 2;
-    float inputY = height * 0.6f; // Adjusted Y position
+    float inputY = height * 0.3f; // Position after the title
     
     // Render input field
     glColor3f(0.2f, 0.2f, 0.2f);
@@ -262,40 +288,35 @@ void SplashScreen::renderNewGameScreen() {
     // Reduce input text scale from 3.0f to 1.5f
     glColor3f(1.0f, 1.0f, 1.0f);
     renderText(m_isTyping ? m_seedInput + "_" : m_seedInput, 
-               inputX + 10, inputY + inputHeight/2, 1.5f);
+               inputX + 10, inputY + inputHeight/2 - 12, 1.5f); // Vertical centering adjustment
     
     // Reduce help text scale from 3.0f to 1.2f
     glColor3f(0.7f, 0.7f, 0.7f);
-    renderTextAtCenter("SEED (leave empty for random)", width/2, inputY + inputHeight + 20, 1.2f);
+    renderTextAtCenter("SEED (leave empty for random)", width/2, inputY - 20, 1.2f);
     
     // Create button
     float buttonWidth = width * 0.3f;
     float buttonHeight = height * 0.08f;
     float buttonX = (width - buttonWidth) / 2;
-    float createY = height * 0.45f; // Adjusted Y position
-    float backY = height * 0.3f; // Adjusted Y position
+    float buttonSpacing = height * 0.05f;
+    float createY = inputY + inputHeight + buttonSpacing;
+    float backY = createY + buttonHeight + buttonSpacing;
     
     bool highlightCreate = isMouseOverButton(buttonX, createY, buttonWidth, buttonHeight);
     bool highlightBack = isMouseOverButton(buttonX, backY, buttonWidth, buttonHeight);
     
-    // Create world button
-    renderButton("CREATE WORLD", buttonX, createY, buttonWidth, buttonHeight, highlightCreate);
+    // Create button
+    renderButton("CREATE", buttonX, createY, buttonWidth, buttonHeight, highlightCreate);
     
     // Back button
     renderButton("BACK", buttonX, backY, buttonWidth, buttonHeight, highlightBack);
     
-    // Handle clicking
+    // Handle button clicks
     if (m_mousePressed && !m_lastMousePressed) {
-        if (isMouseOverButton(inputX, inputY, inputWidth, inputHeight)) {
-            m_isTyping = true;
-        } else if (highlightCreate) {
-            m_isTyping = false;
+        if (highlightCreate) {
             createNewGame();
         } else if (highlightBack) {
-            m_isTyping = false;
             m_currentState = UIState::SPLASH_SCREEN;
-        } else {
-            m_isTyping = false;
         }
     }
 }
@@ -309,83 +330,71 @@ void SplashScreen::renderLoadGameScreen() {
     
     // Title - reduce scale from 6.0f to 2.5f
     glColor3f(0.8f, 0.8f, 0.8f);
-    renderTextAtCenter("LOAD GAME", width/2, height * 0.9f, 2.5f);
+    renderTextAtCenter("LOAD GAME", width/2, height * 0.15f, 2.5f);
     
-    // List of save games
-    float listWidth = width * 0.7f;
-    float entryHeight = height * 0.08f;
+    // Save list area
+    float listWidth = width * 0.8f;
+    float listHeight = height * 0.4f;
     float listX = (width - listWidth) / 2;
-    float listY = height * 0.7f; // Adjusted Y position, this is now the BOTTOM of the list
-    float maxVisibleEntries = 5;
+    float listY = height * 0.25f;
     
-    // Draw list background
-    glColor3f(0.3f, 0.3f, 0.3f);
-    renderBox(listX, listY, listWidth, entryHeight * std::min(maxVisibleEntries, (float)m_saveGames.size() + 1));
+    // Background for saves list
+    glColor3f(0.15f, 0.15f, 0.3f);
+    renderBox(listX, listY, listWidth, listHeight);
     
+    // Draw save entries
     if (m_saveGames.empty()) {
-        glColor3f(0.8f, 0.8f, 0.8f);
-        renderTextAtCenter("No saved games found", width/2, listY + entryHeight/2, 1.5f);
+        glColor3f(0.7f, 0.7f, 0.7f);
+        renderTextAtCenter("NO SAVE GAMES FOUND", width/2, listY + listHeight/2, 1.5f);
     } else {
-        // Render save entries
-        for (size_t i = 0; i < m_saveGames.size(); i++) {
-            if (i >= maxVisibleEntries) break;
+        float entryHeight = height * 0.07f;
+        float maxEntries = std::min(static_cast<int>(m_saveGames.size()), static_cast<int>(listHeight / entryHeight));
+        
+        for (int i = 0; i < maxEntries; i++) {
+            float entryY = listY + i * entryHeight;
+            bool isSelected = i == m_selectedSaveIndex;
             
-            float entryY = listY + (maxVisibleEntries - 1 - i) * entryHeight; // Entries are drawn from bottom to top
-            bool isSelected = m_selectedSaveIndex == (int)i;
-            bool isHighlighted = isMouseOverButton(listX, entryY, listWidth, entryHeight);
-            
-            // Background
+            // Entry background
             if (isSelected) {
-                glColor3f(0.2f, 0.3f, 0.5f);
-            } else if (isHighlighted) {
-                glColor3f(0.25f, 0.25f, 0.3f);
+                glColor3f(0.4f, 0.4f, 0.7f);
+            } else if (isMouseOverButton(listX, entryY, listWidth, entryHeight)) {
+                glColor3f(0.3f, 0.3f, 0.5f);
             } else {
-                glColor3f(0.2f, 0.2f, 0.2f);
+                glColor3f(0.2f, 0.2f, 0.4f);
             }
             renderBox(listX, entryY, listWidth, entryHeight);
             
-            // Save name and date - reduce scales
-            glColor3f(0.8f, 0.8f, 0.8f);
-            renderText(m_saveGames[i].name, listX + 10, entryY + entryHeight/2, 1.4f);
+            // Entry text - reduce scale from 3.0f to 1.3f
+            glColor3f(1.0f, 1.0f, 1.0f);
             
-            glColor3f(0.6f, 0.6f, 0.6f);
-            renderText(m_saveGames[i].date, listX + listWidth - 200, entryY + entryHeight/2, 1.0f);
+            // Render save name
+            std::string saveName = m_saveGames[i].name.empty() ? 
+                                  "Unnamed Save " + std::to_string(i+1) : 
+                                  m_saveGames[i].name;
+            renderText(saveName, listX + 20, entryY + entryHeight/2 - 10, 1.3f);
             
-            // Delete button
-            float deleteWidth = 80;
-            float deleteX = listX + listWidth - deleteWidth - 10;
-            bool deleteHighlight = isMouseOverButton(deleteX, entryY + 5, deleteWidth, entryHeight - 10);
-            
-            if (deleteHighlight) {
-                glColor3f(0.7f, 0.2f, 0.2f);
-            } else {
-                glColor3f(0.5f, 0.1f, 0.1f);
-            }
-            renderBox(deleteX, entryY + 5, deleteWidth, entryHeight - 10);
-            
-            glColor3f(0.9f, 0.9f, 0.9f);
-            renderTextAtCenter("DELETE", deleteX + deleteWidth/2, entryY + entryHeight/2, 1.0f);
-            
-            // Handle clicking on delete
-            if (m_mousePressed && !m_lastMousePressed && deleteHighlight) {
-                deleteSaveGame(i);
-                continue;
+            // Render date on the right side if available
+            if (!m_saveGames[i].date.empty()) {
+                glColor3f(0.7f, 0.7f, 0.7f);
+                float dateWidth = 8.0f * m_saveGames[i].date.length() * 1.0f; // Estimate width
+                renderText(m_saveGames[i].date, listX + listWidth - dateWidth - 20, entryY + entryHeight/2 - 10, 1.0f);
             }
             
-            // Handle clicking on save entry
-            if (m_mousePressed && !m_lastMousePressed && isHighlighted && !deleteHighlight) {
+            // Handle clicking on a save entry
+            if (m_mousePressed && !m_lastMousePressed && 
+                isMouseOverButton(listX, entryY, listWidth, entryHeight)) {
                 m_selectedSaveIndex = i;
                 m_selectedSavePath = m_saveGames[i].filename;
             }
         }
     }
     
-    // Load and Back buttons
+    // Button position calculations
     float buttonWidth = width * 0.3f;
     float buttonHeight = height * 0.08f;
     float buttonX = (width - buttonWidth) / 2;
-    float loadY = height * 0.4f; // Adjusted Y position
-    float backY = height * 0.3f; // Adjusted Y position
+    float loadY = listY + listHeight + height * 0.05f;
+    float backY = loadY + buttonHeight + height * 0.03f;
     
     bool highlightLoad = isMouseOverButton(buttonX, loadY, buttonWidth, buttonHeight) && m_selectedSaveIndex >= 0;
     bool highlightBack = isMouseOverButton(buttonX, backY, buttonWidth, buttonHeight);
@@ -431,7 +440,7 @@ void SplashScreen::renderInGameMenu() {
     
     // Title - reduce scale from 6.0f to 2.5f
     glColor3f(0.9f, 0.9f, 0.9f);
-    renderTextAtCenter("GAME MENU", width/2, height * 0.8f, 2.5f);
+    renderTextAtCenter("GAME MENU", width/2, height * 0.15f, 2.5f);
     
     // Menu buttons
     float buttonWidth = width * 0.4f;
@@ -439,11 +448,11 @@ void SplashScreen::renderInGameMenu() {
     float buttonX = (width - buttonWidth) / 2;
     float buttonSpacing = height * 0.02f;
     
-    float resumeY = height * 0.65f; // Adjusted Y position
-    float saveY = resumeY - buttonHeight - buttonSpacing;
-    float loadY = saveY - buttonHeight - buttonSpacing;
-    float splashY = loadY - buttonHeight - buttonSpacing;
-    float quitY = splashY - buttonHeight - buttonSpacing;
+    float resumeY = height * 0.3f; // Start after title
+    float saveY = resumeY + buttonHeight + buttonSpacing;
+    float loadY = saveY + buttonHeight + buttonSpacing;
+    float splashY = loadY + buttonHeight + buttonSpacing;
+    float quitY = splashY + buttonHeight + buttonSpacing;
     
     bool highlightResume = isMouseOverButton(buttonX, resumeY, buttonWidth, buttonHeight);
     bool highlightSave = isMouseOverButton(buttonX, saveY, buttonWidth, buttonHeight);
@@ -451,18 +460,12 @@ void SplashScreen::renderInGameMenu() {
     bool highlightSplash = isMouseOverButton(buttonX, splashY, buttonWidth, buttonHeight);
     bool highlightQuit = isMouseOverButton(buttonX, quitY, buttonWidth, buttonHeight);
     
-    // Resume button
-    renderButton("RESUME GAME", buttonX, resumeY, buttonWidth, buttonHeight, highlightResume);
-    
-    // Save game button
-    renderButton("SAVE GAME", buttonX, saveY, buttonWidth, buttonHeight, highlightSave);
-    
     // Save game name input
     if (m_isTyping) {
         float inputWidth = width * 0.5f;
         float inputHeight = height * 0.06f;
         float inputX = (width - inputWidth) / 2;
-        float inputY = saveY + inputHeight + 10; // Adjusted Y position
+        float inputY = saveY - inputHeight - 10; // Place above save button
         
         // Background
         glColor3f(0.2f, 0.2f, 0.2f);
@@ -470,12 +473,18 @@ void SplashScreen::renderInGameMenu() {
         
         // Text - reduce scale from 3.0f to 1.5f
         glColor3f(1.0f, 1.0f, 1.0f);
-        renderText(m_saveName + "_", inputX + 10, inputY + inputHeight/2, 1.5f);
+        renderText(m_saveName + "_", inputX + 10, inputY + inputHeight/2 - 12, 1.5f);
         
         // Label - reduce scale from 3.0f to 1.2f
         glColor3f(0.9f, 0.9f, 0.9f);
-        renderTextAtCenter("ENTER SAVE NAME", width/2, inputY + inputHeight + 20, 1.2f);
+        renderTextAtCenter("ENTER SAVE NAME", width/2, inputY - 20, 1.2f);
     }
+    
+    // Resume button
+    renderButton("RESUME GAME", buttonX, resumeY, buttonWidth, buttonHeight, highlightResume);
+    
+    // Save game button
+    renderButton("SAVE GAME", buttonX, saveY, buttonWidth, buttonHeight, highlightSave);
     
     // Other buttons
     renderButton("LOAD GAME", buttonX, loadY, buttonWidth, buttonHeight, highlightLoad);
@@ -521,65 +530,96 @@ void SplashScreen::renderInGameMenu() {
 }
 
 void SplashScreen::renderTextAtCenter(const std::string& text, float centerX, float centerY, float scale) {
+    // Use TextRenderer if available
     if (m_textRenderer && m_textRenderer->isInitialized()) {
-        // Calculate text width for centering
-        float width = m_textRenderer->getTextWidth(text, scale);
+        float textWidth = m_textRenderer->getTextWidth(text, scale);
+        float x = centerX - textWidth / 2.0f;
+        // Calculate vertical centering based on the font size
+        // In a top-left origin system, we need to adjust y to center the text vertically
+        float fontSize = scale * 24.0f; // Approximate font size based on scale
+        float y = centerY - fontSize / 2.0f; // Position y to center the text vertically
         
-        // Calculate x position for centering
-        float x = centerX - (width / 2.0f);
+        m_textRenderer->renderText(text, x, y, scale, glm::vec3(1.0f, 1.0f, 1.0f));
+    } else {
+        // Fallback rendering
+        glColor3f(1.0f, 1.0f, 1.0f);
         
-        // Render the text
-        m_textRenderer->renderText(text, x, centerY, scale, glm::vec3(1.0f, 1.0f, 1.0f));
+        float charWidth = 8.0f * scale;
+        float charHeight = 16.0f * scale;
+        float textWidth = text.length() * charWidth;
+        
+        float x = centerX - textWidth / 2.0f;
+        float y = centerY - charHeight / 2.0f;
+        
+        renderText(text, x, y, scale);
     }
-    // No fallback rendering - if TextRenderer isn't available, nothing will be rendered
 }
 
 void SplashScreen::renderText(const std::string& text, float x, float y, float scale) {
+    // Use the TextRenderer if available (with corrected coordinates)
     if (m_textRenderer && m_textRenderer->isInitialized()) {
         m_textRenderer->renderText(text, x, y, scale, glm::vec3(1.0f, 1.0f, 1.0f));
+    } else {
+        // Fallback rendering (using legacy OpenGL)
+        glColor3f(1.0f, 1.0f, 1.0f);
+        
+        float charWidth = 8.0f * scale;
+        float charHeight = 16.0f * scale;
+        
+        for (size_t i = 0; i < text.length(); ++i) {
+            char c = text[i];
+            float xPos = x + i * charWidth;
+            
+            // Simple rectangle for each character (in a proper top-left origin system)
+            glBegin(GL_LINE_LOOP);
+            glVertex2f(xPos, y);                 // Top-left
+            glVertex2f(xPos, y + charHeight);    // Bottom-left
+            glVertex2f(xPos + charWidth, y + charHeight); // Bottom-right
+            glVertex2f(xPos + charWidth, y);     // Top-right
+            glEnd();
+        }
     }
-    // No fallback rendering - if TextRenderer isn't available, nothing will be rendered
 }
 
 void SplashScreen::renderButton(const std::string& text, float x, float y, float width, float height, bool highlight) {
-    // Draw button background
-    glColor4f(0.2f, 0.2f, 0.2f, 0.8f); // Semi-transparent dark background
+    // Draw button background with highlight effect if mouse is over it
     if (highlight) {
-        glColor4f(0.3f, 0.3f, 0.3f, 0.9f); // Slightly lighter when highlighted
+        glColor4f(0.4f, 0.4f, 0.9f, 0.9f); // Brighter blue when highlighted
+    } else {
+        glColor4f(0.2f, 0.2f, 0.7f, 0.8f); // Dark blue base color
     }
+    
+    // Render the button box
     renderBox(x, y, width, height);
     
-    // Draw button border
-    glColor4f(0.8f, 0.8f, 0.8f, 1.0f); // Light border
-    if (highlight) {
-        glColor4f(1.0f, 1.0f, 1.0f, 1.0f); // Brighter border when highlighted
-    }
-    glLineWidth(2.0f);
-    glBegin(GL_LINE_LOOP);
-    glVertex2f(x, y);
-    glVertex2f(x + width, y);
-    glVertex2f(x + width, y + height);
-    glVertex2f(x, y + height);
-    glEnd();
+    // Render button text centered in the button
+    // Use white text for better contrast
+    glColor3f(1.0f, 1.0f, 1.0f);
     
-    // Render button text - reduce scale from 1.5f to 1.0f
+    // Use the TextRenderer if available for better text rendering
     if (m_textRenderer && m_textRenderer->isInitialized()) {
-        float textScale = 1.0f;
+        float textScale = height * 0.4f / 48.0f; // Scale based on button height and font size
         float textWidth = m_textRenderer->getTextWidth(text, textScale);
         float textX = x + (width - textWidth) / 2.0f;
-        float textY = y + (height + textScale * 20.0f) / 2.0f; // Center text vertically
+        float textY = y + (height - textScale * 48.0f) / 2.0f; // Center vertically
         
-        glm::vec3 textColor = highlight ? glm::vec3(1.0f, 1.0f, 1.0f) : glm::vec3(0.8f, 0.8f, 0.8f);
-        m_textRenderer->renderText(text, textX, textY, textScale, textColor);
+        // Render with the text renderer which uses the same top-left origin
+        m_textRenderer->renderText(text, textX, textY, textScale, glm::vec3(1.0f, 1.0f, 1.0f));
+    } else {
+        // Fallback to built-in text rendering
+        float textScale = 2.0f; // Default scale if TextRenderer isn't available
+        renderTextAtCenter(text, x + width/2, y + height/2, textScale);
     }
 }
 
 void SplashScreen::renderBox(float x, float y, float width, float height) {
+    // Use a consistent counter-clockwise winding order for vertices
+    // (x,y) is top-left in our coordinate system
     glBegin(GL_QUADS);
-    glVertex2f(x, y);
-    glVertex2f(x + width, y);
-    glVertex2f(x + width, y + height);
-    glVertex2f(x, y + height);
+    glVertex2f(x, y);                 // Top-left
+    glVertex2f(x, y + height);        // Bottom-left
+    glVertex2f(x + width, y + height); // Bottom-right
+    glVertex2f(x + width, y);         // Top-right
     glEnd();
 }
 
@@ -868,6 +908,10 @@ void SplashScreen::handleMenuNavigation(int key) {
 }
 
 bool SplashScreen::isMouseOverButton(float x, float y, float width, float height) const {
+    // Check if mouse is within button boundaries
+    // In top-left coordinate system (0,0 at top-left):
+    // - m_mouseX should be between x and x+width
+    // - m_mouseY should be between y and y+height
     return (m_mouseX >= x && m_mouseX <= x + width &&
             m_mouseY >= y && m_mouseY <= y + height);
 }

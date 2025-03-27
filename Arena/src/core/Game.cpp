@@ -223,6 +223,25 @@ void Game::renderHUD() {
     int width = m_window->getWidth();
     int height = m_window->getHeight();
     
+    // Set up orthographic projection for 2D UI rendering
+    glMatrixMode(GL_PROJECTION);
+    glPushMatrix();
+    glLoadIdentity();
+    glOrtho(0, width, height, 0, -1, 1); // Top-left origin for consistency with UI
+    
+    glMatrixMode(GL_MODELVIEW);
+    glPushMatrix();
+    glLoadIdentity();
+    
+    // Disable depth testing for UI
+    GLboolean depthTestEnabled = glIsEnabled(GL_DEPTH_TEST);
+    if (depthTestEnabled) glDisable(GL_DEPTH_TEST);
+    
+    // Enable blending for transparent UI elements
+    GLboolean blendEnabled = glIsEnabled(GL_BLEND);
+    if (!blendEnabled) glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    
     // Render crosshair at screen center
     float crosshairSize = 10.0f;
     glColor4f(1.0f, 1.0f, 1.0f, 0.8f);
@@ -243,10 +262,10 @@ void Game::renderHUD() {
     // Background box
     glColor4f(0.0f, 0.0f, 0.0f, 0.6f);
     glBegin(GL_QUADS);
-    glVertex2f(padding, padding);
-    glVertex2f(padding + boxWidth, padding);
-    glVertex2f(padding + boxWidth, padding + boxHeight);
-    glVertex2f(padding, padding + boxHeight);
+    glVertex2f(padding, height - (padding + boxHeight));
+    glVertex2f(padding + boxWidth, height - (padding + boxHeight));
+    glVertex2f(padding + boxWidth, height - padding);
+    glVertex2f(padding, height - padding);
     glEnd();
     
     // Jetpack status indicator
@@ -259,19 +278,19 @@ void Game::renderHUD() {
     glBegin(GL_TRIANGLES);
     // Draw a jetpack icon
     float centerX = padding + indicatorSize/2 + 10.0f;
-    float centerY = padding + boxHeight/2;
+    float centerY = height - (padding + boxHeight/2);
     
     // Main body
-    glVertex2f(centerX - 10.0f, centerY - 15.0f);
-    glVertex2f(centerX + 10.0f, centerY - 15.0f);
-    glVertex2f(centerX, centerY + 15.0f);
+    glVertex2f(centerX - 10.0f, centerY + 15.0f);
+    glVertex2f(centerX + 10.0f, centerY + 15.0f);
+    glVertex2f(centerX, centerY - 15.0f);
     
     // Flames if enabled
     if (m_player->isJetpackEnabled()) {
         glColor4f(1.0f, 0.7f, 0.2f, 1.0f); // Orange flame
-        glVertex2f(centerX - 8.0f, centerY - 15.0f);
-        glVertex2f(centerX + 8.0f, centerY - 15.0f);
-        glVertex2f(centerX, centerY - 25.0f);
+        glVertex2f(centerX - 8.0f, centerY + 15.0f);
+        glVertex2f(centerX + 8.0f, centerY + 15.0f);
+        glVertex2f(centerX, centerY + 25.0f);
     }
     glEnd();
     
@@ -280,7 +299,7 @@ void Game::renderHUD() {
     float barWidth = 60.0f;
     float barHeight = 10.0f;
     float barX = padding + indicatorSize + 20.0f;
-    float barY = padding + (boxHeight - barHeight) / 2;
+    float barY = height - (padding + (boxHeight + barHeight) / 2);
     
     // Background
     glColor4f(0.3f, 0.3f, 0.3f, 0.8f);
@@ -309,7 +328,7 @@ void Game::renderHUD() {
     
     // Render flying mode status
     float statusSize = 10.0f;
-    float statusY = padding + boxHeight + 15.0f;
+    float statusY = height - (padding + boxHeight + 15.0f);
     
     // Draw flying status indicator
     if (m_player->isFlying()) {
@@ -324,6 +343,17 @@ void Game::renderHUD() {
     glVertex2f(padding + statusSize, statusY + statusSize);
     glVertex2f(padding, statusY + statusSize);
     glEnd();
+    
+    // Restore matrices
+    glMatrixMode(GL_PROJECTION);
+    glPopMatrix();
+    
+    glMatrixMode(GL_MODELVIEW);
+    glPopMatrix();
+    
+    // Restore OpenGL state
+    if (depthTestEnabled) glEnable(GL_DEPTH_TEST);
+    if (!blendEnabled) glDisable(GL_BLEND);
 }
 
 void Game::handleInput(float deltaTime) {
@@ -455,6 +485,12 @@ bool Game::loadWorld(const std::string& savePath) {
         std::string playerSavePath = savePath + ".player";
         if (std::filesystem::exists(playerSavePath)) {
             m_player->loadFromFile(playerSavePath);
+        }
+        
+        // Reinitialize renderer buffers to fix the "Cannot render world - buffers not initialized" error
+        if (m_renderer) {
+            std::cout << "Reinitializing renderer buffers after game load..." << std::endl;
+            m_renderer->setupBuffers();
         }
         
         m_isInGame = true;

@@ -398,21 +398,28 @@ void TextRenderer::renderText(const std::string& text, float x, float y, float s
         
         Character ch = it->second;
         
+        // FIX: Modified for top-left origin coordinates
+        // For top-left origin (0,0 at top-left), we need to adjust the Y calculation
+        // In top-left origin, increasing Y moves DOWN the screen
         float xpos = x + ch.Bearing.x * scale;
-        float ypos = y - (ch.Size.y - ch.Bearing.y) * scale;
+        float ypos = y + ch.Bearing.y * scale - ch.Size.y * scale;  // Adjusted for top-left origin
 
         float w = ch.Size.x * scale;
         float h = ch.Size.y * scale;
+        
+        std::cout << "DEBUG Character '" << c << "': position=(" << xpos << "," << ypos << "), size=(" 
+                  << w << "," << h << "), bearing=(" << ch.Bearing.x << "," << ch.Bearing.y << ")" << std::endl;
 
-        // Define the quad vertices with texture coordinates exactly like in text_test.cpp
+        // Define the quad vertices with texture coordinates for top-left origin system
+        // In top-left system: (0,0) is top-left, (1,1) is bottom-right for texture coordinates
         float vertices[6][4] = {
-            { xpos,     ypos + h,   0.0f, 0.0f },            
-            { xpos,     ypos,       0.0f, 1.0f },
-            { xpos + w, ypos,       1.0f, 1.0f },
+            { xpos,     ypos,       0.0f, 0.0f },            // Top-left vertex, top-left texture coord
+            { xpos,     ypos + h,   0.0f, 1.0f },            // Bottom-left vertex, bottom-left texture
+            { xpos + w, ypos + h,   1.0f, 1.0f },            // Bottom-right vertex, bottom-right texture
 
-            { xpos,     ypos + h,   0.0f, 0.0f },
-            { xpos + w, ypos,       1.0f, 1.0f },
-            { xpos + w, ypos + h,   1.0f, 0.0f }
+            { xpos,     ypos,       0.0f, 0.0f },            // Top-left vertex, top-left texture coord
+            { xpos + w, ypos + h,   1.0f, 1.0f },            // Bottom-right vertex, bottom-right texture
+            { xpos + w, ypos,       1.0f, 0.0f }             // Top-right vertex, top-right texture
         };
 
         // Bind the glyph texture
@@ -554,9 +561,11 @@ void TextRenderer::renderFallbackText(const std::string& text, float x, float y,
 }
 
 void TextRenderer::updateProjection(float width, float height) {
-    // Update projection matrix to use screen coordinates
-    projection = glm::ortho(0.0f, width, 0.0f, height);
-    std::cout << "Updated text renderer projection matrix for dimensions: " << width << "x" << height << std::endl;
+    // Update projection matrix to use screen coordinates with (0,0) at top-left corner
+    // to match GLFW window coordinates and the rest of the UI system
+    projection = glm::ortho(0.0f, width, height, 0.0f);
+    std::cout << "Updated text renderer projection matrix for dimensions: " << width << "x" << height 
+              << " with top-left origin" << std::endl;
 }
 
 void TextRenderer::renderTestText() {
