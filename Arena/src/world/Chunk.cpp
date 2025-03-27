@@ -60,6 +60,10 @@ void Chunk::generateMesh(bool disableGreedyMeshing) {
               << ") with greedy meshing " << (disableGreedyMeshing ? "DISABLED" : "ENABLED") << std::endl;
     
     // STEP 1: FACE CULLING - Determine which faces need to be rendered
+    // Face culling rules:
+    // 1. If the adjacent block is transparent (air, glass, etc.), render the face
+    // 2. If the adjacent block is a different type than the current block (and current is not transparent), render the face
+    // 3. Otherwise, the face is hidden and should be culled
     // This is done BEFORE any greedy meshing - we determine visibility first
     bool needsRender[CHUNK_SIZE][CHUNK_HEIGHT][CHUNK_SIZE][6] = {false};
     int faceCount = 0;
@@ -80,8 +84,8 @@ void Chunk::generateMesh(bool disableGreedyMeshing) {
                                          checkY < 0 || checkY >= CHUNK_HEIGHT || 
                                          checkZ < 0 || checkZ >= CHUNK_SIZE;
                     
-                    // Only render faces adjacent to air or at chunk boundaries
-                    // This is the key change - we ONLY render a face if the adjacent block is air
+                    // Only render faces adjacent to transparent blocks or at chunk boundaries
+                    // This is the key change - we ONLY render a face if the adjacent block is transparent
                     if (isChunkBoundary) {
                         // For chunk boundaries, check neighboring chunks
                         if (m_world) {
@@ -92,7 +96,15 @@ void Chunk::generateMesh(bool disableGreedyMeshing) {
                             
                             // Query the world for the block at this position
                             int adjacentBlock = m_world->getBlock(glm::ivec3(worldX, worldY, worldZ));
-                            if (adjacentBlock == 0) { // Only render if adjacent to air
+                            
+                            // Get current block type
+                            int currentBlock = getBlock(x, y, z);
+                            
+                            // Only render the face if:
+                            // 1. The adjacent block is transparent, OR
+                            // 2. The adjacent block is different from the current block (but only for non-transparent blocks)
+                            if (isBlockTransparent(adjacentBlock) || 
+                                (currentBlock != adjacentBlock && !isBlockTransparent(currentBlock))) {
                                 needsRender[x][y][z][faceIndex] = true;
                                 faceCount++;
                             }
@@ -103,7 +115,14 @@ void Chunk::generateMesh(bool disableGreedyMeshing) {
                         }
                     } else {
                         // Within chunk, check directly
-                        if (m_blocks[checkX][checkY][checkZ] == 0) { // Only render if adjacent to air
+                        int adjacentBlock = m_blocks[checkX][checkY][checkZ];
+                        int currentBlock = getBlock(x, y, z);
+                        
+                        // Only render the face if:
+                        // 1. The adjacent block is transparent, OR
+                        // 2. The adjacent block is different from the current block (but only for non-transparent blocks)
+                        if (isBlockTransparent(adjacentBlock) || 
+                            (currentBlock != adjacentBlock && !isBlockTransparent(currentBlock))) {
                             needsRender[x][y][z][faceIndex] = true;
                             faceCount++;
                         }
@@ -598,4 +617,24 @@ std::vector<AABB> Chunk::buildColliderMesh() const {
     m_collisionMeshDirty = false;
     
     return colliderVolumes;
+}
+
+bool Chunk::isBlockTransparent(int blockType) const {
+    // Block ID 0 is air, which is transparent
+    if (blockType == 0) return true;
+    
+    // Define other transparent block types here
+    // For example, if block ID 2 is glass, 3 is water, etc.
+    switch (blockType) {
+        case 0:  // Air
+            return true;
+        case 2:  // Assuming ID 2 is glass
+            return true;
+        case 3:  // Assuming ID 3 is water
+            return true;
+        case 4:  // Assuming ID 4 is leaves
+            return true;
+        default:
+            return false;
+    }
 } 

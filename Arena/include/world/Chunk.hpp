@@ -49,6 +49,9 @@ public:
     // Check if a block type is solid (for collision purposes)
     bool isBlockSolid(int blockType) const { return blockType > 0; }
     
+    // Check if a block type is transparent (for face culling)
+    bool isBlockTransparent(int blockType) const;
+    
     // Set the world pointer for cross-chunk queries
     void setWorld(World* world) { m_world = world; }
 
