@@ -76,7 +76,7 @@ void World::generateChunk(const glm::ivec3& chunkPos) {
     m_chunks[chunkPos] = std::move(chunk);
     
     // Update meshes for this chunk and adjacent chunks
-    updateChunkMeshes(chunkPos, false);
+    updateChunkMeshes(chunkPos, m_disableGreedyMeshing);
 }
 
 void World::loadChunk(const glm::ivec3& chunkPos) {
@@ -101,7 +101,7 @@ void World::loadChunk(const glm::ivec3& chunkPos) {
     }
     
     // After loading/generating a chunk, update meshes for this chunk and adjacent chunks
-    updateChunkMeshes(chunkPos, false);
+    updateChunkMeshes(chunkPos, m_disableGreedyMeshing);
 }
 
 void World::unloadChunk(const glm::ivec3& chunkPos) {
@@ -361,7 +361,8 @@ void World::updateChunkMeshes(const glm::ivec3& chunkPos, bool disableGreedyMesh
     // Force regenerate this chunk's mesh and mark it for update
     Chunk* chunk = getChunkAt(chunkPos);
     if (chunk) {
-        std::cout << "Regenerating mesh for chunk " << chunkPos.x << "," << chunkPos.y << "," << chunkPos.z << std::endl;
+        std::cout << "Regenerating mesh for chunk " << chunkPos.x << "," << chunkPos.y << "," << chunkPos.z 
+                  << " with greedy meshing " << (disableGreedyMeshing ? "DISABLED" : "ENABLED") << std::endl;
         chunk->setDirty(true);
         chunk->generateMesh(disableGreedyMeshing);
         
@@ -385,7 +386,8 @@ void World::updateChunkMeshes(const glm::ivec3& chunkPos, bool disableGreedyMesh
     for (const auto& neighborPos : neighbors) {
         Chunk* neighbor = getChunkAt(neighborPos);
         if (neighbor) {
-            std::cout << "Regenerating mesh for neighbor chunk " << neighborPos.x << "," << neighborPos.y << "," << neighborPos.z << std::endl;
+            std::cout << "Regenerating mesh for neighbor chunk " << neighborPos.x << "," << neighborPos.y << "," << neighborPos.z 
+                      << " with greedy meshing " << (disableGreedyMeshing ? "DISABLED" : "ENABLED") << std::endl;
             neighbor->setDirty(true);
             neighbor->generateMesh(disableGreedyMeshing);
             

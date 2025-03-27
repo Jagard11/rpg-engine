@@ -73,7 +73,26 @@ void Chunk::generateMesh(bool disableGreedyMeshing) {
                 if (getBlock(x, y, z) == 0) continue; // Skip air blocks
                 
                 for (int faceIndex = 0; faceIndex < 6; faceIndex++) {
-                    if (shouldRenderFace(x, y, z, directions[faceIndex])) {
+                    // When greedy meshing is disabled, we need to render all faces of all blocks
+                    // to ensure complete rendering of the interior voxels
+                    if (disableGreedyMeshing) {
+                        // For non-greedy meshing, render all faces except those adjacent to solid blocks
+                        // that are completely within the same chunk (allows cross-chunk visibility)
+                        int checkX = x + static_cast<int>(directions[faceIndex].x);
+                        int checkY = y + static_cast<int>(directions[faceIndex].y);
+                        int checkZ = z + static_cast<int>(directions[faceIndex].z);
+                        
+                        // If we're at a chunk boundary, always render the face
+                        bool isChunkBoundary = checkX < 0 || checkX >= CHUNK_SIZE || 
+                                              checkY < 0 || checkY >= CHUNK_HEIGHT || 
+                                              checkZ < 0 || checkZ >= CHUNK_SIZE;
+                        
+                        if (isChunkBoundary || m_blocks[checkX][checkY][checkZ] == 0) {
+                            needsRender[x][y][z][faceIndex] = true;
+                            faceCount++;
+                        }
+                    } else if (shouldRenderFace(x, y, z, directions[faceIndex])) {
+                        // For greedy meshing, use the standard visibility check
                         needsRender[x][y][z][faceIndex] = true;
                         faceCount++;
                     }

@@ -597,7 +597,11 @@ void Game::initializeDebugMenu() {
         [this](const std::vector<std::string>& args) {
             if (m_renderer && m_world) {
                 bool isDisabled = m_renderer->isGreedyMeshingDisabled();
+                
+                // Toggle the setting in both renderer and world
                 m_renderer->setDisableGreedyMeshing(!isDisabled);
+                m_world->setDisableGreedyMeshing(!isDisabled);
+                
                 m_debugMenu->commandOutput(std::string("Greedy meshing ") + 
                     (isDisabled ? "ENABLED" : "DISABLED"));
                 
@@ -605,8 +609,8 @@ void Game::initializeDebugMenu() {
                 glm::ivec3 playerChunkPos = m_world->worldToChunkPos(m_player->getPosition());
                 m_debugMenu->commandOutput("Regenerating meshes for visible chunks...");
                 
-                // Update chunks around player with new greedy meshing setting
-                const int REGEN_RADIUS = 2;
+                // Increase the radius to ensure proper rendering of visible chunks
+                const int REGEN_RADIUS = 4; // Increased from 2 to 4
                 for (int x = -REGEN_RADIUS; x <= REGEN_RADIUS; x++) {
                     for (int y = -REGEN_RADIUS; y <= REGEN_RADIUS; y++) {
                         for (int z = -REGEN_RADIUS; z <= REGEN_RADIUS; z++) {

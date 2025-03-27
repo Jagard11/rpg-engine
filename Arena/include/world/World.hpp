@@ -47,6 +47,10 @@ public:
     
     // Mesh management
     void updateChunkMeshes(const glm::ivec3& chunkPos, bool disableGreedyMeshing = false);
+    
+    // Greedy meshing control
+    void setDisableGreedyMeshing(bool disable) { m_disableGreedyMeshing = disable; }
+    bool isGreedyMeshingDisabled() const { return m_disableGreedyMeshing; }
 
 private:
     glm::ivec3 worldToLocalPos(const glm::vec3& worldPos) const;
@@ -58,4 +62,7 @@ private:
     
     // View distance in chunks
     int m_viewDistance;
+    
+    // Global greedy meshing setting
+    bool m_disableGreedyMeshing = false;
 }; 
