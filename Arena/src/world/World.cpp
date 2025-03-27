@@ -364,6 +364,12 @@ void World::updateChunkMeshes(const glm::ivec3& chunkPos) {
         std::cout << "Regenerating mesh for chunk " << chunkPos.x << "," << chunkPos.y << "," << chunkPos.z << std::endl;
         chunk->setDirty(true);
         chunk->generateMesh();
+        
+        // Log confirmation that mesh was generated
+        const auto& vertices = chunk->getMeshVertices();
+        const auto& indices = chunk->getMeshIndices();
+        std::cout << "Generated mesh for chunk (" << chunkPos.x << ", " << chunkPos.y << ", " << chunkPos.z 
+                  << ") with " << vertices.size() / 5 << " vertices and " << indices.size() << " indices" << std::endl;
     }
     
     // Update meshes for all 6 adjacent chunks
@@ -382,6 +388,12 @@ void World::updateChunkMeshes(const glm::ivec3& chunkPos) {
             std::cout << "Regenerating mesh for neighbor chunk " << neighborPos.x << "," << neighborPos.y << "," << neighborPos.z << std::endl;
             neighbor->setDirty(true);
             neighbor->generateMesh();
+            
+            // Log confirmation that mesh was generated
+            const auto& vertices = neighbor->getMeshVertices();
+            const auto& indices = neighbor->getMeshIndices();
+            std::cout << "Generated mesh for chunk (" << neighborPos.x << ", " << neighborPos.y << ", " << neighborPos.z 
+                      << ") with " << vertices.size() / 5 << " vertices and " << indices.size() << " indices" << std::endl;
         }
     }
 } 

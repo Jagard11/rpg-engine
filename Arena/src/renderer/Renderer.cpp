@@ -66,10 +66,8 @@ bool Renderer::initialize() {
     m_viewProjectionLoc = glGetUniformLocation(m_shaderProgram, "viewProjection");
     m_textureLoc = glGetUniformLocation(m_shaderProgram, "textureSampler");
     
-    // Configure culling for consistent rendering
-    glEnable(GL_CULL_FACE);
-    glCullFace(GL_BACK);   // Standard back-face culling
-    glFrontFace(GL_CCW);   // Standard counter-clockwise for front faces
+    // Configure OpenGL settings for rendering
+    // Note: Backface culling is disabled as requested
     
     // Enable depth testing for proper 3D rendering
     glEnable(GL_DEPTH_TEST);
@@ -251,45 +249,20 @@ void Renderer::setupBuffers() {
 }
 
 void Renderer::render(World* world, Player* player) {
-    if (!player) return;
+    // Report buffer state at the start of each frame to help debug
+    std::cout << "Renderer::render - Buffer state: VAO=" << m_vao << " VBO=" << m_vbo 
+              << " EBO=" << m_ebo << " initialized=" << (m_buffersInitialized ? "YES" : "NO") << std::endl;
     
-    // Debug output for buffer state
-    static int frameCounter = 0;
-    if (frameCounter++ % 300 == 0) { // Every ~5 seconds at 60fps
-        std::cout << "Renderer::render - Buffer state:"
-                  << " VAO=" << m_vao
-                  << " VBO=" << m_vbo
-                  << " EBO=" << m_ebo
-                  << " initialized=" << (m_buffersInitialized ? "YES" : "NO")
-                  << std::endl;
+    // Ensure buffer initialization
+    if (!m_buffersInitialized) {
+        setupBuffers();
+        m_buffersInitialized = (m_vao != 0 && m_vbo != 0 && m_ebo != 0);
+        std::cout << "Re-initialized buffers: VAO=" << m_vao << " VBO=" << m_vbo 
+                  << " EBO=" << m_ebo << " Success=" << (m_buffersInitialized ? "YES" : "NO") << std::endl;
     }
     
-    // Store original OpenGL state
-    GLboolean depthTestEnabled = glIsEnabled(GL_DEPTH_TEST);
-    GLboolean cullFaceEnabled = glIsEnabled(GL_CULL_FACE);
-    GLboolean blendEnabled = glIsEnabled(GL_BLEND);
-    
-    GLint blendSrcRGB, blendDstRGB;
-    glGetIntegerv(GL_BLEND_SRC_RGB, &blendSrcRGB);
-    glGetIntegerv(GL_BLEND_DST_RGB, &blendDstRGB);
-    
-    GLint activeTexture;
-    glGetIntegerv(GL_ACTIVE_TEXTURE, &activeTexture);
-    
-    GLint boundVAO;
-    glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &boundVAO);
-    
-    GLint currentProgram;
-    glGetIntegerv(GL_CURRENT_PROGRAM, &currentProgram);
-    
-    // Track if we've changed the state
+    // Start with clean state for this frame
     bool stateModified = false;
-
-    // Clear the screen with sky blue color
-    glClearColor(0.5f, 0.8f, 1.0f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    // Get current window dimensions
     int width, height;
     glfwGetFramebufferSize(glfwGetCurrentContext(), &width, &height);
 
@@ -297,18 +270,20 @@ void Renderer::render(World* world, Player* player) {
     if (world && m_buffersInitialized) {
         stateModified = true;
         glEnable(GL_DEPTH_TEST);
-        glEnable(GL_CULL_FACE);
+        // Removed backface culling as requested
         glUseProgram(m_shaderProgram);
         setupCamera(player);
         renderWorld(world, player);
         glUseProgram(0);
         renderPlayerCollisionBox(player);
+    } else if (!m_buffersInitialized) {
+        std::cerr << "ERROR: Cannot render world - buffers not initialized" << std::endl;
     }
 
     // 2. Switch to legacy OpenGL for UI rendering
     stateModified = true;
     glDisable(GL_DEPTH_TEST);
-    glDisable(GL_CULL_FACE);
+    // No need to disable culling since we're not enabling it
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
@@ -341,16 +316,6 @@ void Renderer::render(World* world, Player* player) {
     
     // Debug menu
     if (m_debugMenu && m_debugMenu->isActive()) {
-        // Check buffer state before debug menu render
-        if (frameCounter % 300 == 0) {
-            std::cout << "Before debug menu render - Buffer state:"
-                     << " VAO=" << m_vao
-                     << " VBO=" << m_vbo
-                     << " EBO=" << m_ebo
-                     << " initialized=" << (m_buffersInitialized ? "YES" : "NO")
-                     << std::endl;
-        }
-        
         m_debugMenu->render();
         
         // Check if buffers are still valid after debug menu render
@@ -374,33 +339,6 @@ void Renderer::render(World* world, Player* player) {
     
     glMatrixMode(GL_MODELVIEW);
     glPopMatrix();
-    
-    // Only restore original state if we've modified it
-    if (stateModified) {
-        // Restore original OpenGL state
-        if (depthTestEnabled) {
-            glEnable(GL_DEPTH_TEST);
-        } else {
-            glDisable(GL_DEPTH_TEST);
-        }
-        
-        if (cullFaceEnabled) {
-            glEnable(GL_CULL_FACE);
-        } else {
-            glDisable(GL_CULL_FACE);
-        }
-        
-        if (blendEnabled) {
-            glEnable(GL_BLEND);
-            glBlendFunc(blendSrcRGB, blendDstRGB);
-        } else {
-            glDisable(GL_BLEND);
-        }
-        
-        glActiveTexture(activeTexture);
-        glBindVertexArray(boundVAO);
-        glUseProgram(currentProgram);
-    }
     
     // Final check to ensure buffers are still valid after rendering
     if ((m_vao == 0 || m_vbo == 0 || m_ebo == 0) && m_buffersInitialized) {
@@ -444,9 +382,7 @@ void Renderer::renderWorld(World* world, Player* player) {
     // Set up OpenGL state for 3D rendering
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
-    glEnable(GL_CULL_FACE);
-    glCullFace(GL_BACK);
-    glFrontFace(GL_CCW);
+    // Removed backface culling as requested
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
     // Set texture for all chunks
@@ -539,7 +475,7 @@ void Renderer::renderWorld(World* world, Player* player) {
     glBindVertexArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-    glDisable(GL_CULL_FACE);
+    // Removed disabling of GL_CULL_FACE since we're not enabling it
     glDisable(GL_DEPTH_TEST);
 }
 

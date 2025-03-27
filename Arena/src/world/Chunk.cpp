@@ -62,17 +62,26 @@ void Chunk::generateMesh() {
     // First scan the entire chunk to identify faces that need rendering
     // This helps prevent z-fighting at chunk boundaries
     bool needsRender[CHUNK_SIZE][CHUNK_HEIGHT][CHUNK_SIZE][6] = {false};
+    int faceCount = 0;
+    
+    std::cout << "Generating mesh for chunk (" << m_x << ", " << m_y << ", " << m_z << ")" << std::endl;
+    
     for (int x = 0; x < CHUNK_SIZE; x++) {
         for (int y = 0; y < CHUNK_HEIGHT; y++) {
             for (int z = 0; z < CHUNK_SIZE; z++) {
                 if (getBlock(x, y, z) == 0) continue; // Skip air blocks
                 
                 for (int faceIndex = 0; faceIndex < 6; faceIndex++) {
-                    needsRender[x][y][z][faceIndex] = shouldRenderFace(x, y, z, directions[faceIndex]);
+                    if (shouldRenderFace(x, y, z, directions[faceIndex])) {
+                        needsRender[x][y][z][faceIndex] = true;
+                        faceCount++;
+                    }
                 }
             }
         }
     }
+    
+    std::cout << "Found " << faceCount << " faces to render in chunk (" << m_x << ", " << m_y << ", " << m_z << ")" << std::endl;
     
     // Vertex data for each face type (scaled to unit size)
     // For a 48x32 texture atlas with 6 tiles (16x16 each)
@@ -297,11 +306,14 @@ void Chunk::addGreedyFace(const std::vector<float>& faceTemplate, const glm::ive
 }
 
 bool Chunk::shouldRenderFace(int x, int y, int z, const glm::vec3& normal) const {
-    // Skip non-existent or air blocks
+    // Only check if the block itself is valid and not air
     if (x < 0 || x >= CHUNK_SIZE || y < 0 || y >= CHUNK_HEIGHT || z < 0 || z >= CHUNK_SIZE || 
         m_blocks[x][y][z] == 0) {
         return false;
     }
+    
+    // With backface culling disabled, we should still only render faces that are
+    // adjacent to air or transparent blocks to avoid internal faces.
     
     // Get the adjacent block position
     int checkX = x + static_cast<int>(normal.x);

@@ -27,10 +27,13 @@ public:
     // UI component setters
     void setSplashScreen(SplashScreen* splashScreen) { m_splashScreen = splashScreen; }
     void setDebugMenu(Debug::DebugMenu* debugMenu) { m_debugMenu = debugMenu; }
+    
+    // Buffer management
+    bool isBuffersInitialized() const { return m_buffersInitialized; }
+    void setupBuffers();
 
 private:
     void setupShaders();
-    void setupBuffers();
     void renderChunk(const Chunk* chunk, const glm::mat4& viewProjection);
     void renderWorld(World* world, Player* player);
     void renderPlayerCollisionBox(Player* player);

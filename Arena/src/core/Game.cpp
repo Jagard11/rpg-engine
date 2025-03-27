@@ -183,9 +183,6 @@ void Game::render() {
     if (m_isInGame && m_world && m_player) {
         // Set up for 3D rendering
         glEnable(GL_DEPTH_TEST);
-        glEnable(GL_CULL_FACE);
-        glCullFace(GL_BACK);
-        glFrontFace(GL_CCW);
         
         // Render world and player view
         m_renderer->render(m_world.get(), m_player.get());
@@ -193,7 +190,6 @@ void Game::render() {
     
     // Set up for 2D UI rendering
     glDisable(GL_DEPTH_TEST);
-    glDisable(GL_CULL_FACE);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     
@@ -405,17 +401,43 @@ void Game::handleInput(float deltaTime) {
 
 void Game::createNewWorld(uint64_t seed) {
     std::cout << "Creating new world with seed: " << seed << std::endl;
+    
     m_world = std::make_unique<World>(seed);
     m_world->initialize();
     
+    // Create player at a default spawn position
     m_player = std::make_unique<Player>();
-    m_isInGame = true;
     
     // Set initial player position - significantly higher to ensure the player doesn't get stuck
     m_player->setPosition(glm::vec3(0.0f, 100.0f, 0.0f));
     
+    m_isInGame = true;
+    
     // Lock cursor for game mode
     m_window->setInputMode(GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    
+    // Set up world debugging
+    if (m_debugMenu) {
+        // Register debug commands for the world if needed in the future
+    }
+    
+    // Force an initial render to ensure chunks are visible
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    
+    // Ensure renderer has initialized its buffers
+    if (m_renderer) {
+        if (!m_renderer->isBuffersInitialized()) {
+            std::cout << "Initializing renderer buffers..." << std::endl;
+            m_renderer->setupBuffers();
+        }
+        
+        // Force initial rendering of the world
+        std::cout << "Performing initial world render..." << std::endl;
+        m_renderer->render(m_world.get(), m_player.get());
+        m_window->swapBuffers();
+    }
+    
+    std::cout << "World creation complete" << std::endl;
 }
 
 bool Game::loadWorld(const std::string& savePath) {
