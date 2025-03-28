@@ -3,6 +3,7 @@
 #include <cmath>
 #include <iostream>
 #include <algorithm>
+#include <filesystem>
 
 World::World(uint64_t seed)
     : m_seed(seed)
@@ -40,6 +41,17 @@ void World::generateChunk(const glm::ivec3& chunkPos) {
         return;
     }
 
+    // First, check if there's a saved version of this chunk
+    std::string filename = "chunks/" + std::to_string(chunkPos.x) + "_" + 
+                           std::to_string(chunkPos.y) + "_" + 
+                           std::to_string(chunkPos.z) + ".chunk";
+    
+    if (std::filesystem::exists(filename)) {
+        // If a saved version exists, load it instead of generating a new one
+        loadChunk(chunkPos);
+        return;
+    }
+
     // Create a new chunk at the given position with proper 3D coordinates
     auto chunk = std::make_unique<Chunk>(chunkPos.x, chunkPos.y, chunkPos.z);
     
@@ -73,6 +85,9 @@ void World::generateChunk(const glm::ivec3& chunkPos) {
         }
     }
     
+    // Mark this as a procedurally generated chunk, not modified by the player
+    chunk->setModified(false);
+    
     // Store the chunk before generating meshes
     m_chunks[chunkPos] = std::move(chunk);
     
@@ -85,18 +100,23 @@ void World::loadChunk(const glm::ivec3& chunkPos) {
         return;
     }
 
-    auto chunk = std::make_unique<Chunk>(chunkPos.x, chunkPos.y, chunkPos.z);
+    // Create the chunk directory if it doesn't exist
+    std::filesystem::create_directories("chunks");
     
-    // Set the world pointer so the chunk can query neighbor blocks
+    // Try to load the chunk from file first
+    std::string filename = "chunks/" + std::to_string(chunkPos.x) + "_" + 
+                           std::to_string(chunkPos.y) + "_" + 
+                           std::to_string(chunkPos.z) + ".chunk";
+    
+    auto chunk = std::make_unique<Chunk>(chunkPos.x, chunkPos.y, chunkPos.z);
     chunk->setWorld(this);
     
-    std::string filename = "chunks/" + std::to_string(chunkPos.x) + "_" + 
-                          std::to_string(chunkPos.y) + "_" + 
-                          std::to_string(chunkPos.z) + ".chunk";
-    
-    if (chunk->deserialize(filename)) {
+    // First try to load from file
+    if (std::filesystem::exists(filename) && chunk->deserialize(filename)) {
+        std::cout << "Loaded existing chunk from file: " << filename << std::endl;
         m_chunks[chunkPos] = std::move(chunk);
     } else {
+        // If file doesn't exist or can't be loaded, generate a new chunk
         generateChunk(chunkPos);
         return; // Return since generateChunk adds the chunk to m_chunks
     }
@@ -108,10 +128,21 @@ void World::loadChunk(const glm::ivec3& chunkPos) {
 void World::unloadChunk(const glm::ivec3& chunkPos) {
     auto it = m_chunks.find(chunkPos);
     if (it != m_chunks.end()) {
+        // Create the chunk directory if it doesn't exist
+        std::filesystem::create_directories("chunks");
+        
+        // Save the chunk data to file
         std::string filename = "chunks/" + std::to_string(chunkPos.x) + "_" + 
                               std::to_string(chunkPos.y) + "_" + 
                               std::to_string(chunkPos.z) + ".chunk";
-        it->second->serialize(filename);
+        
+        if (it->second->serialize(filename)) {
+            std::cout << "Saved chunk to file: " << filename << std::endl;
+        } else {
+            std::cerr << "Failed to save chunk to file: " << filename << std::endl;
+        }
+        
+        // Remove the chunk from memory
         m_chunks.erase(it);
     }
 }
@@ -133,38 +164,57 @@ void World::setBlock(const glm::ivec3& worldPos, int blockType) {
     
     auto it = m_chunks.find(chunkPos);
     if (it != m_chunks.end()) {
-        it->second->setBlock(localPos.x, localPos.y, localPos.z, blockType);
-        it->second->generateMesh();
+        Chunk* chunk = it->second.get();
         
-        // Update adjacent chunks if block is on chunk border
-        if (localPos.x == 0) {
-            auto chunk = getChunkAt(glm::ivec3(chunkPos.x - 1, chunkPos.y, chunkPos.z));
-            if (chunk) chunk->generateMesh();
-        }
-        if (localPos.x == CHUNK_SIZE - 1) {
-            auto chunk = getChunkAt(glm::ivec3(chunkPos.x + 1, chunkPos.y, chunkPos.z));
-            if (chunk) chunk->generateMesh();
-        }
-        if (localPos.y == 0) {
-            auto chunk = getChunkAt(glm::ivec3(chunkPos.x, chunkPos.y - 1, chunkPos.z));
-            if (chunk) chunk->generateMesh();
-        }
-        if (localPos.y == CHUNK_HEIGHT - 1) {
-            auto chunk = getChunkAt(glm::ivec3(chunkPos.x, chunkPos.y + 1, chunkPos.z));
-            if (chunk) chunk->generateMesh();
-        }
-        if (localPos.z == 0) {
-            auto chunk = getChunkAt(glm::ivec3(chunkPos.x, chunkPos.y, chunkPos.z - 1));
-            if (chunk) chunk->generateMesh();
-        }
-        if (localPos.z == CHUNK_SIZE - 1) {
-            auto chunk = getChunkAt(glm::ivec3(chunkPos.x, chunkPos.y, chunkPos.z + 1));
-            if (chunk) chunk->generateMesh();
+        // Get current block type
+        int currentBlock = chunk->getBlock(localPos.x, localPos.y, localPos.z);
+        
+        // Only update if the block is actually changing
+        if (currentBlock != blockType) {
+            // Set the block
+            chunk->setBlock(localPos.x, localPos.y, localPos.z, blockType);
+            
+            // Mark the chunk as modified by the player
+            chunk->setModified(true);
+            
+            // Generate mesh for the updated chunk
+            chunk->generateMesh();
+            
+            // Update adjacent chunks if block is on chunk border
+            if (localPos.x == 0) {
+                auto neighbor = getChunkAt(glm::ivec3(chunkPos.x - 1, chunkPos.y, chunkPos.z));
+                if (neighbor) neighbor->generateMesh();
+            }
+            if (localPos.x == CHUNK_SIZE - 1) {
+                auto neighbor = getChunkAt(glm::ivec3(chunkPos.x + 1, chunkPos.y, chunkPos.z));
+                if (neighbor) neighbor->generateMesh();
+            }
+            if (localPos.y == 0) {
+                auto neighbor = getChunkAt(glm::ivec3(chunkPos.x, chunkPos.y - 1, chunkPos.z));
+                if (neighbor) neighbor->generateMesh();
+            }
+            if (localPos.y == CHUNK_HEIGHT - 1) {
+                auto neighbor = getChunkAt(glm::ivec3(chunkPos.x, chunkPos.y + 1, chunkPos.z));
+                if (neighbor) neighbor->generateMesh();
+            }
+            if (localPos.z == 0) {
+                auto neighbor = getChunkAt(glm::ivec3(chunkPos.x, chunkPos.y, chunkPos.z - 1));
+                if (neighbor) neighbor->generateMesh();
+            }
+            if (localPos.z == CHUNK_SIZE - 1) {
+                auto neighbor = getChunkAt(glm::ivec3(chunkPos.x, chunkPos.y, chunkPos.z + 1));
+                if (neighbor) neighbor->generateMesh();
+            }
         }
     }
 }
 
 bool World::saveToFile(const std::string& filename) {
+    // Create directories for the save file and chunk data
+    std::filesystem::path saveDir = std::filesystem::path(filename).parent_path();
+    std::filesystem::create_directories(saveDir);
+    std::filesystem::create_directories("chunks");
+    
     std::ofstream file(filename, std::ios::binary);
     if (!file.is_open()) {
         std::cerr << "Failed to open file for writing: " << filename << std::endl;
@@ -185,6 +235,7 @@ bool World::saveToFile(const std::string& filename) {
     }
     
     // Save each chunk to its own file
+    int chunksSuccessfullySaved = 0;
     for (const auto& pair : m_chunks) {
         const glm::ivec3& pos = pair.first;
         const Chunk* chunk = pair.second.get();
@@ -193,8 +244,16 @@ bool World::saveToFile(const std::string& filename) {
                                std::to_string(pos.y) + "_" + 
                                std::to_string(pos.z) + ".chunk";
         
-        chunk->serialize(chunkFile);
+        if (chunk->serialize(chunkFile)) {
+            chunksSuccessfullySaved++;
+        } else {
+            std::cerr << "Failed to save chunk to file: " << chunkFile << std::endl;
+        }
     }
+    
+    std::cout << "World saved to " << filename << ". " 
+              << chunksSuccessfullySaved << "/" << numChunks 
+              << " chunks successfully saved." << std::endl;
     
     return true;
 }
@@ -219,14 +278,39 @@ bool World::loadFromFile(const std::string& filename) {
     size_t numChunks;
     file.read(reinterpret_cast<char*>(&numChunks), sizeof(numChunks));
     
+    // Create the chunks directory if it doesn't exist
+    std::filesystem::create_directories("chunks");
+    
     // Read each chunk's position and load it
+    int chunksSuccessfullyLoaded = 0;
     for (size_t i = 0; i < numChunks; i++) {
         glm::ivec3 pos;
         file.read(reinterpret_cast<char*>(&pos), sizeof(pos));
         
-        // Load this chunk
-        loadChunk(pos);
+        // Check if the chunk file exists
+        std::string chunkFile = "chunks/" + std::to_string(pos.x) + "_" + 
+                               std::to_string(pos.y) + "_" + 
+                               std::to_string(pos.z) + ".chunk";
+        
+        try {
+            if (std::filesystem::exists(chunkFile)) {
+                // Load this chunk
+                loadChunk(pos);
+                chunksSuccessfullyLoaded++;
+            } else {
+                // Generate if chunk file doesn't exist
+                generateChunk(pos);
+                chunksSuccessfullyLoaded++;
+            }
+        } catch (const std::exception& e) {
+            std::cerr << "Error loading/generating chunk at position " 
+                     << pos.x << "," << pos.y << "," << pos.z << ": " << e.what() << std::endl;
+        }
     }
+    
+    std::cout << "World loaded from " << filename << ". " 
+              << chunksSuccessfullyLoaded << "/" << numChunks 
+              << " chunks successfully loaded/generated." << std::endl;
     
     return true;
 }
@@ -289,6 +373,21 @@ void World::updateChunks(const glm::vec3& playerPos) {
         bool tooFarVertical = chunkPos.y < (playerChunkPos.y - 4) || chunkPos.y > (playerChunkPos.y + 6);
         
         if (tooFarHorizontal || tooFarVertical) {
+            // Add to unload list, but prioritize unmodified chunks
+            Chunk* chunk = pair.second.get();
+            
+            // If the chunk is modified by the player, make sure it's saved properly
+            if (chunk && chunk->isModified()) {
+                std::string filename = "chunks/" + std::to_string(chunkPos.x) + "_" + 
+                                      std::to_string(chunkPos.y) + "_" + 
+                                      std::to_string(chunkPos.z) + ".chunk";
+                std::filesystem::create_directories("chunks");
+                
+                if (chunk->serialize(filename)) {
+                    std::cout << "Saved player-modified chunk to file: " << filename << std::endl;
+                }
+            }
+            
             chunksToUnload.push_back(chunkPos);
         }
     }

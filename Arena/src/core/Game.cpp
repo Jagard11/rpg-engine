@@ -8,6 +8,16 @@
 #include <thread>
 #include "debug/DebugMenu.hpp"
 
+// Add this global variable and function at the top of the file
+static Game* g_gameInstance = nullptr;
+
+// Add mouse button callback
+static void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
+    if (g_gameInstance) {
+        g_gameInstance->handleMouseInput(button, action, mods);
+    }
+}
+
 Game::Game()
     : m_window(nullptr)
     , m_renderer(nullptr)
@@ -15,10 +25,14 @@ Game::Game()
     , m_player(nullptr)
     , m_splashScreen(nullptr)
     , m_debugMenu(nullptr)
+    , m_voxelManipulator(nullptr)
     , m_isRunning(false)
     , m_isInGame(false)
     , m_fps(0)
 {
+    // Store the global instance for callbacks
+    g_gameInstance = this;
+
     if (!initialize()) {
         throw std::runtime_error("Failed to initialize game");
     }
@@ -97,6 +111,12 @@ bool Game::initialize() {
         // Initialize world with a default seed
         m_world = std::make_unique<World>(12345);
         m_world->generateChunk(glm::ivec3(0, 0, 0)); // Generate initial chunk
+
+        // Set up mouse button callback for voxel manipulation
+        glfwSetMouseButtonCallback(m_window->getHandle(), mouse_button_callback);
+
+        // Initialize voxel manipulator
+        m_voxelManipulator = std::make_unique<VoxelManipulator>();
 
         m_isRunning = true;
         return true;
@@ -438,6 +458,11 @@ void Game::createNewWorld(uint64_t seed) {
     // Set initial player position - significantly higher to ensure the player doesn't get stuck
     m_player->setPosition(glm::vec3(0.0f, 100.0f, 0.0f));
     
+    // Initialize voxel manipulator with the world
+    if (m_voxelManipulator) {
+        m_voxelManipulator->initialize(m_world.get());
+    }
+    
     m_isInGame = true;
     
     // Lock cursor for game mode
@@ -493,6 +518,11 @@ bool Game::loadWorld(const std::string& savePath) {
         if (m_renderer) {
             std::cout << "Reinitializing renderer buffers after game load..." << std::endl;
             m_renderer->setupBuffers();
+        }
+        
+        // Initialize voxel manipulator with the loaded world
+        if (m_voxelManipulator) {
+            m_voxelManipulator->initialize(m_world.get());
         }
         
         m_isInGame = true;
@@ -638,4 +668,29 @@ void Game::initializeDebugMenu() {
 
     // Set the debug menu as active in the window for character input
     m_window->setActiveDebugMenu(m_debugMenu.get());
+}
+
+// Add new method to handle mouse input
+void Game::handleMouseInput(int button, int action, int mods) {
+    // Skip if not in game
+    if (!m_isInGame || !m_world || !m_player) {
+        return;
+    }
+    
+    // Skip if splash screen is active or debug menu is open
+    if ((m_splashScreen && m_splashScreen->isActive()) || 
+        (m_debugMenu && m_debugMenu->isActive())) {
+        return;
+    }
+    
+    // Process mouse input for voxel manipulation
+    if (m_voxelManipulator) {
+        m_voxelManipulator->processInput(
+            m_world.get(), 
+            m_player.get(), 
+            button, 
+            action == GLFW_PRESS,
+            m_renderer.get() // Pass the renderer to access highlight information
+        );
+    }
 } 

@@ -37,6 +37,10 @@ public:
     bool isDirty() const { return m_isDirty; }
     void setDirty(bool dirty) { m_isDirty = dirty; }
     
+    // Track if the chunk has been modified by the player
+    bool isModified() const { return m_isModified; }
+    void setModified(bool modified) { m_isModified = modified; }
+    
     bool serialize(const std::string& filename) const;
     bool deserialize(const std::string& filename);
 
@@ -71,6 +75,7 @@ private:
     std::vector<unsigned int> m_meshIndices;
     int m_x, m_y, m_z; // Updated to store 3D position
     bool m_isDirty;
+    bool m_isModified; // Track whether player has modified this chunk
     
     // Caching collision mesh for performance
     mutable std::vector<AABB> m_collisionMesh;

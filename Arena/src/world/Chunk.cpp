@@ -2,12 +2,14 @@
 #include "world/World.hpp"
 #include <fstream>
 #include <iostream>
+#include <filesystem>
 
 Chunk::Chunk(int x, int y, int z)
     : m_x(x)
     , m_y(y)
     , m_z(z)
     , m_isDirty(true)
+    , m_isModified(false)
     , m_world(nullptr)
 {
     // Initialize blocks to air (0)
@@ -31,6 +33,7 @@ void Chunk::setBlock(int x, int y, int z, int blockType) {
     if (m_blocks[x][y][z] != blockType) {
         m_blocks[x][y][z] = blockType;
         m_isDirty = true;
+        m_isModified = true; // Mark as modified when blocks are changed by the player
         m_collisionMeshDirty = true; // Mark collision mesh dirty when blocks change
     }
 }
@@ -485,15 +488,23 @@ void Chunk::addFace(const std::vector<float>& vertices, const glm::vec3& positio
 }
 
 bool Chunk::serialize(const std::string& filename) const {
+    // Create directory if it doesn't exist
+    std::filesystem::path dir = std::filesystem::path(filename).parent_path();
+    std::filesystem::create_directories(dir);
+    
     std::ofstream file(filename, std::ios::binary);
     if (!file.is_open()) {
+        std::cerr << "Failed to open file for writing: " << filename << std::endl;
         return false;
     }
 
-    // Write chunk position (3D now)
+    // Write chunk position (3D)
     file.write(reinterpret_cast<const char*>(&m_x), sizeof(m_x));
     file.write(reinterpret_cast<const char*>(&m_y), sizeof(m_y));
     file.write(reinterpret_cast<const char*>(&m_z), sizeof(m_z));
+    
+    // Write modification flag
+    file.write(reinterpret_cast<const char*>(&m_isModified), sizeof(m_isModified));
 
     // Write block data
     file.write(reinterpret_cast<const char*>(m_blocks.data()), 
@@ -508,16 +519,21 @@ bool Chunk::deserialize(const std::string& filename) {
         return false;
     }
 
-    // Read chunk position (3D now)
+    // Read chunk position (3D)
     file.read(reinterpret_cast<char*>(&m_x), sizeof(m_x));
     file.read(reinterpret_cast<char*>(&m_y), sizeof(m_y));
     file.read(reinterpret_cast<char*>(&m_z), sizeof(m_z));
+    
+    // Read modification flag
+    file.read(reinterpret_cast<char*>(&m_isModified), sizeof(m_isModified));
 
     // Read block data
     file.read(reinterpret_cast<char*>(m_blocks.data()),
               sizeof(int) * CHUNK_SIZE * CHUNK_HEIGHT * CHUNK_SIZE);
 
     m_isDirty = true;
+    m_collisionMeshDirty = true;
+    
     return true;
 }
 

@@ -56,6 +56,10 @@ public:
     void renderBlockHighlight(const glm::ivec3& blockPos, const glm::ivec3& faceNormal);
     void setHighlightEnabled(bool enabled) { m_highlightEnabled = enabled; }
     bool isHighlightEnabled() const { return m_highlightEnabled; }
+    
+    // Accessor methods for highlighted block information
+    const glm::ivec3& getHighlightedBlock() const { return m_highlightedBlock; }
+    const glm::ivec3& getHighlightedFace() const { return m_highlightedFace; }
 
 private:
     void setupShaders();

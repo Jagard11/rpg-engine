@@ -30,6 +30,7 @@ set(SOURCES
     src/world/World.cpp
     src/world/Chunk.cpp
     src/world/WorldGenerator.cpp
+    src/world/VoxelManipulator.cpp
     src/player/Player.cpp
     src/physics/CollisionSystem.cpp
     src/renderer/Renderer.cpp
@@ -51,6 +52,7 @@ set(HEADERS
     include/world/World.hpp
     include/world/Chunk.hpp
     include/world/WorldGenerator.hpp
+    include/world/VoxelManipulator.hpp
     include/player/Player.hpp
     include/physics/CollisionSystem.hpp
     include/renderer/Renderer.hpp
