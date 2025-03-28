@@ -1,9 +1,18 @@
 #include "renderer/Renderer.hpp"
+#include "world/World.hpp"
+#include "player/Player.hpp"
+#include "world/Chunk.hpp"
+#include "renderer/TextureManager.hpp"
+#include "debug/DebugMenu.hpp"
+#include "ui/SplashScreen.hpp"
+#include <GLFW/glfw3.h>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <GL/glu.h>
 #include <stdexcept>
 #include <iostream>
-#include <GLFW/glfw3.h>
+#include <algorithm>
+#include <cmath>
 
 // Vertex shader source with normals support
 const char* vertexShaderSource = R"(
@@ -90,12 +99,16 @@ Renderer::Renderer()
     , m_hudVao(0)
     , m_hudVbo(0)
     , m_hudEbo(0)
+    , m_highlightVao(0)
+    , m_highlightVbo(0)
+    , m_highlightEbo(0)
     , m_disableBackfaceCulling(false)
     , m_disableGreedyMeshing(false)
     , m_enableLodRendering(true)
     , m_lodRenderDistance(1609.34f * 4.0f)
     , m_showCollisionBox(false)
     , m_player(nullptr)
+    , m_highlightEnabled(true)
 {
 }
 
@@ -104,6 +117,12 @@ Renderer::~Renderer() {
     if (m_vao) glDeleteVertexArrays(1, &m_vao);
     if (m_vbo) glDeleteBuffers(1, &m_vbo);
     if (m_ebo) glDeleteBuffers(1, &m_ebo);
+    if (m_hudVao) glDeleteVertexArrays(1, &m_hudVao);
+    if (m_hudVbo) glDeleteBuffers(1, &m_hudVbo);
+    if (m_hudEbo) glDeleteBuffers(1, &m_hudEbo);
+    if (m_highlightVao) glDeleteVertexArrays(1, &m_highlightVao);
+    if (m_highlightVbo) glDeleteBuffers(1, &m_highlightVbo);
+    if (m_highlightEbo) glDeleteBuffers(1, &m_highlightEbo);
 }
 
 bool Renderer::initialize() {
@@ -466,6 +485,12 @@ void Renderer::renderWorld(World* world, Player* player) {
         static_cast<int>(std::floor(player->getPosition().z / Chunk::CHUNK_SIZE))
     );
     
+    // Do raycast before chunk rendering to know what to highlight
+    World::RaycastResult highlightResult;
+    if (m_highlightEnabled) {
+        highlightResult = world->raycast(cameraPos, player->getForward(), 5.0f);
+    }
+    
     // Render all chunks, sorted by distance to player for better rendering priority
     std::vector<std::pair<float, const Chunk*>> sortedChunks;
     int visibleChunks = 0;
@@ -537,13 +562,28 @@ void Renderer::renderWorld(World* world, Player* player) {
         renderChunk(pair.second, viewProjection);
     }
 
+    // After rendering all chunks, check for block highlight
+    if (m_highlightEnabled && highlightResult.hit && highlightResult.distance <= 5.0f) {
+        // Save OpenGL state
+        glUseProgram(m_shaderProgram);
+        glUniformMatrix4fv(m_modelLoc, 1, GL_FALSE, glm::value_ptr(glm::mat4(1.0f)));
+        glUniformMatrix4fv(m_viewProjectionLoc, 1, GL_FALSE, glm::value_ptr(viewProjection));
+        
+        // Render the highlight on the hit face
+        renderBlockHighlight(highlightResult.blockPos, highlightResult.faceNormal);
+    }
+
+    // Restore OpenGL state
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    if (!m_disableBackfaceCulling) {
+        glEnable(GL_CULL_FACE);
+    }
+
     // Cleanup
     glUseProgram(0);
     glBindVertexArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-    glDisable(GL_CULL_FACE);
-    glDisable(GL_DEPTH_TEST);
 }
 
 void Renderer::renderChunk(const Chunk* chunk, const glm::mat4& viewProjection) {
@@ -782,4 +822,116 @@ void Renderer::renderHUD() {
     
     // Restore depth testing if it was enabled
     if (depthTestEnabled) glEnable(GL_DEPTH_TEST);
+}
+
+void Renderer::renderBlockHighlight(const glm::ivec3& blockPos, const glm::ivec3& faceNormal) {
+    if (!m_highlightEnabled) return;
+    
+    // Save current OpenGL state
+    GLboolean depthTestEnabled = glIsEnabled(GL_DEPTH_TEST);
+    GLboolean blendEnabled = glIsEnabled(GL_BLEND);
+    GLint blendSrcFactor, blendDstFactor;
+    glGetIntegerv(GL_BLEND_SRC_ALPHA, &blendSrcFactor);
+    glGetIntegerv(GL_BLEND_DST_ALPHA, &blendDstFactor);
+    GLint currentProgram;
+    glGetIntegerv(GL_CURRENT_PROGRAM, &currentProgram);
+    
+    // Store the highlighted block and face
+    m_highlightedBlock = blockPos;
+    m_highlightedFace = faceNormal;
+    
+    // Set up highlight rendering state
+    glDisable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    
+    // Create a slightly larger box around the block for the highlight
+    // Use an offset to make the highlight appear just slightly in front of the block face
+    const float OFFSET = 0.002f;
+    glm::vec3 min = glm::vec3(blockPos);
+    glm::vec3 max = glm::vec3(blockPos) + glm::vec3(1.0f);
+    
+    // Adjust the highlighted face to be slightly offset from the block
+    if (faceNormal.x < 0) min.x -= OFFSET;
+    if (faceNormal.x > 0) max.x += OFFSET;
+    if (faceNormal.y < 0) min.y -= OFFSET;
+    if (faceNormal.y > 0) max.y += OFFSET;
+    if (faceNormal.z < 0) min.z -= OFFSET;
+    if (faceNormal.z > 0) max.z += OFFSET;
+    
+    // Create vertices for the highlighted face
+    std::vector<float> vertices;
+    
+    // Define the vertices for the highlighted face based on the face normal
+    if (faceNormal.x != 0) {
+        // Left/Right face
+        float x = faceNormal.x > 0 ? max.x : min.x;
+        vertices = {
+            x, min.y, min.z,  // Bottom-left
+            x, min.y, max.z,  // Bottom-right
+            x, max.y, min.z,  // Top-left
+            x, max.y, max.z   // Top-right
+        };
+    } else if (faceNormal.y != 0) {
+        // Top/Bottom face
+        float y = faceNormal.y > 0 ? max.y : min.y;
+        vertices = {
+            min.x, y, min.z,  // Bottom-left
+            max.x, y, min.z,  // Bottom-right
+            min.x, y, max.z,  // Top-left
+            max.x, y, max.z   // Top-right
+        };
+    } else {
+        // Front/Back face
+        float z = faceNormal.z > 0 ? max.z : min.z;
+        vertices = {
+            min.x, min.y, z,  // Bottom-left
+            max.x, min.y, z,  // Bottom-right
+            min.x, max.y, z,  // Top-left
+            max.x, max.y, z   // Top-right
+        };
+    }
+    
+    // Define indices for the face (two triangles)
+    std::vector<unsigned int> indices = {0, 1, 2, 1, 3, 2};
+    
+    // Use legacy OpenGL for simple rendering without creating extra VAOs/VBOs
+    glUseProgram(0);
+    
+    // Draw the highlight using immediate mode for simplicity
+    glColor4f(1.0f, 1.0f, 1.0f, 0.4f);
+    glLineWidth(3.0f);
+    
+    // Draw filled face with semi-transparency
+    glBegin(GL_TRIANGLES);
+    for (unsigned int idx : indices) {
+        int vertexIdx = idx * 3;
+        glVertex3f(vertices[vertexIdx], vertices[vertexIdx + 1], vertices[vertexIdx + 2]);
+    }
+    glEnd();
+    
+    // Draw outline with solid white for better visibility
+    glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+    glBegin(GL_LINE_LOOP);
+    glVertex3f(vertices[0], vertices[1], vertices[2]);
+    glVertex3f(vertices[3], vertices[4], vertices[5]);
+    glVertex3f(vertices[9], vertices[10], vertices[11]);
+    glVertex3f(vertices[6], vertices[7], vertices[8]);
+    glEnd();
+    
+    // Restore original OpenGL state
+    if (depthTestEnabled) {
+        glEnable(GL_DEPTH_TEST);
+    } else {
+        glDisable(GL_DEPTH_TEST);
+    }
+    
+    if (blendEnabled) {
+        glEnable(GL_BLEND);
+    } else {
+        glDisable(GL_BLEND);
+    }
+    
+    glBlendFunc(blendSrcFactor, blendDstFactor);
+    glUseProgram(currentProgram);
 } 

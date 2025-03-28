@@ -40,6 +40,7 @@ set(SOURCES
     src/debug/DebugMenu.cpp
     src/debug/DebugUtils.cpp
     src/stb_image_impl.cpp
+    src/texture/TextureManager.cpp
 )
 
 # Add header files

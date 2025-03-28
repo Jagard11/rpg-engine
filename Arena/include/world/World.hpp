@@ -52,6 +52,15 @@ public:
     void setDisableGreedyMeshing(bool disable) { m_disableGreedyMeshing = disable; }
     bool isGreedyMeshingDisabled() const { return m_disableGreedyMeshing; }
 
+    // Raycast functionality
+    struct RaycastResult {
+        glm::ivec3 blockPos;  // Position of the hit block
+        glm::ivec3 faceNormal;  // Normal of the hit face
+        float distance;  // Distance to the hit point
+        bool hit;  // Whether the ray hit anything
+    };
+    RaycastResult raycast(const glm::vec3& start, const glm::vec3& direction, float maxDistance = 5.0f) const;
+
 private:
     glm::ivec3 worldToLocalPos(const glm::vec3& worldPos) const;
     Chunk* getChunkAt(const glm::ivec3& chunkPos);

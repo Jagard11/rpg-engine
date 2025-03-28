@@ -409,4 +409,173 @@ void World::removeChunk(const glm::ivec3& chunkPos) {
         // Update adjacent chunks' meshes
         updateChunkMeshes(chunkPos, false);
     }
+}
+
+World::RaycastResult World::raycast(const glm::vec3& start, const glm::vec3& direction, float maxDistance) const {
+    RaycastResult result;
+    result.hit = false;
+    result.distance = maxDistance;
+    
+    // Normalize direction
+    glm::vec3 dir = glm::normalize(direction);
+    
+    // Ray march through the world
+    glm::vec3 currentPos = start;
+    float stepSize = 0.05f; // Use a smaller step size for more precision
+    
+    for (float distance = 0.0f; distance < maxDistance; distance += stepSize) {
+        // Get current block position (floor for proper block coords)
+        glm::ivec3 blockPos = glm::ivec3(
+            std::floor(currentPos.x),
+            std::floor(currentPos.y),
+            std::floor(currentPos.z)
+        );
+        
+        // Get block type at current position
+        int blockType = getBlock(blockPos);
+        
+        // If we hit a solid block (not air)
+        if (blockType > 0) {
+            // Calculate fractional position within the block
+            glm::vec3 fractPos = glm::fract(currentPos);
+            
+            // For edge cases, we'll check all potentially visible faces
+            std::vector<glm::ivec3> potentialFaces;
+            std::vector<float> faceWeights;
+            
+            // Check all six faces with their distances to block boundaries
+            // X- face (left)
+            if (fractPos.x < 0.1f) {
+                potentialFaces.push_back(glm::ivec3(-1, 0, 0));
+                faceWeights.push_back(fractPos.x);
+            }
+            
+            // X+ face (right)
+            if (fractPos.x > 0.9f) {
+                potentialFaces.push_back(glm::ivec3(1, 0, 0));
+                faceWeights.push_back(1.0f - fractPos.x);
+            }
+            
+            // Y- face (bottom)
+            if (fractPos.y < 0.1f) {
+                potentialFaces.push_back(glm::ivec3(0, -1, 0));
+                faceWeights.push_back(fractPos.y);
+            }
+            
+            // Y+ face (top)
+            if (fractPos.y > 0.9f) {
+                potentialFaces.push_back(glm::ivec3(0, 1, 0));
+                faceWeights.push_back(1.0f - fractPos.y);
+            }
+            
+            // Z- face (back)
+            if (fractPos.z < 0.1f) {
+                potentialFaces.push_back(glm::ivec3(0, 0, -1));
+                faceWeights.push_back(fractPos.z);
+            }
+            
+            // Z+ face (front)
+            if (fractPos.z > 0.9f) {
+                potentialFaces.push_back(glm::ivec3(0, 0, 1));
+                faceWeights.push_back(1.0f - fractPos.z);
+            }
+            
+            // If we're not at an edge, use standard approach
+            if (potentialFaces.empty()) {
+                // Determine which face was hit by finding the component closest to an edge
+                glm::ivec3 normal(0, 0, 0);
+                
+                // Calculate distances to block boundaries in each direction
+                float distToMinX = fractPos.x;
+                float distToMaxX = 1.0f - fractPos.x;
+                float distToMinY = fractPos.y;
+                float distToMaxY = 1.0f - fractPos.y;
+                float distToMinZ = fractPos.z;
+                float distToMaxZ = 1.0f - fractPos.z;
+                
+                // Find the closest boundary
+                float minDist = distToMinX;
+                normal = glm::ivec3(-1, 0, 0); // -X face
+                
+                if (distToMaxX < minDist) {
+                    minDist = distToMaxX;
+                    normal = glm::ivec3(1, 0, 0); // +X face
+                }
+                
+                if (distToMinY < minDist) {
+                    minDist = distToMinY;
+                    normal = glm::ivec3(0, -1, 0); // -Y face
+                }
+                
+                if (distToMaxY < minDist) {
+                    minDist = distToMaxY;
+                    normal = glm::ivec3(0, 1, 0); // +Y face
+                }
+                
+                if (distToMinZ < minDist) {
+                    minDist = distToMinZ;
+                    normal = glm::ivec3(0, 0, -1); // -Z face
+                }
+                
+                if (distToMaxZ < minDist) {
+                    minDist = distToMaxZ;
+                    normal = glm::ivec3(0, 0, 1); // +Z face
+                }
+                
+                potentialFaces.push_back(normal);
+            }
+            
+            // Check all potential faces to find a visible one
+            bool found = false;
+            glm::ivec3 bestNormal(0, 0, 0);
+            float bestAlignment = -1.0f;
+            
+            for (size_t i = 0; i < potentialFaces.size(); i++) {
+                glm::ivec3 normal = potentialFaces[i];
+                
+                // Check if the face is actually exposed (adjacent block is air)
+                glm::ivec3 adjacentBlockPos = blockPos + normal;
+                int adjacentBlockType = getBlock(adjacentBlockPos);
+                
+                // Only consider faces that are exposed to air
+                if (adjacentBlockType == 0) {
+                    // Calculate how directly this face is being viewed
+                    // Dot product between view direction and face normal
+                    float alignment = std::abs(glm::dot(glm::vec3(normal), dir));
+                    
+                    // If this is the most directly faced surface, or if we're at an edge with
+                    // a low distance weight, choose this face
+                    if (alignment > bestAlignment) {
+                        bestAlignment = alignment;
+                        bestNormal = normal;
+                        found = true;
+                    }
+                }
+            }
+            
+            // If we found a visible face
+            if (found) {
+                // Make sure the normal points outward (away from ray direction)
+                if (glm::dot(glm::vec3(bestNormal), dir) > 0) {
+                    bestNormal = -bestNormal; // Flip the normal if it's pointing in the wrong direction
+                }
+                
+                // Fill the result
+                result.hit = true;
+                result.blockPos = blockPos;
+                result.faceNormal = bestNormal;
+                result.distance = distance;
+                break;
+            }
+            
+            // If no visible face found, continue ray marching
+            currentPos += dir * stepSize;
+            continue;
+        }
+        
+        // Move along the ray
+        currentPos += dir * stepSize;
+    }
+    
+    return result;
 } 

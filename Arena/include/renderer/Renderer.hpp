@@ -52,6 +52,11 @@ public:
     bool isShowingCollisionBox() const { return m_showCollisionBox; }
     void setPlayer(Player* player) { m_player = player; }
 
+    // Highlight rendering
+    void renderBlockHighlight(const glm::ivec3& blockPos, const glm::ivec3& faceNormal);
+    void setHighlightEnabled(bool enabled) { m_highlightEnabled = enabled; }
+    bool isHighlightEnabled() const { return m_highlightEnabled; }
+
 private:
     void setupShaders();
     void renderChunk(const Chunk* chunk, const glm::mat4& viewProjection);
@@ -68,6 +73,9 @@ private:
     GLuint m_hudVao;           // Added for HUD VAO
     GLuint m_hudVbo;           // Added for HUD VBO
     GLuint m_hudEbo;           // Added for HUD EBO
+    GLuint m_highlightVao;     // Added for highlight VAO
+    GLuint m_highlightVbo;     // Added for highlight VBO
+    GLuint m_highlightEbo;     // Added for highlight EBO
     
     std::unique_ptr<TextureManager> m_textureManager;
 
@@ -93,4 +101,7 @@ private:
 
     bool m_showCollisionBox;  // State for collision box visualization
     Player* m_player;  // Pointer to the player for collision box rendering
+    bool m_highlightEnabled;  // Whether block highlighting is enabled
+    glm::ivec3 m_highlightedBlock;  // Currently highlighted block position
+    glm::ivec3 m_highlightedFace;   // Currently highlighted face normal
 }; 
