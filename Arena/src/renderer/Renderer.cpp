@@ -322,7 +322,6 @@ void Renderer::render(World* world, Player* player) {
         setupCamera(player);
         renderWorld(world, player);
         glUseProgram(0);
-        renderPlayerCollisionBox(player);
     } else if (!m_buffersInitialized) {
         std::cerr << "ERROR: Cannot render world - buffers not initialized" << std::endl;
     }
@@ -394,11 +393,6 @@ void Renderer::render(World* world, Player* player) {
     if ((m_vao == 0 || m_vbo == 0 || m_ebo == 0) && m_buffersInitialized) {
         std::cerr << "WARNING: OpenGL buffers were invalidated during frame rendering!" << std::endl;
         m_buffersInitialized = false;
-    }
-
-    // Render player collision box if enabled
-    if (m_showCollisionBox && player) {
-        renderPlayerCollisionBox(player);
     }
 }
 
@@ -676,112 +670,6 @@ void Renderer::renderChunk(const Chunk* chunk, const glm::mat4& viewProjection) 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     glUseProgram(0);
     glBindTexture(GL_TEXTURE_2D, 0);
-}
-
-void Renderer::renderPlayerCollisionBox(Player* player) {
-    if (!player) return;
-    
-    // Save current OpenGL state
-    GLboolean depthTestEnabled;
-    glGetBooleanv(GL_DEPTH_TEST, &depthTestEnabled);
-    
-    // Set up rendering state for collision box
-    glDisable(GL_DEPTH_TEST);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    
-    // Get player collision bounds
-    glm::vec3 min = player->getMinBounds();
-    glm::vec3 max = player->getMaxBounds();
-    
-    // Get player's orientation vectors
-    glm::vec3 forward = player->getForward();
-    glm::vec3 right = player->getRight();
-    glm::vec3 up = player->getUp();
-    
-    // Create transformation matrix
-    glm::mat4 transform = glm::translate(glm::mat4(1.0f), player->getPosition());
-    
-    // Create rotation matrix from orientation vectors
-    // Ensure vectors are orthonormal
-    forward = glm::normalize(forward);
-    right = glm::normalize(glm::cross(forward, up));
-    up = glm::normalize(glm::cross(right, forward));
-    
-    glm::mat4 rotation = glm::mat4(
-        glm::vec4(right, 0.0f),
-        glm::vec4(up, 0.0f),
-        glm::vec4(-forward, 0.0f), // Negate forward for correct orientation
-        glm::vec4(0.0f, 0.0f, 0.0f, 1.0f)
-    );
-    
-    // Combine transformations
-    transform = transform * rotation;
-    
-    // Draw wireframe box
-    glColor4f(1.0f, 0.0f, 0.0f, 0.7f);
-    glLineWidth(2.0f);
-    
-    // Save current matrix
-    glPushMatrix();
-    
-    // Apply transformation
-    glMultMatrixf(glm::value_ptr(transform));
-    
-    // Calculate box dimensions
-    glm::vec3 dimensions = max - min;
-    
-    glBegin(GL_LINES);
-    
-    // Draw bottom square
-    glVertex3f(-dimensions.x * 0.5f, -dimensions.y * 0.5f, -dimensions.z * 0.5f);
-    glVertex3f(dimensions.x * 0.5f, -dimensions.y * 0.5f, -dimensions.z * 0.5f);
-    
-    glVertex3f(dimensions.x * 0.5f, -dimensions.y * 0.5f, -dimensions.z * 0.5f);
-    glVertex3f(dimensions.x * 0.5f, -dimensions.y * 0.5f, dimensions.z * 0.5f);
-    
-    glVertex3f(dimensions.x * 0.5f, -dimensions.y * 0.5f, dimensions.z * 0.5f);
-    glVertex3f(-dimensions.x * 0.5f, -dimensions.y * 0.5f, dimensions.z * 0.5f);
-    
-    glVertex3f(-dimensions.x * 0.5f, -dimensions.y * 0.5f, dimensions.z * 0.5f);
-    glVertex3f(-dimensions.x * 0.5f, -dimensions.y * 0.5f, -dimensions.z * 0.5f);
-    
-    // Draw top square
-    glVertex3f(-dimensions.x * 0.5f, dimensions.y * 0.5f, -dimensions.z * 0.5f);
-    glVertex3f(dimensions.x * 0.5f, dimensions.y * 0.5f, -dimensions.z * 0.5f);
-    
-    glVertex3f(dimensions.x * 0.5f, dimensions.y * 0.5f, -dimensions.z * 0.5f);
-    glVertex3f(dimensions.x * 0.5f, dimensions.y * 0.5f, dimensions.z * 0.5f);
-    
-    glVertex3f(dimensions.x * 0.5f, dimensions.y * 0.5f, dimensions.z * 0.5f);
-    glVertex3f(-dimensions.x * 0.5f, dimensions.y * 0.5f, dimensions.z * 0.5f);
-    
-    glVertex3f(-dimensions.x * 0.5f, dimensions.y * 0.5f, dimensions.z * 0.5f);
-    glVertex3f(-dimensions.x * 0.5f, dimensions.y * 0.5f, -dimensions.z * 0.5f);
-    
-    // Draw vertical lines
-    glVertex3f(-dimensions.x * 0.5f, -dimensions.y * 0.5f, -dimensions.z * 0.5f);
-    glVertex3f(-dimensions.x * 0.5f, dimensions.y * 0.5f, -dimensions.z * 0.5f);
-    
-    glVertex3f(dimensions.x * 0.5f, -dimensions.y * 0.5f, -dimensions.z * 0.5f);
-    glVertex3f(dimensions.x * 0.5f, dimensions.y * 0.5f, -dimensions.z * 0.5f);
-    
-    glVertex3f(dimensions.x * 0.5f, -dimensions.y * 0.5f, dimensions.z * 0.5f);
-    glVertex3f(dimensions.x * 0.5f, dimensions.y * 0.5f, dimensions.z * 0.5f);
-    
-    glVertex3f(-dimensions.x * 0.5f, -dimensions.y * 0.5f, dimensions.z * 0.5f);
-    glVertex3f(-dimensions.x * 0.5f, dimensions.y * 0.5f, dimensions.z * 0.5f);
-    
-    glEnd();
-    
-    // Restore matrix
-    glPopMatrix();
-    
-    // Restore previous state
-    if (depthTestEnabled) {
-        glEnable(GL_DEPTH_TEST);
-    }
-    glDisable(GL_BLEND);
 }
 
 void Renderer::setupCamera(const Player* player) {
