@@ -6,7 +6,6 @@
 CollisionSystem::CollisionSystem()
     : m_width(0.6f)   // Base width - actual collision uses smaller values
     , m_height(1.8f)  // Standard player height
-    , m_collisionBox(0.25f, 1.8f, 0.25f) // Default collision box size
     , m_collisionInset(0.05f)
     , m_edgeThreshold(0.05f)
     , m_verticalStepSize(0.02f)
@@ -19,11 +18,8 @@ CollisionSystem::CollisionSystem()
 
 void CollisionSystem::init(float width, float height) {
     // Always use a fixed width for consistent collision 
-    m_width = width;
+    m_width = 0.6f; // Base width - actual collision uses smaller fixed width of 0.3f
     m_height = height;
-    
-    // Initialize the collision box with appropriate dimensions
-    m_collisionBox = CollisionBox(0.25f, height, 0.25f);
 }
 
 bool CollisionSystem::collidesWithBlocks(const glm::vec3& pos, const glm::vec3& velocity, World* world, bool useWiderCollision) {
@@ -38,33 +34,37 @@ bool CollisionSystem::collidesWithBlocks(const glm::vec3& pos, const glm::vec3& 
     // Important: pos is now treated as the player's feet position (bottom center)
     glm::vec3 min, max;
     
-    // Get the appropriate collision box based on movement characteristics
-    CollisionBox activeBox = m_collisionBox;
+    // For better consistency, use a fixed collision box size that doesn't change with direction
+    // Use a cylinder-like collision model with a fixed width for X and Z
+    float collisionWidth = 0.3f; // Reduced from 0.4f to ensure falling through 2x2 holes
     
     // When falling, use a slightly different collision box to prevent getting stuck on walls
     bool isFalling = velocity.y < 0;
     
-    // Apply different collision strategies based on movement
-    if (isFalling) {
-        // Use a smaller collision box when falling to avoid getting stuck on edges
-        activeBox = m_collisionBox.getSmallerBox(0.2f);
-        // Add a bit of vertical offset when falling to avoid catching on edges
-        activeBox.offset.y = 0.2f;
-    } else if (std::abs(velocity.y) < 0.1f && (std::abs(velocity.x) > 0.01f || std::abs(velocity.z) > 0.01f)) {
-        // If moving horizontally with little vertical movement, use a slightly narrower box
-        activeBox = m_collisionBox.getSmallerBox(0.1f);
-    }
+    // Define bottomInset here so it's accessible throughout the method
+    float bottomInset = isFalling ? 0.2f : 0.1f; // Increased bottom inset when falling (0.15f -> 0.2f)
     
-    // For ground detection, use a slightly wider box
+    // Adjust horizontal collision width based on movement direction
+    // If we're moving horizontally (with little/no vertical movement), use a slightly narrower box
+    bool isHorizontalMovement = std::abs(velocity.y) < 0.1f && (std::abs(velocity.x) > 0.01f || std::abs(velocity.z) > 0.01f);
+    float horizontalMovementInset = isHorizontalMovement ? 0.03f : 0.0f;
+    
     if (useWiderCollision) {
-        // Expand the collision box slightly
-        activeBox.width *= 1.1f;
-        activeBox.depth *= 1.1f;
+        // IMPORTANT: This wider collision is only used for ground detection
+        // We want to be more generous when checking if there's ground below
+        min = pos + glm::vec3(-collisionWidth - 0.05f, 0.0f, -collisionWidth - 0.05f);
+        max = pos + glm::vec3(collisionWidth + 0.05f, m_height, collisionWidth + 0.05f);
+    } else {
+        // Normal collision - adjusted to prevent clipping into voxels
+        // Add a small inset at the bottom and raise it when falling to prevent getting stuck on walls
+        
+        // CRITICAL FIX: For falling, we're more concerned with ground collision than wall collision
+        // So we make the horizontal collision box narrower to avoid getting stuck on walls
+        float sideInset = isFalling ? 0.05f : (0.025f + horizontalMovementInset); // Extra horizontal inset when falling or moving horizontally
+        
+        min = pos + glm::vec3(-collisionWidth + sideInset, bottomInset, -collisionWidth + sideInset);
+        max = pos + glm::vec3(collisionWidth - sideInset, m_height - 0.05f, collisionWidth - sideInset);
     }
-    
-    // Calculate the bounds based on our active collision box
-    min = activeBox.getMin(pos);
-    max = activeBox.getMax(pos);
     
     // Debug output for collision checking
     static int debugCounter = 0;
@@ -178,8 +178,8 @@ bool CollisionSystem::collidesWithBlocks(const glm::vec3& pos, const glm::vec3& 
                         
                         if (isSideBlock) {
                             // For side blocks during falling, use a reduced collision box
-                            glm::vec3 reducedMin = pos + glm::vec3(-activeBox.width * 0.7f, activeBox.offset.y, -activeBox.width * 0.7f);
-                            glm::vec3 reducedMax = pos + glm::vec3(activeBox.width * 0.7f, m_height - 0.05f, activeBox.width * 0.7f);
+                            glm::vec3 reducedMin = pos + glm::vec3(-collisionWidth * 0.7f, bottomInset, -collisionWidth * 0.7f);
+                            glm::vec3 reducedMax = pos + glm::vec3(collisionWidth * 0.7f, m_height - 0.05f, collisionWidth * 0.7f);
                             
                             // Use the reduced box for side collisions when falling
                             if (!intersectsWithBlock(reducedMin, reducedMax, blockMin, blockMax)) {
@@ -214,8 +214,8 @@ bool CollisionSystem::collidesWithBlocks(const glm::vec3& pos, const glm::vec3& 
 bool CollisionSystem::checkGroundCollision(const glm::vec3& pos, const glm::vec3& velocity, World* world) {
     if (!world) return false;
     
-    // Use the collision box dimensions for ground detection
-    const float groundCheckWidth = m_collisionBox.width * 0.9f; // Slightly smaller than collision width
+    // Use a fixed-width cylinder model for ground detection
+    const float groundCheckWidth = 0.3f; // Reduced from 0.4f to match updated collision width
     glm::vec3 groundCheckPos = pos;
     const float groundCheckDepth = 0.1f; // How far below the player to check for ground
     
@@ -387,56 +387,6 @@ glm::vec3 CollisionSystem::moveWithCollision(const glm::vec3& currentPos, const 
                 glm::vec3 ceilingCheckPos = nextPos;
                 ceilingCheckPos.y = nextPos.y + m_height - 0.1f; // Check near the top of the player
                 
-                // First, check for wall collisions on the sides that might be stopping upward movement
-                bool hittingWall = false;
-                glm::vec3 sideNormal(0.0f);
-                
-                // Check sides for walls when moving up
-                const float sideCheckDistance = 0.35f;
-                const float sideNudgeAmount = 0.15f;
-                
-                // Check in 4 horizontal directions for walls
-                const glm::vec3 checkDirections[4] = {
-                    glm::vec3(1.0f, 0.0f, 0.0f),  // +X
-                    glm::vec3(-1.0f, 0.0f, 0.0f), // -X
-                    glm::vec3(0.0f, 0.0f, 1.0f),  // +Z
-                    glm::vec3(0.0f, 0.0f, -1.0f)  // -Z
-                };
-                
-                for (int dir = 0; dir < 4; dir++) {
-                    // Check if there's a wall in this direction
-                    glm::vec3 sideCheckPos = nextPos + checkDirections[dir] * 0.3f; // Check near the player's sides
-                    
-                    glm::ivec3 blockPos(
-                        std::floor(sideCheckPos.x),
-                        std::floor(sideCheckPos.y + 0.5f), // Check at middle height
-                        std::floor(sideCheckPos.z)
-                    );
-                    
-                    int blockType = world->getBlock(blockPos);
-                    if (isBlockSolid(blockType)) {
-                        hittingWall = true;
-                        sideNormal -= checkDirections[dir]; // Accumulate normals pointing away from walls
-                    }
-                }
-                
-                // If hitting a wall while moving up, try to slide along it
-                if (hittingWall && glm::length(sideNormal) > 0.001f) {
-                    sideNormal = glm::normalize(sideNormal);
-                    
-                    // Calculate slide vector - push away from wall and maintain upward movement
-                    glm::vec3 slideVector = sideNormal * 0.1f;
-                    glm::vec3 slidingNextPos = nextPos + slideVector;
-                    
-                    // Only use this if it doesn't cause another collision
-                    if (!collidesWithBlocks(slidingNextPos, velocity, world, false)) {
-                        nextPos = slidingNextPos;
-                        if (verboseDebug) {
-                            std::cout << "Applied wall slide while moving up" << std::endl;
-                        }
-                    }
-                }
-                
                 // Check if there's a solid block above the player's head
                 glm::ivec3 blockPos(
                     std::floor(ceilingCheckPos.x),
@@ -504,16 +454,6 @@ glm::vec3 CollisionSystem::moveWithCollision(const glm::vec3& currentPos, const 
                     // We've hit a solid ceiling with no way around it
                     // Adjust position to be just below the ceiling
                     nextPos.y = std::floor(ceilingCheckPos.y) - m_height + 0.01f;
-                    
-                    // Also apply a reverse velocity immediately to prevent sticking
-                    // This helps especially when jumping directly into a ceiling
-                    if (velocity.y > 0.5f) {
-                        const_cast<glm::vec3&>(velocity).y = -velocity.y * 0.1f; // Apply negative bounce with dampening
-                        if (verboseDebug) {
-                            std::cout << "Applied ceiling bounce to prevent sticking" << std::endl;
-                        }
-                    }
-                    
                     break;
                 }
             } 
@@ -552,165 +492,58 @@ glm::vec3 CollisionSystem::moveWithCollision(const glm::vec3& currentPos, const 
                 
                 // Check each side for wall collisions
                 for (int side = 0; side < 4; side++) {
-                    glm::vec3 checkPos = nextPos + sideOffsets[side];
+                    glm::vec3 sidePos = nextPos + sideOffsets[side];
+                    
+                    // Check if this side point is inside a block
                     glm::ivec3 blockPos(
-                        std::floor(checkPos.x),
-                        std::floor(checkPos.y),
-                        std::floor(checkPos.z)
+                        std::floor(sidePos.x),
+                        std::floor(sidePos.y),
+                        std::floor(sidePos.z)
                     );
                     
                     int blockType = world->getBlock(blockPos);
                     if (isBlockSolid(blockType)) {
+                        wallCollision = true;
                         wallCollisionCount++;
                         
-                        // Calculate direction to nudge the player away from the wall
-                        nudgeDirection -= sideOffsets[side];
-                        wallCollision = true;
-                    }
-                }
-                
-                // Check for vertical edges specifically (diagonal corners) at multiple heights
-                bool verticalEdgeDetected = false;
-                glm::vec3 edgeAvoidanceNormal(0.0f);
-                
-                // Check corners to detect edges
-                const glm::vec3 cornerOffsets[4] = {
-                    glm::vec3(-collisionWidth, 0.5f, -collisionWidth),  // Back-Left
-                    glm::vec3(collisionWidth, 0.5f, -collisionWidth),   // Back-Right
-                    glm::vec3(-collisionWidth, 0.5f, collisionWidth),   // Front-Left
-                    glm::vec3(collisionWidth, 0.5f, collisionWidth)     // Front-Right
-                };
-                
-                int cornerCollisions = 0;
-                for (int corner = 0; corner < 4; corner++) {
-                    glm::vec3 checkPos = nextPos + cornerOffsets[corner];
-                    glm::ivec3 blockPos(
-                        std::floor(checkPos.x),
-                        std::floor(checkPos.y),
-                        std::floor(checkPos.z)
-                    );
-                    
-                    int blockType = world->getBlock(blockPos);
-                    if (isBlockSolid(blockType)) {
-                        cornerCollisions++;
-                        edgeAvoidanceNormal -= glm::normalize(glm::vec3(cornerOffsets[corner].x, 0, cornerOffsets[corner].z));
-                    }
-                }
-                
-                // If we have corner collisions but not many side collisions,
-                // it's likely we're hitting vertical edges
-                if (cornerCollisions > 0 && wallCollisionCount <= 1) {
-                    verticalEdgeDetected = true;
-                    if (verboseDebug) {
-                        std::cout << "Vertical edge detected during falling" << std::endl;
-                    }
-                }
-                
-                // If we found vertical edge collision, handle it specially
-                if (verticalEdgeDetected && glm::length(edgeAvoidanceNormal) > 0.001f) {
-                    edgeAvoidanceNormal = glm::normalize(edgeAvoidanceNormal);
-                    
-                    // Try stronger horizontal nudges for edges
-                    const float edgeNudgeDistances[] = {0.05f, 0.1f, 0.15f};
-                    bool nudgeSuccessful = false;
-                    
-                    for (float nudgeDistance : edgeNudgeDistances) {
-                        // Apply horizontal nudge away from the edge
-                        glm::vec3 nudgedPos = nextPos + edgeAvoidanceNormal * nudgeDistance;
-                        
-                        // Check if the nudge resolves the collision
-                        if (!collidesWithBlocks(nudgedPos, velocity, world, false)) {
-                            // Successfully nudged away from edge
-                            nextPos = nudgedPos;
-                            nudgeSuccessful = true;
-                            
-                            if (verboseDebug) {
-                                std::cout << "Successfully nudged away from vertical edge by " 
-                                          << nudgeDistance << std::endl;
-                            }
+                        // Calculate nudge direction away from this wall
+                        switch (side) {
+                            case 0: // Left wall - nudge right
+                                nudgeDirection.x += 0.05f;
                                 break;
-                        }
-                    }
-                    
-                    // If standard nudging didn't work, try with a slight upward component
-                    if (!nudgeSuccessful) {
-                        // Try nudge with upward component
-                        glm::vec3 upwardEdgeNormal = glm::normalize(edgeAvoidanceNormal + glm::vec3(0.0f, 0.1f, 0.0f));
-                        
-                        for (float nudgeDistance : edgeNudgeDistances) {
-                            glm::vec3 nudgedPos = nextPos + upwardEdgeNormal * nudgeDistance;
-                            
-                            if (!collidesWithBlocks(nudgedPos, velocity, world, false)) {
-                                // Successfully nudged with upward component
-                                nextPos = nudgedPos;
-                                nudgeSuccessful = true;
-                                
-                                if (verboseDebug) {
-                                    std::cout << "Successfully nudged away from vertical edge with upward component by " 
-                                              << nudgeDistance << std::endl;
-                                }
+                            case 1: // Right wall - nudge left
+                                nudgeDirection.x -= 0.05f;
+                                break;
+                            case 2: // Back wall - nudge forward
+                                nudgeDirection.z += 0.05f;
+                                break;
+                            case 3: // Front wall - nudge backward
+                                nudgeDirection.z -= 0.05f;
                                 break;
                         }
                     }
                 }
                 
-                    // If we successfully nudged, continue falling
-                    if (nudgeSuccessful) {
-                        newPos = nextPos;
-                        continue;
+                // If we're colliding with walls while falling, apply a nudge
+                if (wallCollision) {
+                    // Normalize nudge direction if hitting multiple walls
+                    if (wallCollisionCount > 1) {
+                        nudgeDirection = glm::normalize(nudgeDirection) * 0.05f;
                     }
-                }
-                
-                // If we're colliding with walls while moving down, try to slide along them
-                // This is the critical part that allows sliding down walls
-                if (wallCollision && !groundCollision) {
-                    if (wallCollisionCount >= 3) {
-                        // If we're in a corner with multiple walls, we should slow down
-                        // but still allow some downward movement to prevent getting stuck
-                        nextPos.y = newPos.y + verticalStep.y * 0.5f; // Reduced vertical movement
-                        
-                        if (verboseDebug) {
-                            std::cout << "Multiple wall collisions, slowing descent" << std::endl;
-                        }
-                    } else if (glm::length(nudgeDirection) > 0.001f) {
-                        // We have a clear direction to nudge
-                        nudgeDirection = glm::normalize(nudgeDirection);
-                        
-                        // Apply horizontal nudge and continue downward movement
-                        float nudgeAmount = 0.05f;
-                        glm::vec3 nudgedPos = nextPos + nudgeDirection * nudgeAmount;
-                        
-                        // Check if the nudge resolves the collision
+                    
+                    // Apply the nudge to prevent sticking to walls
+                    glm::vec3 nudgedPos = nextPos + nudgeDirection;
+                    
+                    // Only use the nudged position if it doesn't cause a new collision
                     if (!collidesWithBlocks(nudgedPos, velocity, world, false)) {
-                            // Successfully nudged away from wall
                         nextPos = nudgedPos;
-                            
                         if (verboseDebug) {
-                                std::cout << "Successfully nudged away from wall while sliding down" << std::endl;
-                        }
-                    } else {
-                            // If nudging didn't work, still allow some downward movement
-                            // but keep horizontal position the same to stay close to the wall
-                            nextPos.x = newPos.x;
-                            nextPos.z = newPos.z;
-                            
-                            if (verboseDebug) {
-                                std::cout << "Sliding straight down wall" << std::endl;
-                            }
-                        }
-                    } else {
-                        // No clear nudge direction, maintain vertical movement but keep horizontal position
-                        nextPos.x = newPos.x;
-                        nextPos.z = newPos.z;
-                        
-                        if (verboseDebug) {
-                            std::cout << "Sliding straight down wall (no nudge direction)" << std::endl;
+                            std::cout << "Applied wall nudge while falling: " 
+                                     << nudgeDirection.x << ", " << nudgeDirection.y << ", " << nudgeDirection.z 
+                                     << " (wall count: " << wallCollisionCount << ")" << std::endl;
                         }
                     }
                 }
-                
-                // Apply the position update after wall sliding logic
-                newPos = nextPos;
             }
             
             // No ground collision, proceed with the step
@@ -743,18 +576,14 @@ glm::vec3 CollisionSystem::moveWithCollision(const glm::vec3& currentPos, const 
             
             // Cast rays in multiple directions to detect nearby walls before moving
             const float wallDetectionDistance = 0.075f; // Detect walls very close to player
-            
-            // Get the current collision box dimensions
-            const float collisionWidth = m_collisionBox.width;
-            const float collisionDepth = m_collisionBox.depth;
-            
+            const float collisionWidth = 0.3f; // Same as in collidesWithBlocks
             // Points to check around the player's body
             const glm::vec3 checkPoints[] = {
                 glm::vec3(0.0f, 0.5f, 0.0f),                    // Center
                 glm::vec3(-collisionWidth * 0.9f, 0.5f, 0.0f),  // Left
                 glm::vec3(collisionWidth * 0.9f, 0.5f, 0.0f),   // Right
-                glm::vec3(0.0f, 0.5f, -collisionDepth * 0.9f),  // Back
-                glm::vec3(0.0f, 0.5f, collisionDepth * 0.9f)    // Front
+                glm::vec3(0.0f, 0.5f, -collisionWidth * 0.9f),  // Back
+                glm::vec3(0.0f, 0.5f, collisionWidth * 0.9f)    // Front
             };
             
             // Check points in all 4 horizontal directions
@@ -808,8 +637,8 @@ glm::vec3 CollisionSystem::moveWithCollision(const glm::vec3& currentPos, const 
                 newPos + glm::vec3(0.0f, 0.5f, 0.0f),                    // Center
                 newPos + glm::vec3(-collisionWidth * 0.8f, 0.5f, 0.0f),  // Left
                 newPos + glm::vec3(collisionWidth * 0.8f, 0.5f, 0.0f),   // Right
-                newPos + glm::vec3(0.0f, 0.5f, -collisionDepth * 0.8f),  // Back
-                newPos + glm::vec3(0.0f, 0.5f, collisionDepth * 0.8f)    // Front
+                newPos + glm::vec3(0.0f, 0.5f, -collisionWidth * 0.8f),  // Back
+                newPos + glm::vec3(0.0f, 0.5f, collisionWidth * 0.8f)    // Front
             };
             
             // Normalize movement direction for ray casting
@@ -1010,15 +839,14 @@ glm::vec3 CollisionSystem::moveWithCollision(const glm::vec3& currentPos, const 
                                     }
                                 }
                             }
-                        }
-                        else {
-                            // Neither stepping up nor sliding works
+                            } else {
+                                // Neither stepping up nor sliding works
+                                break;
+                            }
+                        } else {
+                            // Not near ground and can't slide on either axis
                             break;
                         }
-                    }
-                    else {
-                        // Not near ground and can't slide on either axis
-                        break;
                     }
                 }
             }
@@ -1233,7 +1061,7 @@ bool CollisionSystem::intersectsWithBlock(const glm::vec3& min, const glm::vec3&
          std::min(deltaMinY, deltaMaxY) > std::min(deltaMinZ, deltaMaxZ));
         
     // Use a larger epsilon for vertical walls to prevent sticking
-    float adjustedHorizontalEpsilon = isVerticalWallCollision ? 0.045f : horizontalEpsilon; // Increased from 0.035f to 0.045f
+    float adjustedHorizontalEpsilon = isVerticalWallCollision ? 0.035f : horizontalEpsilon;
     
     return (min.x <= blockMax.x + adjustedHorizontalEpsilon && max.x >= blockMin.x - adjustedHorizontalEpsilon &&
             min.y <= blockMax.y + verticalEpsilon && max.y >= blockMin.y - verticalEpsilon &&
@@ -1243,40 +1071,23 @@ bool CollisionSystem::intersectsWithBlock(const glm::vec3& min, const glm::vec3&
 bool CollisionSystem::isInsideBlock(const glm::vec3& pos, World* world) {
     if (!world) return false;
     
-    // Use a scaled down version of our collision box for more precise inside checks
-    CollisionBox checkBox = m_collisionBox.getSmallerBox(0.2f);
+    // Check a few key points around the player's body instead of just center points
+    // This gives better detection for wall collisions
     
-    // Check points around the player's body at different heights
-    const float heights[] = { 0.1f, 0.9f, checkBox.height - 0.1f };
-    
-    // Check center at each height level
-    for (const float height : heights) {
-        glm::vec3 checkPos = pos + glm::vec3(0.0f, height, 0.0f);
-        glm::ivec3 blockPos(
-            std::floor(checkPos.x),
-            std::floor(checkPos.y),
-            std::floor(checkPos.z)
-        );
+    // Check center points at different heights
+    const glm::vec3 checkOffsets[] = {
+        glm::vec3(0.0f, 0.1f, 0.0f),     // Feet
+        glm::vec3(0.0f, 0.9f, 0.0f),     // Torso
+        glm::vec3(0.0f, 1.7f, 0.0f),     // Head
         
-        int blockType = world->getBlock(blockPos);
-        if (isBlockSolid(blockType)) {
-            return true;
-        }
-    }
-    
-    // Check horizontal points at mid-height
-    const float midHeight = 0.9f;
-    const float checkRadius = checkBox.width * 0.5f;
-    
-    // Check points around middle height (torso)
-    const glm::vec3 horizontalOffsets[] = {
-        glm::vec3(checkRadius, midHeight, 0.0f),     // Right
-        glm::vec3(-checkRadius, midHeight, 0.0f),    // Left
-        glm::vec3(0.0f, midHeight, checkRadius),     // Front
-        glm::vec3(0.0f, midHeight, -checkRadius)     // Back
+        // Add horizontal checks to catch wall collisions
+        glm::vec3(0.25f, 0.9f, 0.0f),    // Right side
+        glm::vec3(-0.25f, 0.9f, 0.0f),   // Left side
+        glm::vec3(0.0f, 0.9f, 0.25f),    // Front
+        glm::vec3(0.0f, 0.9f, -0.25f)    // Back
     };
     
-    for (const auto& offset : horizontalOffsets) {
+    for (const auto& offset : checkOffsets) {
         glm::vec3 checkPos = pos + offset;
     glm::ivec3 blockPos(
             std::floor(checkPos.x),
@@ -1285,8 +1096,8 @@ bool CollisionSystem::isInsideBlock(const glm::vec3& pos, World* world) {
         );
         
     int blockType = world->getBlock(blockPos);
-        if (isBlockSolid(blockType)) {
-            return true;
+        if (blockType > 0) {
+            return true; // Found a solid block at one of the check points
         }
     }
     
@@ -1396,40 +1207,35 @@ bool CollisionSystem::collidesWithBlocksGreedy(const glm::vec3& pos, const glm::
     // The collision box should be centered horizontally around the player, but start at their feet
     glm::vec3 min, max;
     
-    // Get the appropriate collision box based on movement characteristics
-    CollisionBox activeBox = m_collisionBox;
+    // Use a much smaller collision box for accurate hole detection
+    float collisionWidth = 0.3f; // Match the standard collision width
     
-    // Apply different collision strategies based on movement
-    bool isFalling = velocity.y < 0;
+    // Adjust horizontal collision width based on movement direction
+    // If we're moving horizontally (with little vertical movement), use a slightly narrower box
+    bool isHorizontalMovement = std::abs(velocity.y) < 0.1f && (std::abs(velocity.x) > 0.01f || std::abs(velocity.z) > 0.01f);
+    float horizontalMovementInset = isHorizontalMovement ? 0.03f : 0.0f;
     
-    if (isFalling) {
-        // Use a smaller collision box when falling to avoid getting stuck on edges
-        activeBox = m_collisionBox.getSmallerBox(0.2f);
-        // Add a bit of vertical offset when falling to avoid catching on edges
-        activeBox.offset.y = 0.2f;
-    } else if (std::abs(velocity.y) < 0.1f && (std::abs(velocity.x) > 0.01f || std::abs(velocity.z) > 0.01f)) {
-        // If moving horizontally with little vertical movement, use a slightly narrower box
-        activeBox = m_collisionBox.getSmallerBox(0.1f);
-    }
-    
-    // For ground detection, use a slightly wider box
     if (useWiderCollision) {
-        // Expand the collision box slightly
-        activeBox.width *= 1.1f;
-        activeBox.depth *= 1.1f;
+        // Use a wider collision box for ground detection, but still smaller than before
+        min = pos + glm::vec3(-(collisionWidth + 0.2f), 0.0f, -(collisionWidth + 0.2f));
+        max = pos + glm::vec3(collisionWidth + 0.2f, m_height, collisionWidth + 0.2f);
+    } else {
+        // Use narrower collision box for regular movement
+        min = pos + glm::vec3(-collisionWidth + horizontalMovementInset, 0.0f, -collisionWidth + horizontalMovementInset);
+        max = pos + glm::vec3(collisionWidth - horizontalMovementInset, m_height, collisionWidth - horizontalMovementInset);
     }
-    
-    // Calculate the bounds based on our active collision box
-    min = activeBox.getMin(pos);
-    max = activeBox.getMax(pos);
     
     if (verboseDebug) {
         std::cout << "==== GREEDY COLLISION CHECK ====" << std::endl;
         std::cout << "Player position (feet): (" << pos.x << ", " << pos.y << ", " << pos.z << ")" << std::endl;
         std::cout << "Collision box min: (" << min.x << ", " << min.y << ", " << min.z << ")" << std::endl;
         std::cout << "Collision box max: (" << max.x << ", " << max.y << ", " << max.z << ")" << std::endl;
-        std::cout << "Is falling: " << (isFalling ? "YES" : "NO") << std::endl;
-        std::cout << "===========================" << std::endl;
+        std::cout << "Collision box width: " << (max.x - min.x) << ", height: " << (max.y - min.y) 
+                  << ", depth: " << (max.z - min.z) << std::endl;
+        
+        if (useWiderCollision) {
+            std::cout << "Using wider collision box for chunk boundary detection" << std::endl;
+        }
     }
     
     // CRITICAL FIX: Check if the player's feet are below ground level
@@ -1616,11 +1422,9 @@ void CollisionSystem::correctVerticalWallCollision(glm::vec3& position, const gl
     if (!collidesWithBlocks(position, velocity, world, false)) return;
     
     // We're colliding, check if it's a vertical wall by checking nearby points
-    // around player's body at multiple heights
+    // around player's torso height
     const float wallCheckDistance = 0.1f;
-    
-    // Check multiple height levels to better detect walls
-    const float checkHeights[] = { 0.25f, 0.9f, 1.5f }; // Feet, torso, head
+    const float playerHalfHeight = 0.9f; // Half of player height
     
     // Check in all four horizontal directions
     const glm::vec3 checkDirs[] = {
@@ -1633,13 +1437,9 @@ void CollisionSystem::correctVerticalWallCollision(glm::vec3& position, const gl
     glm::vec3 wallNormal(0.0f);
     bool foundWall = false;
     
-    // Track which directions have walls for edge detection
-    bool wallsFound[4] = {false, false, false, false};
-    
-    // Check for walls at each height level
-    for (float height : checkHeights) {
+    // Check for walls
     for (int i = 0; i < 4; i++) {
-            glm::vec3 checkPos = position + checkDirs[i] * wallCheckDistance + glm::vec3(0.0f, height, 0.0f);
+        glm::vec3 checkPos = position + checkDirs[i] * wallCheckDistance + glm::vec3(0.0f, playerHalfHeight, 0.0f);
         glm::ivec3 blockPos(
             std::floor(checkPos.x),
             std::floor(checkPos.y),
@@ -1648,45 +1448,8 @@ void CollisionSystem::correctVerticalWallCollision(glm::vec3& position, const gl
         
         int blockType = world->getBlock(blockPos);
         if (isBlockSolid(blockType)) {
-                // Add stronger weighting for walls at mid-heights (more important to player collision)
-                float weight = (height == 0.9f) ? 1.5f : 1.0f;
-                wallNormal -= checkDirs[i] * weight; // Accumulate normals pointing away from walls
+            wallNormal -= checkDirs[i]; // Accumulate normals pointing away from walls
             foundWall = true;
-                wallsFound[i] = true;
-            }
-        }
-    }
-    
-    // Also check for diagonal walls by checking corners at mid height
-    const float cornerCheckHeight = 0.9f;
-    const float cornerDistance = 0.12f;
-    
-    const glm::vec3 cornerDirs[] = {
-        glm::vec3(1.0f, 0.0f, 1.0f),    // +X+Z
-        glm::vec3(1.0f, 0.0f, -1.0f),   // +X-Z
-        glm::vec3(-1.0f, 0.0f, 1.0f),   // -X+Z
-        glm::vec3(-1.0f, 0.0f, -1.0f)   // -X-Z
-    };
-    
-    // Track which corners have walls for edge detection
-    bool cornerWallsFound[4] = {false, false, false, false};
-    
-    for (int i = 0; i < 4; i++) {
-        const glm::vec3& dir = cornerDirs[i];
-        glm::vec3 normalizedDir = glm::normalize(dir);
-        glm::vec3 checkPos = position + normalizedDir * cornerDistance + glm::vec3(0.0f, cornerCheckHeight, 0.0f);
-        
-        glm::ivec3 blockPos(
-            std::floor(checkPos.x),
-            std::floor(checkPos.y),
-            std::floor(checkPos.z)
-        );
-        
-        int blockType = world->getBlock(blockPos);
-        if (isBlockSolid(blockType)) {
-            wallNormal -= normalizedDir; // Add to wall normal
-            foundWall = true;
-            cornerWallsFound[i] = true;
         }
     }
     
@@ -1694,242 +1457,19 @@ void CollisionSystem::correctVerticalWallCollision(glm::vec3& position, const gl
     if (foundWall && glm::length(wallNormal) > 0.001f) {
         wallNormal = glm::normalize(wallNormal);
         
-        static int debugCounter = 0;
-        bool verboseDebug = m_debugMode && (debugCounter++ % 120 == 0);
-        
-        if (verboseDebug) {
-            std::cout << "Detected wall collision, wall normal: (" 
-                      << wallNormal.x << ", " << wallNormal.y << ", " << wallNormal.z << ")" << std::endl;
-        }
-        
-        // Check specifically for vertical edge collisions based on wall pattern
-        bool isVerticalEdge = false;
-        glm::vec3 edgeAvoidanceNormal(0.0f);
-        
-        // If we have walls in adjacent directions or specific corner patterns, it's likely a vertical edge
-        if ((wallsFound[0] && wallsFound[2]) || (wallsFound[0] && wallsFound[3]) || 
-            (wallsFound[1] && wallsFound[2]) || (wallsFound[1] && wallsFound[3])) {
-            isVerticalEdge = true;
-            
-            // Calculate an optimal avoidance direction (diagonal away from the edge)
-            if (wallsFound[0] && wallsFound[2]) {
-                edgeAvoidanceNormal = glm::normalize(glm::vec3(-1.0f, 0.0f, -1.0f));
-            } else if (wallsFound[0] && wallsFound[3]) {
-                edgeAvoidanceNormal = glm::normalize(glm::vec3(-1.0f, 0.0f, 1.0f));
-            } else if (wallsFound[1] && wallsFound[2]) {
-                edgeAvoidanceNormal = glm::normalize(glm::vec3(1.0f, 0.0f, -1.0f));
-            } else if (wallsFound[1] && wallsFound[3]) {
-                edgeAvoidanceNormal = glm::normalize(glm::vec3(1.0f, 0.0f, 1.0f));
-            }
-        }
-        // Also check corner patterns for edges
-        else if (cornerWallsFound[0] || cornerWallsFound[1] || cornerWallsFound[2] || cornerWallsFound[3]) {
-            isVerticalEdge = true;
-            // Calculate direction to move away from the edge
-            if (cornerWallsFound[0]) {
-                edgeAvoidanceNormal = glm::normalize(glm::vec3(-1.0f, 0.0f, -1.0f));
-            } else if (cornerWallsFound[1]) {
-                edgeAvoidanceNormal = glm::normalize(glm::vec3(-1.0f, 0.0f, 1.0f));
-            } else if (cornerWallsFound[2]) {
-                edgeAvoidanceNormal = glm::normalize(glm::vec3(1.0f, 0.0f, -1.0f));
-            } else if (cornerWallsFound[3]) {
-                edgeAvoidanceNormal = glm::normalize(glm::vec3(1.0f, 0.0f, 1.0f));
-            }
-        }
-        
-        // Handle vertical edge collisions with specialized pushing
-        if (isVerticalEdge) {
-            if (verboseDebug) {
-                std::cout << "Vertical edge detected, trying specialized correction" << std::endl;
-            }
-            
-            // Use stronger pushes for vertical edges and try different strategies
-            const float edgePushDistances[] = {0.15f, 0.25f, 0.35f};
-            
-            // First try a pure horizontal push along the calculated optimal direction
-            for (float pushDistance : edgePushDistances) {
-                glm::vec3 correctedPos = position + edgeAvoidanceNormal * pushDistance;
-                
-                if (!collidesWithBlocks(correctedPos, velocity, world, false)) {
-                    if (verboseDebug) {
-                        std::cout << "Corrected vertical edge collision with horizontal push of " 
-                                  << pushDistance << std::endl;
-                    }
-                    position = correctedPos;
-                    return;
-                }
-            }
-            
-            // If horizontal push fails, try adding an upward component to slide up the edge
-            for (float pushDistance : edgePushDistances) {
-                // Add a stronger upward bias for edges
-                glm::vec3 upwardEdgeNormal = glm::normalize(edgeAvoidanceNormal + glm::vec3(0.0f, 0.5f, 0.0f));
-                glm::vec3 correctedPos = position + upwardEdgeNormal * pushDistance;
-                
-                if (!collidesWithBlocks(correctedPos, velocity, world, false)) {
-                    if (verboseDebug) {
-                        std::cout << "Corrected vertical edge collision with upward-biased push of " 
-                                  << pushDistance << std::endl;
-                    }
-                    position = correctedPos;
-                    return;
-                }
-            }
-            
-            // Last resort - try a purely vertical push with large value
-            if (velocity.y <= 0) {  // Only when falling or not moving vertically
-                for (float upwardPush = 0.15f; upwardPush <= 0.4f; upwardPush += 0.1f) {
-                    glm::vec3 correctedPos = position + glm::vec3(0.0f, upwardPush, 0.0f);
-                    
-                    if (!collidesWithBlocks(correctedPos, velocity, world, false)) {
-                        if (verboseDebug) {
-                            std::cout << "Corrected vertical edge collision with pure vertical push of " 
-                                      << upwardPush << std::endl;
-                        }
-                        position = correctedPos;
-                        return;
-                    }
-                }
-            }
-        }
-        
-        // If not a vertical edge or if edge correction failed, use regular wall correction
-        // Try pushing away from the wall with progressive strengths
-        const float pushDistances[] = { 0.1f, 0.15f, 0.2f };
-        
-        for (float pushDistance : pushDistances) {
+        // Try pushing away from the wall
+        float pushDistance = 0.08f; // Slightly larger push to ensure we're clear
         glm::vec3 correctedPos = position + wallNormal * pushDistance;
         
         // Only use the correction if it resolves the collision
         if (!collidesWithBlocks(correctedPos, velocity, world, false)) {
-                if (verboseDebug) {
-                    std::cout << "Corrected wall collision with push distance " << pushDistance << std::endl;
-                }
             position = correctedPos;
-                return;
+        } else {
+            // If just pushing horizontally doesn't work, try a slight upward nudge too
+            glm::vec3 upwardCorrectedPos = position + wallNormal * pushDistance + glm::vec3(0.0f, 0.1f, 0.0f);
+            if (!collidesWithBlocks(upwardCorrectedPos, velocity, world, false)) {
+                position = upwardCorrectedPos;
             }
         }
-        
-        // If horizontal pushes don't work, try adding a slight upward component
-        // to help slide up small lips and edges
-        for (float pushDistance : pushDistances) {
-            // Calculate a slightly upward-biased push vector
-            glm::vec3 upwardWallNormal = glm::normalize(wallNormal + glm::vec3(0.0f, 0.3f, 0.0f));
-            glm::vec3 correctedPos = position + upwardWallNormal * pushDistance;
-            
-            if (!collidesWithBlocks(correctedPos, velocity, world, false)) {
-                if (verboseDebug) {
-                    std::cout << "Corrected wall collision with upward bias and push distance " 
-                              << pushDistance << std::endl;
-                }
-                position = correctedPos;
-                return;
-            }
-        }
-        
-        // Last resort - try a purely vertical nudge if sliding is involved
-        if (velocity.y < 0) {
-            for (float upwardPush = 0.1f; upwardPush <= 0.3f; upwardPush += 0.1f) {
-                glm::vec3 correctedPos = position + glm::vec3(0.0f, upwardPush, 0.0f);
-                
-                if (!collidesWithBlocks(correctedPos, velocity, world, false)) {
-                    if (verboseDebug) {
-                        std::cout << "Corrected wall collision with purely vertical push of " 
-                                  << upwardPush << std::endl;
-                    }
-                    position = correctedPos;
-                    return;
-                }
-            }
-        }
-        
-        if (verboseDebug) {
-            std::cout << "Warning: Failed to correct wall collision" << std::endl;
-        }
     }
-}
-
-glm::vec3 CollisionSystem::getCameraPosition(const glm::vec3& playerPos, float cameraHeight, const glm::vec3& forward, World* world) {
-    if (!world) return playerPos + glm::vec3(0.0f, cameraHeight, 0.0f);
-    
-    // Start with default camera position (above player)
-    glm::vec3 cameraPos = playerPos + glm::vec3(0.0f, cameraHeight, 0.0f);
-    
-    // Check if camera is inside a block
-    if (!isInsideBlock(cameraPos, world)) {
-        // Camera is already in a safe position
-        return cameraPos;
-    }
-    
-    // Camera is clipping, need to adjust it
-    static int debugCounter = 0;
-    bool verboseDebug = m_debugMode && (debugCounter++ % 120 == 0);
-    
-    if (verboseDebug) {
-        std::cout << "Camera is clipping into a block at position (" 
-                  << cameraPos.x << ", " << cameraPos.y << ", " << cameraPos.z << ")" << std::endl;
-    }
-    
-    // First try to adjust camera horizontally toward the player's looking direction
-    // This often works well for corners/edges that the player is looking toward
-    glm::vec3 horizontalForward = glm::normalize(glm::vec3(forward.x, 0.0f, forward.z));
-    
-    // Try several adjustments with increasing intensity
-    const float adjustments[] = { 0.2f, 0.3f, 0.4f };
-    for (float adjustment : adjustments) {
-        // Move camera in the direction player is looking (helps when player looks at a wall)
-        glm::vec3 adjustedPos = cameraPos + horizontalForward * adjustment;
-        
-        if (!isInsideBlock(adjustedPos, world)) {
-            if (verboseDebug) {
-                std::cout << "Adjusted camera forward by " << adjustment 
-                          << " to avoid clipping" << std::endl;
-            }
-            return adjustedPos;
-        }
-        
-        // If forward doesn't work, try backward (helps when backing into walls)
-        adjustedPos = cameraPos - horizontalForward * adjustment;
-        if (!isInsideBlock(adjustedPos, world)) {
-            if (verboseDebug) {
-                std::cout << "Adjusted camera backward by " << adjustment 
-                          << " to avoid clipping" << std::endl;
-            }
-            return adjustedPos;
-        }
-    }
-    
-    // Try to find any direction that works by checking in 8 directions
-    const float radialAdjustment = 0.35f;
-    for (int i = 0; i < 8; i++) {
-        float angle = static_cast<float>(i) * M_PI / 4.0f;
-        glm::vec3 direction(cos(angle), 0.0f, sin(angle));
-        glm::vec3 adjustedPos = cameraPos + direction * radialAdjustment;
-        
-        if (!isInsideBlock(adjustedPos, world)) {
-            if (verboseDebug) {
-                std::cout << "Adjusted camera radially in direction " << i 
-                          << " to avoid clipping" << std::endl;
-            }
-            return adjustedPos;
-        }
-    }
-    
-    // If horizontal adjustments fail, try adjusting height
-    for (float yAdjust = 0.1f; yAdjust <= 0.5f; yAdjust += 0.1f) {
-        glm::vec3 adjustedPos = cameraPos + glm::vec3(0.0f, yAdjust, 0.0f);
-        if (!isInsideBlock(adjustedPos, world)) {
-            if (verboseDebug) {
-                std::cout << "Adjusted camera upward by " << yAdjust 
-                          << " to avoid clipping" << std::endl;
-            }
-            return adjustedPos;
-        }
-    }
-    
-    // If all else fails, return player position (last resort)
-    if (verboseDebug) {
-        std::cout << "WARNING: Failed to find safe camera position, reverting to player position" << std::endl;
-    }
-    return playerPos + glm::vec3(0.0f, cameraHeight, 0.0f);
 } 

@@ -37,6 +37,10 @@ public:
     bool isJetpackEnabled() const { return m_jetpackEnabled; }
     float getJetpackFuel() const { return m_jetpackFuel; }
     
+    // Collision system access
+    CollisionSystem& getCollisionSystem() { return m_collisionSystem; }
+    const CollisionSystem& getCollisionSystem() const { return m_collisionSystem; }
+    
     // Collision helpers
     glm::vec3 getMinBounds() const;
     glm::vec3 getMaxBounds() const;

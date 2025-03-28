@@ -82,6 +82,9 @@ private:
     GLuint m_highlightEbo;     // Added for highlight EBO
     
     std::unique_ptr<TextureManager> m_textureManager;
+    
+    // Store a reference to the active world for camera collision checks
+    World* m_activeWorld = nullptr;
 
     // Shader uniforms
     GLint m_modelLoc;

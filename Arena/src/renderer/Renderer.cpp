@@ -328,6 +328,9 @@ void Renderer::render(World* world, Player* player) {
     // Track if we need to restore GPU state between renders
     bool stateModified = false;
     
+    // Store reference to the active world for camera positioning
+    m_activeWorld = world;
+    
     // Get current window dimensions
     int width, height;
     glfwGetFramebufferSize(glfwGetCurrentContext(), &width, &height);
@@ -426,23 +429,44 @@ void Renderer::renderWorld(World* world, Player* player) {
     float aspectRatio = static_cast<float>(width) / height;
 
     // Set up view and projection matrices
-    glm::mat4 projection = glm::perspective(glm::radians(70.0f), aspectRatio, 0.25f, 1000.0f);
+    glm::mat4 projection = glm::perspective(glm::radians(70.0f), aspectRatio, 0.05f, 1000.0f);
     
-    // Apply the same camera height offset here
-    glm::vec3 cameraPos = player->getPosition();
-    float cameraHeight = 1.5f; // Reduced from 10.0f to 1.5 voxels high
-    cameraPos.y += cameraHeight;
+    // Use the collision system to find a safe camera position that prevents clipping
+    float cameraHeight = 1.5f; // Height above player position
+    CollisionSystem* collisionSystem = &player->getCollisionSystem(); // Get reference to player's collision system
+    
+    // Get an adjusted camera position using collision detection
+    glm::vec3 position = player->getPosition();
+    glm::vec3 forward = player->getForward();
+    
+    // Get an adjusted camera position that prevents clipping into walls
+    glm::vec3 adjustedPosition = position;
+    
+    // For const correctness, create a non-const copy of the world pointer
+    // This is safe since getCameraPosition doesn't actually modify the world
+    World* mutableWorld = const_cast<World*>(m_activeWorld);
+    
+    // Call getCameraPosition on our copy
+    adjustedPosition = const_cast<CollisionSystem&>(*collisionSystem).getCameraPosition(
+        position,
+        cameraHeight,
+        forward,
+        mutableWorld
+    );
+    
+    // Use the adjusted position
+    position = adjustedPosition;
     
     // Only print camera position debug occasionally
     static int cameraDebugCounter = 0;
     if (cameraDebugCounter++ % 300 == 0) { // Every 5 seconds at 60fps
-        std::cout << "RENDER_WORLD DEBUG: Camera at position (" << cameraPos.x << ", " 
-                << cameraPos.y << ", " << cameraPos.z << ")" << std::endl;
+        std::cout << "RENDER_WORLD DEBUG: Camera at position (" << position.x << ", " 
+                << position.y << ", " << position.z << ")" << std::endl;
     }
     
     glm::mat4 view = glm::lookAt(
-        cameraPos,
-        cameraPos + player->getForward(),
+        position,
+        position + forward,
         glm::vec3(0.0f, 1.0f, 0.0f)
     );
     glm::mat4 viewProjection = projection * view;
@@ -473,7 +497,6 @@ void Renderer::renderWorld(World* world, Player* player) {
     glUniformMatrix4fv(m_viewProjectionLoc, 1, GL_FALSE, glm::value_ptr(viewProjection));
 
     // Calculate frustum planes for frustum culling
-    glm::vec3 forward = player->getForward();
     glm::vec3 right = player->getRight();
     glm::vec3 up = player->getUp();
     float renderDistance = 16 * Chunk::CHUNK_SIZE; // 16 chunks of render distance
@@ -488,7 +511,7 @@ void Renderer::renderWorld(World* world, Player* player) {
     // Do raycast before chunk rendering to know what to highlight
     World::RaycastResult highlightResult;
     if (m_highlightEnabled) {
-        highlightResult = world->raycast(cameraPos, player->getForward(), 5.0f);
+        highlightResult = world->raycast(position, player->getForward(), 5.0f);
     }
     
     // Render all chunks, sorted by distance to player for better rendering priority
@@ -510,7 +533,7 @@ void Renderer::renderWorld(World* world, Player* player) {
         );
         
         // Calculate distance to chunk
-        float distToChunk = glm::length(chunkCenter - cameraPos);
+        float distToChunk = glm::length(chunkCenter - position);
         
         // Skip chunks that are too far away
         if (distToChunk > renderDistance) {
@@ -519,7 +542,7 @@ void Renderer::renderWorld(World* world, Player* player) {
         
         // Simple frustum culling
         // Calculate vector from camera to chunk center
-        glm::vec3 toCenterVec = glm::normalize(chunkCenter - cameraPos);
+        glm::vec3 toCenterVec = glm::normalize(chunkCenter - position);
         
         // If the dot product is negative, the chunk is behind the camera
         if (glm::dot(forward, toCenterVec) < 0.0f && distToChunk > Chunk::CHUNK_SIZE * 1.5f) {
@@ -726,7 +749,7 @@ void Renderer::setupCamera(const Player* player) {
     
     // Calculate perspective matrix using GLM
     float fov = 70.0f; // Field of view in degrees
-    float nearPlane = 0.25f;
+    float nearPlane = 0.05f;
     float farPlane = 1000.0f;
     
     // Convert FOV to radians
@@ -759,7 +782,34 @@ void Renderer::setupCamera(const Player* player) {
     
     // Set camera height
     float cameraHeight = 1.5f;
-    position.y += cameraHeight;
+    
+    // Get an adjusted camera position using collision detection
+    World* world = nullptr; // Need to get the world reference - we'll need to pass it in
+    if (m_activeWorld) {
+        // If we have access to the active world, use it for camera collision check
+        const CollisionSystem& collisionSystem = player->getCollisionSystem();
+        
+        // Need a mutable copy of the camera position
+        glm::vec3 adjustedPosition = position;
+        
+        // For const correctness, create a non-const copy of the world pointer
+        // This is safe since getCameraPosition doesn't actually modify the world
+        World* mutableWorld = const_cast<World*>(m_activeWorld);
+        
+        // Call getCameraPosition on our copy
+        adjustedPosition = const_cast<CollisionSystem&>(collisionSystem).getCameraPosition(
+            position,
+            cameraHeight,
+            forward,
+            mutableWorld
+        );
+        
+        // Use the adjusted position
+        position = adjustedPosition;
+    } else {
+        // Fall back to simple height offset if world isn't available
+        position.y += cameraHeight;
+    }
     
     // Calculate camera target
     glm::vec3 target = position + forward;
@@ -774,8 +824,8 @@ void Renderer::setupCamera(const Player* player) {
     // Debug output
     static int debugCounter = 0;
     if (debugCounter++ % 300 == 0) {
-        std::cout << "CAMERA HEIGHT DEBUG: Setting camera at height " << cameraHeight 
-                  << " voxels above player position: " << position.y << std::endl;
+        std::cout << "CAMERA HEIGHT DEBUG: Camera at position " 
+                  << position.x << ", " << position.y << ", " << position.z << std::endl;
     }
 }
 

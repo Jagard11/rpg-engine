@@ -21,7 +21,7 @@ Player::Player()
     , m_jetpackEnabled(false)
     , m_jetpackFuel(100.0f)
     , m_canDoubleJump(false)
-    , m_width(0.8f)
+    , m_width(0.6f)  // Visual width - should match collision model's width
     , m_height(1.8f)
     , m_ignoreNextMouseMovement(false)
     , m_firstMouse(true)
@@ -29,7 +29,12 @@ Player::Player()
     , m_lastY(0.0)
 {
     updateVectors();
+    // Initialize the collision system
     m_collisionSystem.init(m_width, m_height);
+    
+    // Set a custom collision box that will allow the player to fall into 1x1 holes
+    CollisionBox playerBox(0.25f, m_height, 0.25f);
+    m_collisionSystem.setCollisionBox(playerBox);
 }
 
 Player::~Player() {
@@ -128,6 +133,8 @@ void Player::update(float deltaTime, World* world) {
     }
     lastY = m_position.y;
     
+    // Note: Block change detection moved to moveWithCollision method
+    
     if (!m_isFlying) {
         // Apply gravity
         const float gravity = -20.0f;
@@ -165,6 +172,8 @@ void Player::update(float deltaTime, World* world) {
             // Move in small increments to catch all collisions
             int safetyCounter = 0; // Prevent infinite loops
             int collisionIterations = 0;
+            bool edgeDetected = false;
+            
             while (std::abs(remainingMovement) > 0.001f && safetyCounter++ < 1000) {
                 // Use smaller steps when close to blocks or when moving quickly
                 float step = (std::abs(remainingMovement) < stepSize) ? remainingMovement : (remainingMovement > 0 ? stepSize : -stepSize * 0.5f);
@@ -187,25 +196,71 @@ void Player::update(float deltaTime, World* world) {
                 // Check for collisions after step
                 if (m_collisionSystem.collidesWithBlocks(m_position, m_velocity, world, step < 0)) {
                     collisionIterations++;
-                    // Revert step and stop movement in this direction
-                    m_position.y -= step;
                     
-                    // If moving down and collision detected, we're on ground
-                    if (step < 0) {
+                    // Check if we're hitting the ground or a wall/edge
+                    bool groundCollision = m_collisionSystem.checkGroundCollision(m_position, m_velocity, world);
+                    
+                    if (groundCollision) {
+                        // We've hit the ground - stop vertical movement
+                        m_position.y -= step;
                         m_isOnGround = true;
+                        m_velocity.y = 0;
+                        
+                        if (verboseUpdate) {
+                            std::cout << "Ground collision detected" << std::endl;
+                        }
+                        break;
+                    } else {
+                        // We've hit a wall, not the ground
+                        // First try to detect and handle vertical edges
+                        glm::vec3 originalPos = m_position;
+                        
+                        // Try to correct vertical wall/edge collision
+                        m_collisionSystem.correctVerticalWallCollision(m_position, m_velocity, world);
+                        
+                        // If position changed after correction, we've successfully handled an edge or wall
+                        if (originalPos != m_position) {
+                            edgeDetected = true;
+                            
+                            // Don't completely stop vertical movement when sliding down walls
+                            // Instead, slow it down to simulate friction against the wall
+                            if (m_velocity.y < 0) {
+                                // Slow down vertical movement but don't stop it
+                                m_velocity.y *= 0.85f; // 15% slowdown per collision
+                                
+                                if (verboseUpdate) {
+                                    std::cout << "Wall collision - sliding down at velocity " << m_velocity.y << std::endl;
+                                }
+                            }
+                            
+                            // Continue movement after correction
+                            continue;
+                        } else {
+                            // If correction didn't work, revert the step and stop movement
+                            m_position.y -= step;
+                            
+                            // Only stop vertical movement if hitting ground, not wall
+                            if (step < 0 && groundCollision) {
+                                m_isOnGround = true;
+                                m_velocity.y = 0;
+                            } else if (step > 0) {
+                                // If moving up, we hit a ceiling
+                                m_velocity.y = 0;
+                            }
+                            
+                            break;
+                        }
                     }
-                    
-                    m_velocity.y = 0;
-                    
-                    if (verboseUpdate) {
-                        std::cout << "Collision detected during vertical movement" << std::endl;
-                    }
-                    break;
                 }
             }
             
-            if (verboseUpdate && collisionIterations > 0) {
-                std::cout << "Vertical movement collisions: " << collisionIterations << std::endl;
+            if (verboseUpdate) {
+                if (collisionIterations > 0) {
+                    std::cout << "Vertical movement collisions: " << collisionIterations << std::endl;
+                }
+                if (edgeDetected) {
+                    std::cout << "Edge collision detected - applied edge handling" << std::endl;
+                }
             }
         } else if (!m_isOnGround && m_velocity.y > 0) {
             // For upward movement, proceed with normal collision checks
@@ -447,6 +502,23 @@ void Player::jump() {
 
 void Player::moveWithCollision(const glm::vec3& movement, World* world) {
     if (glm::length(movement) < 0.0001f) return;
+    
+    // Check if blocks beneath us have been modified before applying movement
+    // This prevents the player from hovering when blocks are removed
+    static float lastPhysicsCheckTime = 0.0f;
+    float currentTime = glfwGetTime();
+    
+    // Only run this check periodically (max every 0.1 seconds) to avoid performance impact
+    if (currentTime - lastPhysicsCheckTime > 0.1f && !m_isFlying && m_isOnGround) {
+        bool blocksChangedBelowPlayer = world && world->checkPlayerPhysicsUpdate(m_position, m_width, m_height);
+        if (blocksChangedBelowPlayer) {
+            // Player is standing on a block that was just removed
+            m_isOnGround = false;
+            m_velocity.y = -0.1f; // Small downward velocity to initiate falling
+            std::cout << "Block removed beneath player, initiating fall" << std::endl;
+        }
+        lastPhysicsCheckTime = currentTime;
+    }
     
     // Use the collision system to handle movement
     m_position = m_collisionSystem.moveWithCollision(m_position, movement, m_velocity, world, m_isFlying, m_isOnGround);

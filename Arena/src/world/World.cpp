@@ -4,6 +4,7 @@
 #include <iostream>
 #include <algorithm>
 #include <filesystem>
+#include <GLFW/glfw3.h>
 
 World::World(uint64_t seed)
     : m_seed(seed)
@@ -171,11 +172,20 @@ void World::setBlock(const glm::ivec3& worldPos, int blockType) {
         
         // Only update if the block is actually changing
         if (currentBlock != blockType) {
+            // Track modified block for physics updates before changing the block
+            // This is especially important for supporting blocks turning into air
+            m_recentlyModifiedBlocks.push_back({worldPos, currentBlock, blockType, glfwGetTime()});
+            
             // Set the block
             chunk->setBlock(localPos.x, localPos.y, localPos.z, blockType);
             
             // Mark the chunk as modified by the player
             chunk->setModified(true);
+            
+            // Maintain a reasonable size for the recently modified blocks list
+            if (m_recentlyModifiedBlocks.size() > 100) {
+                m_recentlyModifiedBlocks.pop_front();
+            }
             
             // Generate mesh for the updated chunk
             chunk->generateMesh();
@@ -677,4 +687,65 @@ World::RaycastResult World::raycast(const glm::vec3& start, const glm::vec3& dir
     }
     
     return result;
+}
+
+bool World::checkPlayerPhysicsUpdate(const glm::vec3& playerPosition, float playerWidth, float playerHeight) {
+    // If there are no recently modified blocks, no need to check
+    if (m_recentlyModifiedBlocks.empty()) {
+        return false;
+    }
+    
+    // Get current time
+    double currentTime = glfwGetTime();
+    
+    // Use player width directly rather than a fixed value
+    const float collisionWidth = playerWidth * 0.9f; // Scale to match CollisionSystem
+    
+    // Check center point first
+    glm::vec3 centerPoint = playerPosition;
+    centerPoint.y -= 0.05f; // Slightly below player feet
+    
+    // Check if any recently modified blocks were directly below the player
+    for (const auto& modifiedBlock : m_recentlyModifiedBlocks) {
+        // Only consider blocks changed to air (when removed) and only for recent changes
+        if (modifiedBlock.newType == 0 && currentTime - modifiedBlock.timeModified < 0.3) {
+            glm::vec3 blockPos = glm::vec3(modifiedBlock.position);
+            
+            // Check if this block is directly below the player's center
+            if (std::abs(blockPos.x - centerPoint.x) < 0.5f &&
+                std::abs(blockPos.z - centerPoint.z) < 0.5f &&
+                blockPos.y <= centerPoint.y && 
+                blockPos.y > centerPoint.y - 0.2f) {
+                
+                return true; // Block directly below player was removed
+            }
+            
+            // Check in a small circle around the player's feet (same as ground collision)
+            const int numSamplePoints = 4; // Reduced from previous value
+            const float radius = collisionWidth * 0.75f; // Reduced to match ground check
+            
+            for (int i = 0; i < numSamplePoints; i++) {
+                float angle = (float)i * (2.0f * M_PI / numSamplePoints);
+                float sampleX = centerPoint.x + radius * cos(angle);
+                float sampleZ = centerPoint.z + radius * sin(angle);
+                
+                // Check if this block covers any of our sample points
+                if (std::abs(blockPos.x - sampleX) < 0.5f &&
+                    std::abs(blockPos.z - sampleZ) < 0.5f &&
+                    blockPos.y <= centerPoint.y && 
+                    blockPos.y > centerPoint.y - 0.2f) {
+                    
+                    return true; // Block under a sample point was removed
+                }
+            }
+        }
+    }
+    
+    // Clear blocks older than 1 second to manage memory
+    double cutoffTime = currentTime - 1.0;
+    while (!m_recentlyModifiedBlocks.empty() && m_recentlyModifiedBlocks.front().timeModified < cutoffTime) {
+        m_recentlyModifiedBlocks.pop_front();
+    }
+    
+    return false;
 } 
