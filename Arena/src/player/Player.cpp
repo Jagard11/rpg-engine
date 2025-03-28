@@ -393,14 +393,14 @@ void Player::handleInput(float deltaTime, World* world) {
 }
 
 void Player::updateVectors() {
-    // Calculate new forward vector based on yaw and pitch
+    // Calculate the new forward vector
     m_forward.x = cos(glm::radians(m_yaw)) * cos(glm::radians(m_pitch));
     m_forward.y = sin(glm::radians(m_pitch));
     m_forward.z = sin(glm::radians(m_yaw)) * cos(glm::radians(m_pitch));
     m_forward = glm::normalize(m_forward);
     
     // Calculate right and up vectors
-    m_right = glm::normalize(glm::cross(m_forward, m_up));
+    m_right = glm::normalize(glm::cross(m_forward, glm::vec3(0.0f, 1.0f, 0.0f)));
     m_up = glm::normalize(glm::cross(m_right, m_forward));
     
     // For movement, only flatten the vectors when not flying
@@ -453,11 +453,11 @@ void Player::moveWithCollision(const glm::vec3& movement, World* world) {
 }
 
 glm::vec3 Player::getMinBounds() const {
-    return m_collisionSystem.getMinBounds(m_position);
+    return m_collisionSystem.getMinBounds(m_position, m_forward);
 }
 
 glm::vec3 Player::getMaxBounds() const {
-    return m_collisionSystem.getMaxBounds(m_position);
+    return m_collisionSystem.getMaxBounds(m_position, m_forward);
 }
 
 bool Player::saveToFile(const std::string& filepath) {

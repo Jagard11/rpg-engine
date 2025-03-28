@@ -18,6 +18,7 @@ Game::Game()
     , m_isRunning(false)
     , m_isInGame(false)
     , m_fps(0)
+    , m_showCollisionBox(false)  // Initialize collision box visualization state
 {
     if (!initialize()) {
         throw std::runtime_error("Failed to initialize game");
@@ -464,6 +465,11 @@ void Game::createNewWorld(uint64_t seed) {
         m_window->swapBuffers();
     }
     
+    // Set player pointer in renderer
+    if (m_renderer && m_player) {
+        m_renderer->setPlayer(m_player.get());
+    }
+    
     std::cout << "World creation complete" << std::endl;
 }
 
@@ -591,6 +597,16 @@ void Game::initializeDebugMenu() {
             } else {
                 m_debugMenu->commandOutput("ERROR: Renderer not initialized");
             }
+        });
+    
+    m_debugMenu->registerCommand("toggle_collision_box", "Toggle player collision box visualization",
+        [this](const std::vector<std::string>& args) {
+            m_showCollisionBox = !m_showCollisionBox;
+            if (m_renderer) {
+                m_renderer->setShowCollisionBox(m_showCollisionBox);
+            }
+            m_debugMenu->commandOutput(std::string("Collision box visualization ") + 
+                (m_showCollisionBox ? "ENABLED" : "DISABLED"));
         });
     
     m_debugMenu->registerCommand("toggle_greedy", "Toggle greedy meshing",

@@ -382,16 +382,38 @@ glm::vec3 CollisionSystem::moveWithCollision(const glm::vec3& currentPos, const 
     return newPos;
 }
 
-glm::vec3 CollisionSystem::getMinBounds(const glm::vec3& pos) const {
-    // Match the collision box used in collidesWithBlocks for consistency
-    // Important: pos is now treated as the player's feet position
-    return pos + glm::vec3(-(m_width/2 + 0.1f), 0.0f, -(m_width/2 + 0.1f));
+glm::vec3 CollisionSystem::getMinBounds(const glm::vec3& pos, const glm::vec3& forward) const {
+    // Calculate the base collision box points relative to the player's position
+    glm::vec3 baseMin = glm::vec3(-m_width/2, 0.0f, -m_width/2);
+    glm::vec3 baseMax = glm::vec3(m_width/2, m_height, m_width/2);
+    
+    // Rotate the points based on the player's forward direction
+    glm::vec3 rotatedMin = rotatePoint(baseMin, forward);
+    glm::vec3 rotatedMax = rotatePoint(baseMax, forward);
+    
+    // Return the minimum point after rotation
+    return pos + glm::vec3(
+        std::min(rotatedMin.x, rotatedMax.x),
+        std::min(rotatedMin.y, rotatedMax.y),
+        std::min(rotatedMin.z, rotatedMax.z)
+    );
 }
 
-glm::vec3 CollisionSystem::getMaxBounds(const glm::vec3& pos) const {
-    // Match the collision box used in collidesWithBlocks for consistency
-    // Important: pos is now treated as the player's feet position
-    return pos + glm::vec3(m_width/2 + 0.1f, m_height - m_collisionInset*2, m_width/2 + 0.1f);
+glm::vec3 CollisionSystem::getMaxBounds(const glm::vec3& pos, const glm::vec3& forward) const {
+    // Calculate the base collision box points relative to the player's position
+    glm::vec3 baseMin = glm::vec3(-m_width/2, 0.0f, -m_width/2);
+    glm::vec3 baseMax = glm::vec3(m_width/2, m_height, m_width/2);
+    
+    // Rotate the points based on the player's forward direction
+    glm::vec3 rotatedMin = rotatePoint(baseMin, forward);
+    glm::vec3 rotatedMax = rotatePoint(baseMax, forward);
+    
+    // Return the maximum point after rotation
+    return pos + glm::vec3(
+        std::max(rotatedMin.x, rotatedMax.x),
+        std::max(rotatedMin.y, rotatedMax.y),
+        std::max(rotatedMin.z, rotatedMax.z)
+    );
 }
 
 void CollisionSystem::adjustPositionAtBlockBoundaries(glm::vec3& pos, bool verbose) {
@@ -752,4 +774,20 @@ bool CollisionSystem::intersectsWithAABB(const glm::vec3& min1, const glm::vec3&
     return (min1.x <= max2.x + epsilonXZ && max1.x >= min2.x - epsilonXZ &&
             min1.y <= max2.y + epsilonY && max1.y >= min2.y - epsilonY &&
             min1.z <= max2.z + epsilonXZ && max1.z >= min2.z - epsilonXZ);
+}
+
+glm::vec3 CollisionSystem::rotatePoint(const glm::vec3& point, const glm::vec3& forward) const {
+    // Calculate the rotation matrix based on the forward vector
+    glm::vec3 right = glm::normalize(glm::cross(forward, glm::vec3(0.0f, 1.0f, 0.0f)));
+    glm::vec3 up = glm::normalize(glm::cross(right, forward));
+    
+    // Create rotation matrix
+    glm::mat3 rotationMatrix(
+        right,
+        up,
+        forward
+    );
+    
+    // Apply rotation
+    return rotationMatrix * point;
 } 

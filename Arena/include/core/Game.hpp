@@ -44,4 +44,5 @@ private:
     bool m_isRunning;
     bool m_isInGame;
     int m_fps;
+    bool m_showCollisionBox;  // State for collision box visualization
 }; 

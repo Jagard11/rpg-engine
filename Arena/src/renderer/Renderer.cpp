@@ -82,12 +82,20 @@ const char* fragmentShaderSource = R"(
 
 Renderer::Renderer()
     : m_shaderProgram(0)
+    , m_hudShaderProgram(0)
+    , m_textureAtlas(0)
     , m_vao(0)
     , m_vbo(0)
     , m_ebo(0)
-    , m_buffersInitialized(false)
+    , m_hudVao(0)
+    , m_hudVbo(0)
+    , m_hudEbo(0)
     , m_disableBackfaceCulling(false)
     , m_disableGreedyMeshing(false)
+    , m_enableLodRendering(true)
+    , m_lodRenderDistance(1609.34f * 4.0f)
+    , m_showCollisionBox(false)
+    , m_player(nullptr)
 {
 }
 
@@ -387,6 +395,11 @@ void Renderer::render(World* world, Player* player) {
         std::cerr << "WARNING: OpenGL buffers were invalidated during frame rendering!" << std::endl;
         m_buffersInitialized = false;
     }
+
+    // Render player collision box if enabled
+    if (m_showCollisionBox && player) {
+        renderPlayerCollisionBox(player);
+    }
 }
 
 void Renderer::renderWorld(World* world, Player* player) {
@@ -518,6 +531,11 @@ void Renderer::renderWorld(World* world, Player* player) {
                   << world->getChunks().size() << " total chunks" << std::endl;
         std::cout << "Backface culling: " << (m_disableBackfaceCulling ? "DISABLED" : "ENABLED") << std::endl;
         std::cout << "Greedy meshing: " << (m_disableGreedyMeshing ? "DISABLED" : "ENABLED") << std::endl;
+        std::cout << "LOD rendering: " << (m_enableLodRendering ? "ENABLED" : "DISABLED") << std::endl;
+        
+        if (m_enableLodRendering) {
+            std::cout << "LOD rendering is enabled but no LOD chunks exist yet." << std::endl;
+        }
     }
     
     // Render sorted chunks
@@ -676,50 +694,88 @@ void Renderer::renderPlayerCollisionBox(Player* player) {
     glm::vec3 min = player->getMinBounds();
     glm::vec3 max = player->getMaxBounds();
     
+    // Get player's orientation vectors
+    glm::vec3 forward = player->getForward();
+    glm::vec3 right = player->getRight();
+    glm::vec3 up = player->getUp();
+    
+    // Create transformation matrix
+    glm::mat4 transform = glm::translate(glm::mat4(1.0f), player->getPosition());
+    
+    // Create rotation matrix from orientation vectors
+    // Ensure vectors are orthonormal
+    forward = glm::normalize(forward);
+    right = glm::normalize(glm::cross(forward, up));
+    up = glm::normalize(glm::cross(right, forward));
+    
+    glm::mat4 rotation = glm::mat4(
+        glm::vec4(right, 0.0f),
+        glm::vec4(up, 0.0f),
+        glm::vec4(-forward, 0.0f), // Negate forward for correct orientation
+        glm::vec4(0.0f, 0.0f, 0.0f, 1.0f)
+    );
+    
+    // Combine transformations
+    transform = transform * rotation;
+    
     // Draw wireframe box
     glColor4f(1.0f, 0.0f, 0.0f, 0.7f);
     glLineWidth(2.0f);
     
+    // Save current matrix
+    glPushMatrix();
+    
+    // Apply transformation
+    glMultMatrixf(glm::value_ptr(transform));
+    
+    // Calculate box dimensions
+    glm::vec3 dimensions = max - min;
+    
     glBegin(GL_LINES);
-    // Bottom square
-    glVertex3f(min.x, min.y, min.z);
-    glVertex3f(max.x, min.y, min.z);
     
-    glVertex3f(max.x, min.y, min.z);
-    glVertex3f(max.x, min.y, max.z);
+    // Draw bottom square
+    glVertex3f(-dimensions.x * 0.5f, -dimensions.y * 0.5f, -dimensions.z * 0.5f);
+    glVertex3f(dimensions.x * 0.5f, -dimensions.y * 0.5f, -dimensions.z * 0.5f);
     
-    glVertex3f(max.x, min.y, max.z);
-    glVertex3f(min.x, min.y, max.z);
+    glVertex3f(dimensions.x * 0.5f, -dimensions.y * 0.5f, -dimensions.z * 0.5f);
+    glVertex3f(dimensions.x * 0.5f, -dimensions.y * 0.5f, dimensions.z * 0.5f);
     
-    glVertex3f(min.x, min.y, max.z);
-    glVertex3f(min.x, min.y, min.z);
+    glVertex3f(dimensions.x * 0.5f, -dimensions.y * 0.5f, dimensions.z * 0.5f);
+    glVertex3f(-dimensions.x * 0.5f, -dimensions.y * 0.5f, dimensions.z * 0.5f);
     
-    // Top square
-    glVertex3f(min.x, max.y, min.z);
-    glVertex3f(max.x, max.y, min.z);
+    glVertex3f(-dimensions.x * 0.5f, -dimensions.y * 0.5f, dimensions.z * 0.5f);
+    glVertex3f(-dimensions.x * 0.5f, -dimensions.y * 0.5f, -dimensions.z * 0.5f);
     
-    glVertex3f(max.x, max.y, min.z);
-    glVertex3f(max.x, max.y, max.z);
+    // Draw top square
+    glVertex3f(-dimensions.x * 0.5f, dimensions.y * 0.5f, -dimensions.z * 0.5f);
+    glVertex3f(dimensions.x * 0.5f, dimensions.y * 0.5f, -dimensions.z * 0.5f);
     
-    glVertex3f(max.x, max.y, max.z);
-    glVertex3f(min.x, max.y, max.z);
+    glVertex3f(dimensions.x * 0.5f, dimensions.y * 0.5f, -dimensions.z * 0.5f);
+    glVertex3f(dimensions.x * 0.5f, dimensions.y * 0.5f, dimensions.z * 0.5f);
     
-    glVertex3f(min.x, max.y, max.z);
-    glVertex3f(min.x, max.y, min.z);
+    glVertex3f(dimensions.x * 0.5f, dimensions.y * 0.5f, dimensions.z * 0.5f);
+    glVertex3f(-dimensions.x * 0.5f, dimensions.y * 0.5f, dimensions.z * 0.5f);
     
-    // Vertical lines
-    glVertex3f(min.x, min.y, min.z);
-    glVertex3f(min.x, max.y, min.z);
+    glVertex3f(-dimensions.x * 0.5f, dimensions.y * 0.5f, dimensions.z * 0.5f);
+    glVertex3f(-dimensions.x * 0.5f, dimensions.y * 0.5f, -dimensions.z * 0.5f);
     
-    glVertex3f(max.x, min.y, min.z);
-    glVertex3f(max.x, max.y, min.z);
+    // Draw vertical lines
+    glVertex3f(-dimensions.x * 0.5f, -dimensions.y * 0.5f, -dimensions.z * 0.5f);
+    glVertex3f(-dimensions.x * 0.5f, dimensions.y * 0.5f, -dimensions.z * 0.5f);
     
-    glVertex3f(max.x, min.y, max.z);
-    glVertex3f(max.x, max.y, max.z);
+    glVertex3f(dimensions.x * 0.5f, -dimensions.y * 0.5f, -dimensions.z * 0.5f);
+    glVertex3f(dimensions.x * 0.5f, dimensions.y * 0.5f, -dimensions.z * 0.5f);
     
-    glVertex3f(min.x, min.y, max.z);
-    glVertex3f(min.x, max.y, max.z);
+    glVertex3f(dimensions.x * 0.5f, -dimensions.y * 0.5f, dimensions.z * 0.5f);
+    glVertex3f(dimensions.x * 0.5f, dimensions.y * 0.5f, dimensions.z * 0.5f);
+    
+    glVertex3f(-dimensions.x * 0.5f, -dimensions.y * 0.5f, dimensions.z * 0.5f);
+    glVertex3f(-dimensions.x * 0.5f, dimensions.y * 0.5f, dimensions.z * 0.5f);
+    
     glEnd();
+    
+    // Restore matrix
+    glPopMatrix();
     
     // Restore previous state
     if (depthTestEnabled) {

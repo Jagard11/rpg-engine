@@ -24,8 +24,8 @@ public:
                               World* world, bool isFlying, bool& isOnGround);
     
     // Helper functions for collision box calculations
-    glm::vec3 getMinBounds(const glm::vec3& pos) const;
-    glm::vec3 getMaxBounds(const glm::vec3& pos) const;
+    glm::vec3 getMinBounds(const glm::vec3& pos, const glm::vec3& forward) const;
+    glm::vec3 getMaxBounds(const glm::vec3& pos, const glm::vec3& forward) const;
     
     // Special collision cases
     glm::vec3 findSafePosition(const glm::vec3& pos, World* world, float startHeight = 100.0f);
@@ -75,4 +75,7 @@ private:
     // Helper for AABB vs AABB collision detection 
     bool intersectsWithAABB(const glm::vec3& min1, const glm::vec3& max1,
                            const glm::vec3& min2, const glm::vec3& max2) const;
+
+    // Helper for oriented collision box calculations
+    glm::vec3 rotatePoint(const glm::vec3& point, const glm::vec3& forward) const;
 }; 
