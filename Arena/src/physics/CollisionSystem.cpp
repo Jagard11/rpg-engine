@@ -1126,31 +1126,68 @@ void CollisionSystem::adjustPositionAtBlockBoundaries(glm::vec3& pos, bool verbo
     float xFraction = pos.x - std::floor(pos.x);
     float zFraction = pos.z - std::floor(pos.z);
     
+    // Also check for positions at chunk boundaries (multiples of 16)
+    bool atChunkBoundaryX = std::abs(fmod(pos.x, World::CHUNK_SIZE)) < 0.01f || 
+                           std::abs(fmod(pos.x, World::CHUNK_SIZE)) > (World::CHUNK_SIZE - 0.01f);
+    bool atChunkBoundaryZ = std::abs(fmod(pos.z, World::CHUNK_SIZE)) < 0.01f || 
+                           std::abs(fmod(pos.z, World::CHUNK_SIZE)) > (World::CHUNK_SIZE - 0.01f);
+    
     glm::vec3 adjustment(0.0f);
     bool madeAdjustment = false;
     
-    // Determine if we need to adjust position (very close to block boundaries)
-    if (xFraction < 0.02f) {
-        adjustment.x = 0.03f;
+    // Only adjust in extreme cases where the player is almost exactly on a boundary
+    // Use a much smaller threshold (0.01f instead of 0.05f)
+    // And use a much smaller adjustment (0.02f instead of 0.15f)
+    if (xFraction < 0.01f) {
+        adjustment.x = 0.02f;
         madeAdjustment = true;
-    } else if (xFraction > 0.98f) {
-        adjustment.x = -0.03f;
+    } else if (xFraction > 0.99f) {
+        adjustment.x = -0.02f;
         madeAdjustment = true;
     }
     
-    if (zFraction < 0.02f) {
-        adjustment.z = 0.03f;
+    if (zFraction < 0.01f) {
+        adjustment.z = 0.02f;
         madeAdjustment = true;
-    } else if (zFraction > 0.98f) {
-        adjustment.z = -0.03f;
+    } else if (zFraction > 0.99f) {
+        adjustment.z = -0.02f;
+        madeAdjustment = true;
+    }
+    
+    // Apply a minimal adjustment at chunk boundaries - only for extreme cases
+    // This prevents getting completely stuck without being too aggressive
+    if (atChunkBoundaryX) {
+        // Determine direction based on which side of the chunk boundary we're on
+        float xChunkRemainder = fmod(pos.x, World::CHUNK_SIZE);
+        if (xChunkRemainder < 0.01f) {
+            adjustment.x = 0.03f; // Very slight push
+        } else if (xChunkRemainder > (World::CHUNK_SIZE - 0.01f)) {
+            adjustment.x = -0.03f; // Very slight push
+        }
+        madeAdjustment = true;
+    }
+    
+    if (atChunkBoundaryZ) {
+        // Determine direction based on which side of the chunk boundary we're on
+        float zChunkRemainder = fmod(pos.z, World::CHUNK_SIZE);
+        if (zChunkRemainder < 0.01f) {
+            adjustment.z = 0.03f; // Very slight push
+        } else if (zChunkRemainder > (World::CHUNK_SIZE - 0.01f)) {
+            adjustment.z = -0.03f; // Very slight push
+        }
         madeAdjustment = true;
     }
     
     // Apply adjustment if needed
     if (madeAdjustment) {
         if (verbose) {
-            std::cout << "Adjusted position away from block boundary by " 
-                     << "(" << adjustment.x << ", " << adjustment.y << ", " << adjustment.z << ")" << std::endl;
+            std::cout << "Adjusted position away from ";
+            if (atChunkBoundaryX || atChunkBoundaryZ) {
+                std::cout << "chunk boundary";
+            } else {
+                std::cout << "block boundary";
+            }
+            std::cout << " by (" << adjustment.x << ", " << adjustment.y << ", " << adjustment.z << ")" << std::endl;
         }
         pos += adjustment;
     }
@@ -1392,6 +1429,12 @@ bool CollisionSystem::collidesWithBlocksGreedy(const glm::vec3& pos, const glm::
     static int debugCounter = 0;
     bool verboseDebug = m_debugMode && (debugCounter++ % 120 == 0); // Output logs every ~2 seconds
 
+    // Check if the player is at a chunk boundary - use minimal detection
+    bool atChunkBoundaryX = std::abs(fmod(pos.x, World::CHUNK_SIZE)) < 0.01f || 
+                           std::abs(fmod(pos.x, World::CHUNK_SIZE)) > (World::CHUNK_SIZE - 0.01f);
+    bool atChunkBoundaryZ = std::abs(fmod(pos.z, World::CHUNK_SIZE)) < 0.01f || 
+                           std::abs(fmod(pos.z, World::CHUNK_SIZE)) > (World::CHUNK_SIZE - 0.01f);
+    
     // CRITICAL FIX: Treat position as the player's feet, and adjust the collision box calculation
     // The collision box should be centered horizontally around the player, but start at their feet
     glm::vec3 min, max;
@@ -1404,9 +1447,9 @@ bool CollisionSystem::collidesWithBlocksGreedy(const glm::vec3& pos, const glm::
     
     if (isFalling) {
         // Use a smaller collision box when falling to avoid getting stuck on edges
-        activeBox = m_collisionBox.getSmallerBox(0.2f);
+        activeBox = m_collisionBox.getSmallerBox(0.15f); // Reduced from 0.2f
         // Add a bit of vertical offset when falling to avoid catching on edges
-        activeBox.offset.y = 0.2f;
+        activeBox.offset.y = 0.1f; // Reduced from 0.2f
     } else if (std::abs(velocity.y) < 0.1f && (std::abs(velocity.x) > 0.01f || std::abs(velocity.z) > 0.01f)) {
         // If moving horizontally with little vertical movement, use a slightly narrower box
         activeBox = m_collisionBox.getSmallerBox(0.1f);
@@ -1429,6 +1472,10 @@ bool CollisionSystem::collidesWithBlocksGreedy(const glm::vec3& pos, const glm::
         std::cout << "Collision box min: (" << min.x << ", " << min.y << ", " << min.z << ")" << std::endl;
         std::cout << "Collision box max: (" << max.x << ", " << max.y << ", " << max.z << ")" << std::endl;
         std::cout << "Is falling: " << (isFalling ? "YES" : "NO") << std::endl;
+        // Add debug info about chunk boundaries
+        if (atChunkBoundaryX || atChunkBoundaryZ) {
+            std::cout << "At chunk boundary: YES" << std::endl;
+        }
         std::cout << "===========================" << std::endl;
     }
     
@@ -1448,12 +1495,13 @@ bool CollisionSystem::collidesWithBlocksGreedy(const glm::vec3& pos, const glm::
     float highestGroundY = -1.0f;
     
     // Calculate min/max chunk coordinates for checking collisions
-    int minChunkX = static_cast<int>(std::floor(min.x / world->CHUNK_SIZE));
-    int maxChunkX = static_cast<int>(std::floor(max.x / world->CHUNK_SIZE));
-    int minChunkY = static_cast<int>(std::floor(min.y / world->CHUNK_HEIGHT));
-    int maxChunkY = static_cast<int>(std::floor(max.y / world->CHUNK_HEIGHT));
-    int minChunkZ = static_cast<int>(std::floor(min.z / world->CHUNK_SIZE));
-    int maxChunkZ = static_cast<int>(std::floor(max.z / world->CHUNK_SIZE));
+    // Add a minimal safety margin for chunk checks
+    int minChunkX = static_cast<int>(std::floor((min.x - 0.05f) / world->CHUNK_SIZE));
+    int maxChunkX = static_cast<int>(std::floor((max.x + 0.05f) / world->CHUNK_SIZE));
+    int minChunkY = static_cast<int>(std::floor((min.y - 0.05f) / world->CHUNK_HEIGHT));
+    int maxChunkY = static_cast<int>(std::floor((max.y + 0.05f) / world->CHUNK_HEIGHT));
+    int minChunkZ = static_cast<int>(std::floor((min.z - 0.05f) / world->CHUNK_SIZE));
+    int maxChunkZ = static_cast<int>(std::floor((max.z + 0.05f) / world->CHUNK_SIZE));
     
     if (verboseDebug) {
         std::cout << "Checking chunks from (" << minChunkX << ", " << minChunkY << ", " << minChunkZ << ") to ("
@@ -1514,8 +1562,11 @@ bool CollisionSystem::collidesWithBlocksGreedy(const glm::vec3& pos, const glm::
                 }
             }
             
+            // Use a standard collision check with minimal margin
+            float horizontalMargin = 0.005f; // Very minimal margin
+            
             // Check for collision with this volume
-            if (intersectsWithAABB(min, max, volume.min, volume.max)) {
+            if (intersectsWithAABB(min, max, volume.min, volume.max, horizontalMargin)) {
                 collisionsFound++;
                 
                 if (verboseDebug) {
@@ -1539,9 +1590,9 @@ bool CollisionSystem::collidesWithBlocksGreedy(const glm::vec3& pos, const glm::
         // This casting hack allows us to modify the position even though it's a const parameter
         glm::vec3& mutablePos = const_cast<glm::vec3&>(pos);
         
-        // Place the player's feet exactly on top of the highest ground with a significant offset
+        // Place the player's feet exactly on top of the highest ground with a small offset
         // This prevents sinking through the surface due to floating point precision issues
-        mutablePos.y = highestGroundY + 0.01f; // Increased from 0.001f to provide more clearance
+        mutablePos.y = highestGroundY + 0.01f;
     }
     
     // FAILSAFE: If no chunks were checked, assume we're falling through the world
@@ -1562,22 +1613,22 @@ bool CollisionSystem::collidesWithBlocksGreedy(const glm::vec3& pos, const glm::
         std::cout << "Collision volumes checked: " << volumesChecked << std::endl;
         std::cout << "Collisions found: " << collisionsFound << std::endl;
         std::cout << "Highest ground Y: " << highestGroundY << std::endl;
-        std::cout << "Final collision result: " << ((collisionsFound > 0 || groundCollision) ? "TRUE" : "FALSE") << std::endl;
-        std::cout << "=============================" << std::endl;
+        std::cout << "Final collision result: " << (groundCollision ? "TRUE" : "FALSE") << std::endl;
+        std::cout << "=============================\n" << std::endl;
     }
     
-    return collisionsFound > 0 || groundCollision;
+    return groundCollision;
 }
 
 bool CollisionSystem::intersectsWithAABB(const glm::vec3& min1, const glm::vec3& max1,
-                                     const glm::vec3& min2, const glm::vec3& max2) const {
+                                     const glm::vec3& min2, const glm::vec3& max2, float margin) const {
     // Use different epsilon values for horizontal and vertical axes
     const float horizontalEpsilon = 0.02f;
     const float verticalEpsilon = 0.01f;
     
-    return (min1.x <= max2.x + horizontalEpsilon && max1.x >= min2.x - horizontalEpsilon &&
-            min1.y <= max2.y + verticalEpsilon && max1.y >= min2.y - verticalEpsilon &&
-            min1.z <= max2.z + horizontalEpsilon && max1.z >= min2.z - horizontalEpsilon);
+    return (min1.x <= max2.x + horizontalEpsilon + margin && max1.x >= min2.x - horizontalEpsilon - margin &&
+            min1.y <= max2.y + verticalEpsilon + margin && max1.y >= min2.y - verticalEpsilon - margin &&
+            min1.z <= max2.z + horizontalEpsilon + margin && max1.z >= min2.z - horizontalEpsilon - margin);
 }
 
 glm::vec3 CollisionSystem::rotatePoint(const glm::vec3& point, const glm::vec3& forward) const {

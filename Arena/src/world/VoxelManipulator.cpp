@@ -2,6 +2,7 @@
 #include <GLFW/glfw3.h>
 #include <iostream>
 #include "renderer/Renderer.hpp"
+#include "debug/VoxelDebug.hpp"
 
 VoxelManipulator::VoxelManipulator()
     : m_leftMousePressed(false)
@@ -95,6 +96,7 @@ bool VoxelManipulator::addVoxel(World* world, Player* player, const World::Rayca
     
     // Check if placement is valid (not inside player, etc.)
     if (!isValidPlacement(world, newBlockPos)) {
+        Debug::VoxelDebug::recordVoxelOperation(world, newBlockPos, false, "ADD");
         return false;
     }
     
@@ -103,17 +105,34 @@ bool VoxelManipulator::addVoxel(World* world, Player* player, const World::Rayca
         std::cout << "Cannot place block at (" 
                   << newBlockPos.x << ", " << newBlockPos.y << ", " << newBlockPos.z 
                   << ") - would collide with player" << std::endl;
+        Debug::VoxelDebug::recordVoxelOperation(world, newBlockPos, false, "ADD");
         return false;
     }
     
+    // Calculate chunk position and local position for debugging
+    glm::ivec3 chunkPos = world->worldToChunkPos(glm::vec3(newBlockPos));
+    glm::ivec3 localPos = world->worldToLocalPos(glm::vec3(newBlockPos));
+    
+    // Check if we're at a chunk boundary
+    bool isChunkBoundary = 
+        localPos.x == 0 || localPos.x == (World::CHUNK_SIZE - 1) ||
+        localPos.y == 0 || localPos.y == (World::CHUNK_HEIGHT - 1) ||
+        localPos.z == 0 || localPos.z == (World::CHUNK_SIZE - 1);
+    
     // Set the block
     std::cout << "Adding " << blockType << " block at position: (" 
-              << newBlockPos.x << ", " << newBlockPos.y << ", " << newBlockPos.z << ")" << std::endl;
+              << newBlockPos.x << ", " << newBlockPos.y << ", " << newBlockPos.z 
+              << "), chunk: (" << chunkPos.x << ", " << chunkPos.y << ", " << chunkPos.z
+              << "), local: (" << localPos.x << ", " << localPos.y << ", " << localPos.z 
+              << "), is boundary: " << (isChunkBoundary ? "YES" : "NO") << std::endl;
     
     world->setBlock(newBlockPos, blockType);
     
     // Update surrounding chunks
     updateSurroundingChunks(world, newBlockPos);
+    
+    // Record successful voxel addition
+    Debug::VoxelDebug::recordVoxelOperation(world, newBlockPos, true, "ADD");
     
     return true;
 }
@@ -131,17 +150,38 @@ bool VoxelManipulator::removeVoxel(World* world, const World::RaycastResult& ray
     int blockType = world->getBlock(blockPos);
     if (blockType == 0) {
         // Block is already air
+        Debug::VoxelDebug::recordVoxelOperation(world, blockPos, false, "REMOVE");
         return false;
     }
     
+    // Calculate chunk position and local position for debugging
+    glm::ivec3 chunkPos = world->worldToChunkPos(glm::vec3(blockPos));
+    glm::ivec3 localPos = glm::ivec3(
+        blockPos.x % World::CHUNK_SIZE + (blockPos.x < 0 ? World::CHUNK_SIZE : 0),
+        blockPos.y % World::CHUNK_HEIGHT + (blockPos.y < 0 ? World::CHUNK_HEIGHT : 0),
+        blockPos.z % World::CHUNK_SIZE + (blockPos.z < 0 ? World::CHUNK_SIZE : 0)
+    );
+    
+    // Check if we're at a chunk boundary
+    bool isChunkBoundary = 
+        localPos.x == 0 || localPos.x == (World::CHUNK_SIZE - 1) ||
+        localPos.y == 0 || localPos.y == (World::CHUNK_HEIGHT - 1) ||
+        localPos.z == 0 || localPos.z == (World::CHUNK_SIZE - 1);
+        
     std::cout << "Removing block at position: (" 
-              << blockPos.x << ", " << blockPos.y << ", " << blockPos.z << ")" << std::endl;
+              << blockPos.x << ", " << blockPos.y << ", " << blockPos.z 
+              << "), chunk: (" << chunkPos.x << ", " << chunkPos.y << ", " << chunkPos.z
+              << "), local: (" << localPos.x << ", " << localPos.y << ", " << localPos.z 
+              << "), is boundary: " << (isChunkBoundary ? "YES" : "NO") << std::endl;
     
     // Set block to air (0)
     world->setBlock(blockPos, 0);
     
     // Update surrounding chunks
     updateSurroundingChunks(world, blockPos);
+    
+    // Record successful voxel removal
+    Debug::VoxelDebug::recordVoxelOperation(world, blockPos, true, "REMOVE");
     
     return true;
 }

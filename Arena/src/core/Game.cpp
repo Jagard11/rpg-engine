@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <thread>
 #include "debug/DebugMenu.hpp"
+#include "debug/VoxelDebug.hpp"
 
 // Add this global variable and function at the top of the file
 static Game* g_gameInstance = nullptr;
@@ -117,6 +118,9 @@ bool Game::initialize() {
 
         // Initialize voxel manipulator
         m_voxelManipulator = std::make_unique<VoxelManipulator>();
+
+        // Initialize debug systems
+        Debug::VoxelDebug::initialize();
 
         m_isRunning = true;
         return true;
@@ -383,6 +387,12 @@ void Game::handleInput(float deltaTime) {
         if (m_player && !m_debugMenu->isActive()) {
             m_player->ignoreNextMouseMovement();
         }
+    }
+    
+    // Check for F12 key to dump debug information
+    if (m_window->isKeyJustPressed(GLFW_KEY_F12)) {
+        std::cout << "F12 pressed - Dumping debug information..." << std::endl;
+        Debug::VoxelDebug::dumpDebugInfo(m_world.get(), m_player.get());
     }
     
     // Forward keys to debug menu if it's active

@@ -27,14 +27,37 @@ Chunk::~Chunk() {
 
 void Chunk::setBlock(int x, int y, int z, int blockType) {
     if (x < 0 || x >= CHUNK_SIZE || y < 0 || y >= CHUNK_HEIGHT || z < 0 || z >= CHUNK_SIZE) {
+        std::cout << "Chunk::setBlock - REJECTED out of bounds coordinates: (" 
+                  << x << "," << y << "," << z 
+                  << ") for chunk (" << m_x << "," << m_y << "," << m_z 
+                  << "), blockType=" << blockType << std::endl;
         return;
     }
     
-    if (m_blocks[x][y][z] != blockType) {
+    // Check if this is a boundary voxel
+    bool isBoundary = 
+        x == 0 || x == CHUNK_SIZE - 1 || 
+        y == 0 || y == CHUNK_HEIGHT - 1 || 
+        z == 0 || z == CHUNK_SIZE - 1;
+    
+    int oldBlockType = m_blocks[x][y][z];
+    
+    if (oldBlockType != blockType) {
+        std::cout << "Chunk::setBlock - Setting (" 
+                  << x << "," << y << "," << z 
+                  << ") in chunk (" << m_x << "," << m_y << "," << m_z 
+                  << ") from " << oldBlockType << " to " << blockType 
+                  << (isBoundary ? " (BOUNDARY BLOCK)" : "") << std::endl;
+        
         m_blocks[x][y][z] = blockType;
         m_isDirty = true;
         m_isModified = true; // Mark as modified when blocks are changed by the player
         m_collisionMeshDirty = true; // Mark collision mesh dirty when blocks change
+    } else {
+        std::cout << "Chunk::setBlock - Block already has type " << blockType 
+                  << " at (" << x << "," << y << "," << z 
+                  << ") in chunk (" << m_x << "," << m_y << "," << m_z 
+                  << ")" << (isBoundary ? " (BOUNDARY BLOCK)" : "") << std::endl;
     }
 }
 

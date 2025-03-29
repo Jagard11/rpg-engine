@@ -113,7 +113,7 @@ private:
     
     // Helper for AABB vs AABB collision detection 
     bool intersectsWithAABB(const glm::vec3& min1, const glm::vec3& max1,
-                           const glm::vec3& min2, const glm::vec3& max2) const;
+                           const glm::vec3& min2, const glm::vec3& max2, float margin = 0.0f) const;
                            
     // Helper for point vs block collision with margin
     bool pointInsideBlockWithMargin(const glm::vec3& point, const glm::vec3& blockMin, 

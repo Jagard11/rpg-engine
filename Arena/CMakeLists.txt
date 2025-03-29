@@ -40,6 +40,7 @@ set(SOURCES
     src/render/TextRenderer.cpp
     src/debug/DebugMenu.cpp
     src/debug/DebugUtils.cpp
+    src/debug/VoxelDebug.cpp
     src/stb_image_impl.cpp
     src/texture/TextureManager.cpp
 )
@@ -62,6 +63,7 @@ set(HEADERS
     include/render/TextRenderer.hpp
     include/debug/DebugMenu.hpp
     include/debug/DebugUtils.hpp
+    include/debug/VoxelDebug.hpp
 )
 
 # Create executable

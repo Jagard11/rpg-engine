@@ -48,6 +48,7 @@ public:
     
     // Coordinate conversion
     glm::ivec3 worldToChunkPos(const glm::vec3& worldPos) const;
+    glm::ivec3 worldToLocalPos(const glm::vec3& worldPos) const;
     
     // Mesh management
     void updateChunkMeshes(const glm::ivec3& chunkPos, bool disableGreedyMeshing = false);
@@ -74,7 +75,6 @@ private:
         double timeModified;    // Time when the block was modified
     };
     
-    glm::ivec3 worldToLocalPos(const glm::vec3& worldPos) const;
     Chunk* getChunkAt(const glm::ivec3& chunkPos);
 
     std::unordered_map<glm::ivec3, std::unique_ptr<Chunk>, ChunkPosHash> m_chunks;

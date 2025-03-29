@@ -5,6 +5,7 @@
 #include "world/World.hpp"
 #include <fstream>
 #include <iostream>
+#include "debug/VoxelDebug.hpp"
 
 Player::Player()
     : m_position(0.0f, 102.0f, 0.0f)
@@ -45,6 +46,87 @@ void Player::update(float deltaTime, World* world) {
     static int debugCounter = 0;
     bool verboseUpdate = (debugCounter++ % 120 == 0); // Output every ~2 seconds at 60fps
     
+    // Track if player is stuck at chunk boundaries
+    static glm::vec3 lastPosition = m_position;
+    static float stuckTime = 0.0f;
+    static bool wasAtBoundary = false;
+    
+    // Check if player is at chunk boundary
+    bool isAtBoundary = false;
+    if (world) {
+        // Check X boundaries
+        if (std::abs(std::fmod(m_position.x, World::CHUNK_SIZE)) < 0.05f || 
+            std::abs(std::fmod(m_position.x, World::CHUNK_SIZE) - World::CHUNK_SIZE) < 0.05f) {
+            isAtBoundary = true;
+        }
+        // Check Z boundaries
+        if (std::abs(std::fmod(m_position.z, World::CHUNK_SIZE)) < 0.05f || 
+            std::abs(std::fmod(m_position.z, World::CHUNK_SIZE) - World::CHUNK_SIZE) < 0.05f) {
+            isAtBoundary = true;
+        }
+        // Check Y boundaries
+        if (std::abs(std::fmod(m_position.y, World::CHUNK_HEIGHT)) < 0.05f || 
+            std::abs(std::fmod(m_position.y, World::CHUNK_HEIGHT) - World::CHUNK_HEIGHT) < 0.05f) {
+            isAtBoundary = true;
+        }
+    }
+    
+    // Check if we've been stuck in the same position for a while
+    if (isAtBoundary) {
+        // Check if position hasn't changed much
+        float positionDelta = glm::distance(m_position, lastPosition);
+        if (positionDelta < 0.01f) {
+            // At boundary and not moving
+            stuckTime += deltaTime;
+            
+            // If we've been stuck for more than 0.5 seconds, attempt to adjust position
+            if (stuckTime > 0.5f) {
+                // Record trace for debugging
+                std::string contextMessage = "Player stuck at (" + 
+                    std::to_string(m_position.x) + "," + 
+                    std::to_string(m_position.y) + "," + 
+                    std::to_string(m_position.z) + ")";
+                Debug::VoxelDebug::recordStackTrace(contextMessage);
+                
+                // Apply strong boundary adjustment
+                m_collisionSystem.adjustPositionAtBlockBoundaries(m_position, true);
+                
+                // Try to move player away from the boundary with a small nudge
+                float nudgeX = 0, nudgeZ = 0;
+                
+                // Determine which boundary we're on and nudge away from it
+                float xMod = std::fmod(m_position.x, World::CHUNK_SIZE);
+                float zMod = std::fmod(m_position.z, World::CHUNK_SIZE);
+                
+                if (xMod < 0.05f)
+                    nudgeX = 0.15f;
+                else if (xMod > World::CHUNK_SIZE - 0.05f)
+                    nudgeX = -0.15f;
+                
+                if (zMod < 0.05f)
+                    nudgeZ = 0.15f;
+                else if (zMod > World::CHUNK_SIZE - 0.05f)
+                    nudgeZ = -0.15f;
+                
+                // Apply the nudge
+                m_position.x += nudgeX;
+                m_position.z += nudgeZ;
+                
+                stuckTime = 0.0f; // Reset timer
+            }
+        } else {
+            // Moving, but still at boundary
+            stuckTime = 0.0f;
+        }
+        wasAtBoundary = true;
+    } else {
+        // Not at boundary anymore
+        stuckTime = 0.0f;
+        wasAtBoundary = false;
+    }
+    
+    lastPosition = m_position;
+
     if (verboseUpdate) {
         std::cout << "===== PLAYER UPDATE =====" << std::endl;
         std::cout << "Player position: (" << m_position.x << ", " << m_position.y << ", " << m_position.z << ")" << std::endl;
@@ -54,28 +136,17 @@ void Player::update(float deltaTime, World* world) {
         std::cout << "Jetpack enabled: " << (m_jetpackEnabled ? "YES" : "NO") << std::endl;
         std::cout << "Jetpack fuel: " << m_jetpackFuel << std::endl;
         
-        // Check if player is inside a block
         if (world) {
-            int blockType = world->getBlock(glm::vec3(
-                std::floor(m_position.x), 
-                std::floor(m_position.y), 
-                std::floor(m_position.z)));
-            
-            std::cout << "Block at player position: " << blockType << " (0 = air)" << std::endl;
-            
-            // Check block below player
-            int blockBelow = world->getBlock(glm::vec3(
-                std::floor(m_position.x), 
-                std::floor(m_position.y - 0.1f), 
-                std::floor(m_position.z)));
-                
-            std::cout << "Block below player: " << blockBelow << " (0 = air)" << std::endl;
+            int blockAtPlayerPos = world->getBlock(glm::ivec3(m_position.x, m_position.y, m_position.z));
+            int blockBelowPlayer = world->getBlock(glm::ivec3(m_position.x, m_position.y - 0.1f, m_position.z));
+            std::cout << "Block at player position: " << blockAtPlayerPos << " (0 = air)" << std::endl;
+            std::cout << "Block below player: " << blockBelowPlayer << " (0 = air)" << std::endl;
         }
     }
-    
-    // Store velocity before update for debugging
-    glm::vec3 oldVelocity = m_velocity;
+
+    // Store old position and velocity for debugging
     glm::vec3 oldPosition = m_position;
+    glm::vec3 oldVelocity = m_velocity;
     
     // Track the last known safe position (above ground)
     static glm::vec3 lastSafePosition = m_position;
@@ -522,6 +593,20 @@ void Player::moveWithCollision(const glm::vec3& movement, World* world) {
     
     // Use the collision system to handle movement
     m_position = m_collisionSystem.moveWithCollision(m_position, movement, m_velocity, world, m_isFlying, m_isOnGround);
+    
+    // Always check for and fix chunk boundary issues after movement
+    // This helps prevent getting stuck even during normal movement
+    if (world) {
+        bool atChunkBoundaryX = std::abs(fmod(m_position.x, World::CHUNK_SIZE)) < 0.05f || 
+                               std::abs(fmod(m_position.x, World::CHUNK_SIZE) - World::CHUNK_SIZE) < 0.05f;
+        bool atChunkBoundaryZ = std::abs(fmod(m_position.z, World::CHUNK_SIZE)) < 0.05f || 
+                               std::abs(fmod(m_position.z, World::CHUNK_SIZE) - World::CHUNK_SIZE) < 0.05f;
+        
+        if (atChunkBoundaryX || atChunkBoundaryZ) {
+            // Apply a minor adjustment during normal movement to prevent sticking
+            m_collisionSystem.adjustPositionAtBlockBoundaries(m_position, false);
+        }
+    }
 }
 
 glm::vec3 Player::getMinBounds() const {

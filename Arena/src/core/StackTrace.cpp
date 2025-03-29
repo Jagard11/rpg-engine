@@ -11,8 +11,12 @@
 #include <chrono>
 #include <ctime>
 #include <iomanip>
+#include <filesystem>
 
 namespace Core {
+
+// Initialize static member
+std::deque<StackTrace::RecordedTrace> StackTrace::s_recordedTraces;
 
 void StackTrace::installSignalHandlers() {
     signal(SIGSEGV, signalHandler); // Segmentation fault
@@ -81,6 +85,77 @@ std::vector<std::string> StackTrace::captureStackTrace(int skipFrames) {
 
     std::free(symbollist);
     return result;
+}
+
+void StackTrace::recordTrace(const std::string& context) {
+    RecordedTrace trace;
+    trace.timestamp = std::chrono::system_clock::now();
+    trace.context = context;
+    trace.stackFrames = captureStackTrace(2); // Skip recordTrace and caller
+    
+    // Add to the deque, maintaining maximum size
+    s_recordedTraces.push_back(std::move(trace));
+    if (s_recordedTraces.size() > MAX_TRACES) {
+        s_recordedTraces.pop_front();
+    }
+    
+    // Log to stderr that a trace was recorded
+    auto time_t_value = std::chrono::system_clock::to_time_t(trace.timestamp);
+    std::cerr << "Stack trace recorded at " 
+              << std::put_time(std::localtime(&time_t_value), "%Y-%m-%d %H:%M:%S") 
+              << " - Context: " << context << std::endl;
+}
+
+bool StackTrace::dumpTracesToFile(const std::string& filename) {
+    // Create directory if it doesn't exist
+    std::filesystem::path filepath(filename);
+    std::filesystem::create_directories(filepath.parent_path());
+    
+    std::ofstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "Failed to open file for writing: " << filename << std::endl;
+        return false;
+    }
+    
+    auto now_time_t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    
+    file << "===== Stack Trace Dump =====" << std::endl;
+    file << "Dump created: " 
+         << std::put_time(std::localtime(&now_time_t), "%Y-%m-%d %H:%M:%S") 
+         << std::endl;
+    file << "Number of traces: " << s_recordedTraces.size() << std::endl;
+    file << std::endl;
+    
+    for (size_t i = 0; i < s_recordedTraces.size(); ++i) {
+        const auto& trace = s_recordedTraces[i];
+        
+        // Format timestamp
+        auto time_t = std::chrono::system_clock::to_time_t(trace.timestamp);
+        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+            trace.timestamp.time_since_epoch()) % 1000;
+        
+        file << "----- Trace " << (i + 1) << " -----" << std::endl;
+        file << "Time: " << std::put_time(std::localtime(&time_t), "%Y-%m-%d %H:%M:%S") 
+             << "." << std::setfill('0') << std::setw(3) << ms.count() << std::endl;
+        file << "Context: " << trace.context << std::endl;
+        file << "Stack frames:" << std::endl;
+        
+        for (const auto& frame : trace.stackFrames) {
+            file << "  " << frame << std::endl;
+        }
+        
+        file << std::endl;
+    }
+    
+    file << "===== End of Stack Trace Dump =====" << std::endl;
+    
+    std::cout << "Stack traces dumped to " << filename << std::endl;
+    return true;
+}
+
+void StackTrace::clearTraces() {
+    s_recordedTraces.clear();
+    std::cout << "Stack trace buffer cleared" << std::endl;
 }
 
 void StackTrace::printStackTrace(int skipFrames) {

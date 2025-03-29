@@ -172,6 +172,12 @@ void World::setBlock(const glm::ivec3& worldPos, int blockType) {
         
         // Only update if the block is actually changing
         if (currentBlock != blockType) {
+            std::cout << "World::setBlock - Setting block at world:(" 
+                      << worldPos.x << "," << worldPos.y << "," << worldPos.z 
+                      << ") chunk:(" << chunkPos.x << "," << chunkPos.y << "," << chunkPos.z
+                      << ") local:(" << localPos.x << "," << localPos.y << "," << localPos.z
+                      << ") from " << currentBlock << " to " << blockType << std::endl;
+            
             // Track modified block for physics updates before changing the block
             // This is especially important for supporting blocks turning into air
             m_recentlyModifiedBlocks.push_back({worldPos, currentBlock, blockType, glfwGetTime()});
@@ -187,35 +193,27 @@ void World::setBlock(const glm::ivec3& worldPos, int blockType) {
                 m_recentlyModifiedBlocks.pop_front();
             }
             
-            // Generate mesh for the updated chunk
-            chunk->generateMesh();
-            
-            // Update adjacent chunks if block is on chunk border
-            if (localPos.x == 0) {
-                auto neighbor = getChunkAt(glm::ivec3(chunkPos.x - 1, chunkPos.y, chunkPos.z));
-                if (neighbor) neighbor->generateMesh();
-            }
-            if (localPos.x == CHUNK_SIZE - 1) {
-                auto neighbor = getChunkAt(glm::ivec3(chunkPos.x + 1, chunkPos.y, chunkPos.z));
-                if (neighbor) neighbor->generateMesh();
-            }
-            if (localPos.y == 0) {
-                auto neighbor = getChunkAt(glm::ivec3(chunkPos.x, chunkPos.y - 1, chunkPos.z));
-                if (neighbor) neighbor->generateMesh();
-            }
-            if (localPos.y == CHUNK_HEIGHT - 1) {
-                auto neighbor = getChunkAt(glm::ivec3(chunkPos.x, chunkPos.y + 1, chunkPos.z));
-                if (neighbor) neighbor->generateMesh();
-            }
-            if (localPos.z == 0) {
-                auto neighbor = getChunkAt(glm::ivec3(chunkPos.x, chunkPos.y, chunkPos.z - 1));
-                if (neighbor) neighbor->generateMesh();
-            }
-            if (localPos.z == CHUNK_SIZE - 1) {
-                auto neighbor = getChunkAt(glm::ivec3(chunkPos.x, chunkPos.y, chunkPos.z + 1));
-                if (neighbor) neighbor->generateMesh();
+            // Instead of handling each boundary separately, use the updateChunkMeshes
+            // method which will update this chunk and all 6 neighboring chunks
+            bool isChunkBoundary = 
+                localPos.x == 0 || localPos.x == (CHUNK_SIZE - 1) ||
+                localPos.y == 0 || localPos.y == (CHUNK_HEIGHT - 1) ||
+                localPos.z == 0 || localPos.z == (CHUNK_SIZE - 1);
+                
+            if (isChunkBoundary) {
+                // If this is a boundary voxel, update this chunk and all neighbors
+                // to ensure proper mesh updates on all sides
+                std::cout << "Updating all chunks due to boundary voxel modification" << std::endl;
+                updateChunkMeshes(chunkPos);
+            } else {
+                // If it's not a boundary voxel, just update this chunk directly
+                std::cout << "Only updating current chunk for non-boundary voxel" << std::endl;
+                chunk->generateMesh();
             }
         }
+    } else {
+        std::cout << "World::setBlock - Failed: No chunk at position ("
+                  << chunkPos.x << "," << chunkPos.y << "," << chunkPos.z << ")" << std::endl;
     }
 }
 
@@ -545,6 +543,22 @@ World::RaycastResult World::raycast(const glm::vec3& start, const glm::vec3& dir
         
         // If we hit a solid block (not air)
         if (blockType > 0) {
+            // Calculate chunk position and local position for debugging
+            glm::ivec3 chunkPos = worldToChunkPos(glm::vec3(blockPos));
+            glm::ivec3 localPos = worldToLocalPos(glm::vec3(blockPos));
+            
+            // Check if we're at a chunk boundary
+            bool isChunkBoundary = 
+                localPos.x == 0 || localPos.x == (CHUNK_SIZE - 1) ||
+                localPos.y == 0 || localPos.y == (CHUNK_HEIGHT - 1) ||
+                localPos.z == 0 || localPos.z == (CHUNK_SIZE - 1);
+                
+            std::cout << "Raycast - Hit block of type " << blockType 
+                      << " at position: (" << blockPos.x << ", " << blockPos.y << ", " << blockPos.z 
+                      << "), chunk: (" << chunkPos.x << ", " << chunkPos.y << ", " << chunkPos.z
+                      << "), local: (" << localPos.x << ", " << localPos.y << ", " << localPos.z 
+                      << "), is boundary: " << (isChunkBoundary ? "YES" : "NO") << std::endl;
+            
             // Calculate fractional position within the block
             glm::vec3 fractPos = glm::fract(currentPos);
             
@@ -668,6 +682,14 @@ World::RaycastResult World::raycast(const glm::vec3& start, const glm::vec3& dir
                 if (glm::dot(glm::vec3(bestNormal), dir) > 0) {
                     bestNormal = -bestNormal; // Flip the normal if it's pointing in the wrong direction
                 }
+                
+                std::cout << "Raycast - Selected face with normal (" 
+                          << bestNormal.x << ", " << bestNormal.y << ", " << bestNormal.z 
+                          << ") facing " << (bestNormal.x < 0 ? "-X" : 
+                                           bestNormal.x > 0 ? "+X" : 
+                                           bestNormal.y < 0 ? "-Y" : 
+                                           bestNormal.y > 0 ? "+Y" : 
+                                           bestNormal.z < 0 ? "-Z" : "+Z") << std::endl;
                 
                 // Fill the result
                 result.hit = true;
