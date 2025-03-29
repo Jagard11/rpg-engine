@@ -113,23 +113,55 @@ bool VoxelManipulator::addVoxel(World* world, Player* player, const World::Rayca
     glm::ivec3 chunkPos = world->worldToChunkPos(glm::vec3(newBlockPos));
     glm::ivec3 localPos = world->worldToLocalPos(glm::vec3(newBlockPos));
     
+    // CRITICAL FIX: Check if we're exactly at a chunk boundary (where modulo is 0)
+    // These are special cases that need careful handling
+    bool exactBoundary = false;
+    if (newBlockPos.x % World::CHUNK_SIZE == 0 || 
+        newBlockPos.z % World::CHUNK_SIZE == 0 ||
+        newBlockPos.y % World::CHUNK_HEIGHT == 0) {
+        exactBoundary = true;
+        std::cout << "Block is at EXACT CHUNK BOUNDARY!" << std::endl;
+    }
+    
     // Check if we're at a chunk boundary
     bool isChunkBoundary = 
         localPos.x == 0 || localPos.x == (World::CHUNK_SIZE - 1) ||
         localPos.y == 0 || localPos.y == (World::CHUNK_HEIGHT - 1) ||
-        localPos.z == 0 || localPos.z == (World::CHUNK_SIZE - 1);
+        localPos.z == 0 || localPos.z == (World::CHUNK_SIZE - 1) ||
+        exactBoundary;
     
     // Set the block
     std::cout << "Adding " << blockType << " block at position: (" 
               << newBlockPos.x << ", " << newBlockPos.y << ", " << newBlockPos.z 
               << "), chunk: (" << chunkPos.x << ", " << chunkPos.y << ", " << chunkPos.z
               << "), local: (" << localPos.x << ", " << localPos.y << ", " << localPos.z 
-              << "), is boundary: " << (isChunkBoundary ? "YES" : "NO") << std::endl;
+              << "), is boundary: " << (isChunkBoundary ? "YES" : "NO") 
+              << (exactBoundary ? " [EXACT BOUNDARY]" : "") << std::endl;
     
     world->setBlock(newBlockPos, blockType);
     
-    // Update surrounding chunks
-    updateSurroundingChunks(world, newBlockPos);
+    // CRITICAL FIX: For exact boundaries, ensure both chunks are updated
+    if (exactBoundary) {
+        // Determine which adjacent chunks need updates based on exact boundaries
+        if (newBlockPos.x % World::CHUNK_SIZE == 0) {
+            // Update both chunks on either side of X boundary
+            world->updateChunkMeshes(chunkPos + glm::ivec3(-1, 0, 0));
+            world->updateChunkMeshes(chunkPos + glm::ivec3(0, 0, 0));
+        }
+        if (newBlockPos.z % World::CHUNK_SIZE == 0) {
+            // Update both chunks on either side of Z boundary
+            world->updateChunkMeshes(chunkPos + glm::ivec3(0, 0, -1));
+            world->updateChunkMeshes(chunkPos + glm::ivec3(0, 0, 0));
+        }
+        if (newBlockPos.y % World::CHUNK_HEIGHT == 0) {
+            // Update both chunks on either side of Y boundary
+            world->updateChunkMeshes(chunkPos + glm::ivec3(0, -1, 0));
+            world->updateChunkMeshes(chunkPos + glm::ivec3(0, 0, 0));
+        }
+    } else {
+        // Normal case - update surrounding chunks
+        updateSurroundingChunks(world, newBlockPos);
+    }
     
     // Record successful voxel addition
     Debug::VoxelDebug::recordVoxelOperation(world, newBlockPos, true, "ADD");
@@ -156,29 +188,57 @@ bool VoxelManipulator::removeVoxel(World* world, const World::RaycastResult& ray
     
     // Calculate chunk position and local position for debugging
     glm::ivec3 chunkPos = world->worldToChunkPos(glm::vec3(blockPos));
-    glm::ivec3 localPos = glm::ivec3(
-        blockPos.x % World::CHUNK_SIZE + (blockPos.x < 0 ? World::CHUNK_SIZE : 0),
-        blockPos.y % World::CHUNK_HEIGHT + (blockPos.y < 0 ? World::CHUNK_HEIGHT : 0),
-        blockPos.z % World::CHUNK_SIZE + (blockPos.z < 0 ? World::CHUNK_SIZE : 0)
-    );
+    glm::ivec3 localPos = world->worldToLocalPos(glm::vec3(blockPos));
+    
+    // CRITICAL FIX: Check if we're exactly at a chunk boundary (where modulo is 0)
+    // These are special cases that need careful handling
+    bool exactBoundary = false;
+    if (blockPos.x % World::CHUNK_SIZE == 0 || 
+        blockPos.z % World::CHUNK_SIZE == 0 ||
+        blockPos.y % World::CHUNK_HEIGHT == 0) {
+        exactBoundary = true;
+        std::cout << "Block is at EXACT CHUNK BOUNDARY!" << std::endl;
+    }
     
     // Check if we're at a chunk boundary
     bool isChunkBoundary = 
         localPos.x == 0 || localPos.x == (World::CHUNK_SIZE - 1) ||
         localPos.y == 0 || localPos.y == (World::CHUNK_HEIGHT - 1) ||
-        localPos.z == 0 || localPos.z == (World::CHUNK_SIZE - 1);
+        localPos.z == 0 || localPos.z == (World::CHUNK_SIZE - 1) ||
+        exactBoundary;
         
     std::cout << "Removing block at position: (" 
               << blockPos.x << ", " << blockPos.y << ", " << blockPos.z 
               << "), chunk: (" << chunkPos.x << ", " << chunkPos.y << ", " << chunkPos.z
               << "), local: (" << localPos.x << ", " << localPos.y << ", " << localPos.z 
-              << "), is boundary: " << (isChunkBoundary ? "YES" : "NO") << std::endl;
+              << "), is boundary: " << (isChunkBoundary ? "YES" : "NO")
+              << (exactBoundary ? " [EXACT BOUNDARY]" : "") << std::endl;
     
     // Set block to air (0)
     world->setBlock(blockPos, 0);
     
-    // Update surrounding chunks
-    updateSurroundingChunks(world, blockPos);
+    // CRITICAL FIX: For exact boundaries, ensure both chunks are updated
+    if (exactBoundary) {
+        // Determine which adjacent chunks need updates based on exact boundaries
+        if (blockPos.x % World::CHUNK_SIZE == 0) {
+            // Update both chunks on either side of X boundary
+            world->updateChunkMeshes(chunkPos + glm::ivec3(-1, 0, 0));
+            world->updateChunkMeshes(chunkPos + glm::ivec3(0, 0, 0));
+        }
+        if (blockPos.z % World::CHUNK_SIZE == 0) {
+            // Update both chunks on either side of Z boundary
+            world->updateChunkMeshes(chunkPos + glm::ivec3(0, 0, -1));
+            world->updateChunkMeshes(chunkPos + glm::ivec3(0, 0, 0));
+        }
+        if (blockPos.y % World::CHUNK_HEIGHT == 0) {
+            // Update both chunks on either side of Y boundary
+            world->updateChunkMeshes(chunkPos + glm::ivec3(0, -1, 0));
+            world->updateChunkMeshes(chunkPos + glm::ivec3(0, 0, 0));
+        }
+    } else {
+        // Normal case - update surrounding chunks
+        updateSurroundingChunks(world, blockPos);
+    }
     
     // Record successful voxel removal
     Debug::VoxelDebug::recordVoxelOperation(world, blockPos, true, "REMOVE");
@@ -226,38 +286,91 @@ void VoxelManipulator::updateSurroundingChunks(World* world, const glm::ivec3& b
 {
     // Convert to chunk coordinates
     glm::ivec3 chunkPos = world->worldToChunkPos(glm::vec3(blockPos));
+    glm::ivec3 localPos = world->worldToLocalPos(glm::vec3(blockPos));
     
     // Update the chunk containing the block
     world->updateChunkMeshes(chunkPos);
+    
+    // Flags to track which adjacent faces need updates
+    bool updateNegX = false, updatePosX = false;
+    bool updateNegY = false, updatePosY = false;
+    bool updateNegZ = false, updatePosZ = false;
     
     // Also update neighboring chunks if the block is at a chunk boundary
     const int CHUNK_SIZE = World::CHUNK_SIZE;
     const int CHUNK_HEIGHT = World::CHUNK_HEIGHT;
     
     // Check X boundaries
-    if (blockPos.x % CHUNK_SIZE == 0) {
+    if (localPos.x == 0) {
         // On the negative X boundary
+        updateNegX = true;
         world->updateChunkMeshes(chunkPos + glm::ivec3(-1, 0, 0));
-    } else if (blockPos.x % CHUNK_SIZE == CHUNK_SIZE - 1) {
+    } else if (localPos.x == CHUNK_SIZE - 1) {
         // On the positive X boundary
+        updatePosX = true;
         world->updateChunkMeshes(chunkPos + glm::ivec3(1, 0, 0));
     }
     
     // Check Y boundaries
-    if (blockPos.y % CHUNK_HEIGHT == 0) {
+    if (localPos.y == 0) {
         // On the negative Y boundary
+        updateNegY = true;
         world->updateChunkMeshes(chunkPos + glm::ivec3(0, -1, 0));
-    } else if (blockPos.y % CHUNK_HEIGHT == CHUNK_HEIGHT - 1) {
+    } else if (localPos.y == CHUNK_HEIGHT - 1) {
         // On the positive Y boundary
+        updatePosY = true;
         world->updateChunkMeshes(chunkPos + glm::ivec3(0, 1, 0));
     }
     
     // Check Z boundaries
-    if (blockPos.z % CHUNK_SIZE == 0) {
+    if (localPos.z == 0) {
         // On the negative Z boundary
+        updateNegZ = true;
         world->updateChunkMeshes(chunkPos + glm::ivec3(0, 0, -1));
-    } else if (blockPos.z % CHUNK_SIZE == CHUNK_SIZE - 1) {
+    } else if (localPos.z == CHUNK_SIZE - 1) {
         // On the positive Z boundary
+        updatePosZ = true;
         world->updateChunkMeshes(chunkPos + glm::ivec3(0, 0, 1));
+    }
+    
+    // CRITICAL FIX: Update diagonal chunks for corner blocks
+    // If a block is at a corner, we need to update the diagonally adjacent chunks
+    if (updateNegX && updateNegZ) {
+        world->updateChunkMeshes(chunkPos + glm::ivec3(-1, 0, -1)); // NegX, NegZ corner
+    }
+    if (updateNegX && updatePosZ) {
+        world->updateChunkMeshes(chunkPos + glm::ivec3(-1, 0, 1));  // NegX, PosZ corner
+    }
+    if (updatePosX && updateNegZ) {
+        world->updateChunkMeshes(chunkPos + glm::ivec3(1, 0, -1));  // PosX, NegZ corner
+    }
+    if (updatePosX && updatePosZ) {
+        world->updateChunkMeshes(chunkPos + glm::ivec3(1, 0, 1));   // PosX, PosZ corner
+    }
+    
+    // Handle vertical corners as well if needed
+    if (updateNegX && updateNegY) {
+        world->updateChunkMeshes(chunkPos + glm::ivec3(-1, -1, 0)); // NegX, NegY
+    }
+    if (updateNegX && updatePosY) {
+        world->updateChunkMeshes(chunkPos + glm::ivec3(-1, 1, 0));  // NegX, PosY
+    }
+    if (updatePosX && updateNegY) {
+        world->updateChunkMeshes(chunkPos + glm::ivec3(1, -1, 0));  // PosX, NegY
+    }
+    if (updatePosX && updatePosY) {
+        world->updateChunkMeshes(chunkPos + glm::ivec3(1, 1, 0));   // PosX, PosY
+    }
+    if (updateNegZ && updateNegY) {
+        world->updateChunkMeshes(chunkPos + glm::ivec3(0, -1, -1)); // NegZ, NegY
+    }
+    if (updateNegZ && updatePosY) {
+        world->updateChunkMeshes(chunkPos + glm::ivec3(0, 1, -1));  // NegZ, PosY
+    }
+    if (updatePosZ && updateNegY) {
+        world->updateChunkMeshes(chunkPos + glm::ivec3(0, -1, 1));  // PosZ, NegY
+    }
+    if (updatePosZ && updatePosY) {
+        world->updateChunkMeshes(chunkPos + glm::ivec3(0, 1, 1));   // PosZ, PosY
     }
 } 

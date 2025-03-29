@@ -204,6 +204,13 @@ void World::setBlock(const glm::ivec3& worldPos, int blockType) {
                 // If this is a boundary voxel, update this chunk and all neighbors
                 // to ensure proper mesh updates on all sides
                 std::cout << "Updating all chunks due to boundary voxel modification" << std::endl;
+                
+                // CRITICAL FIX: Use a more conservative approach for chunk boundaries
+                // First, update the current chunk explicitly
+                chunk->generateMesh();
+                chunk->setDirty(true);
+                
+                // Then update all adjacent chunks to ensure proper rendering at boundaries
                 updateChunkMeshes(chunkPos);
             } else {
                 // If it's not a boundary voxel, just update this chunk directly
@@ -449,11 +456,41 @@ glm::ivec3 World::worldToChunkPos(const glm::vec3& worldPos) const {
 }
 
 glm::ivec3 World::worldToLocalPos(const glm::vec3& worldPos) const {
-    return glm::ivec3(
-        static_cast<int>(std::floor(worldPos.x)) % CHUNK_SIZE + (worldPos.x < 0 ? CHUNK_SIZE : 0),
-        static_cast<int>(std::floor(worldPos.y)) % CHUNK_HEIGHT + (worldPos.y < 0 ? CHUNK_HEIGHT : 0),
-        static_cast<int>(std::floor(worldPos.z)) % CHUNK_SIZE + (worldPos.z < 0 ? CHUNK_SIZE : 0)
-    );
+    // CRITICAL FIX: When the position is exactly at a chunk boundary
+    // (like x=16.0 which is technically 0 in the next chunk),
+    // we need special handling to ensure consistency
+    
+    int localX = static_cast<int>(std::floor(worldPos.x)) % CHUNK_SIZE;
+    int localY = static_cast<int>(std::floor(worldPos.y)) % CHUNK_HEIGHT;
+    int localZ = static_cast<int>(std::floor(worldPos.z)) % CHUNK_SIZE;
+    
+    // Handle negative coordinates
+    if (worldPos.x < 0 && localX != 0) localX += CHUNK_SIZE;
+    if (worldPos.y < 0 && localY != 0) localY += CHUNK_HEIGHT;
+    if (worldPos.z < 0 && localZ != 0) localZ += CHUNK_SIZE;
+    
+    // Check for exact chunk boundary cases (e.g. exactly at x=16.0, z=16.0)
+    // In these cases, we want to ensure they're treated as the 0 coordinate
+    // of the next chunk, not as 16 of the current chunk
+    if (std::abs(std::fmod(worldPos.x, CHUNK_SIZE)) < 0.001f && 
+        std::fmod(worldPos.x, CHUNK_SIZE) > 0) {
+        // Move to previous chunk's edge if we're at exact boundary
+        localX = 0;
+    }
+    
+    if (std::abs(std::fmod(worldPos.y, CHUNK_HEIGHT)) < 0.001f && 
+        std::fmod(worldPos.y, CHUNK_HEIGHT) > 0) {
+        // Move to previous chunk's edge if we're at exact boundary
+        localY = 0;
+    }
+    
+    if (std::abs(std::fmod(worldPos.z, CHUNK_SIZE)) < 0.001f && 
+        std::fmod(worldPos.z, CHUNK_SIZE) > 0) {
+        // Move to previous chunk's edge if we're at exact boundary
+        localZ = 0;
+    }
+    
+    return glm::ivec3(localX, localY, localZ);
 }
 
 Chunk* World::getChunkAt(const glm::ivec3& chunkPos) {

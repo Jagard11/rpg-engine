@@ -1430,10 +1430,29 @@ bool CollisionSystem::collidesWithBlocksGreedy(const glm::vec3& pos, const glm::
     bool verboseDebug = m_debugMode && (debugCounter++ % 120 == 0); // Output logs every ~2 seconds
 
     // Check if the player is at a chunk boundary - use minimal detection
-    bool atChunkBoundaryX = std::abs(fmod(pos.x, World::CHUNK_SIZE)) < 0.01f || 
-                           std::abs(fmod(pos.x, World::CHUNK_SIZE)) > (World::CHUNK_SIZE - 0.01f);
-    bool atChunkBoundaryZ = std::abs(fmod(pos.z, World::CHUNK_SIZE)) < 0.01f || 
-                           std::abs(fmod(pos.z, World::CHUNK_SIZE)) > (World::CHUNK_SIZE - 0.01f);
+    bool atChunkBoundaryX = std::abs(std::fmod(pos.x, World::CHUNK_SIZE)) < 0.05f || 
+                           std::abs(std::fmod(pos.x, World::CHUNK_SIZE) - World::CHUNK_SIZE) < 0.05f;
+    bool atChunkBoundaryZ = std::abs(std::fmod(pos.z, World::CHUNK_SIZE)) < 0.05f || 
+                           std::abs(std::fmod(pos.z, World::CHUNK_SIZE) - World::CHUNK_SIZE) < 0.05f;
+    
+    // CRITICAL FIX: Additional cases for exact boundaries
+    // These are the cases where a player is standing exactly at a chunk border
+    if (std::abs(std::fmod(std::floor(pos.x), World::CHUNK_SIZE)) < 0.001f) {
+        atChunkBoundaryX = true;
+    }
+    if (std::abs(std::fmod(std::floor(pos.z), World::CHUNK_SIZE)) < 0.001f) {
+        atChunkBoundaryZ = true;
+    }
+    
+    // CRITICAL FIX: If we're at a chunk boundary, expand our collision checking range
+    // to ensure we check blocks from both chunks properly
+    float boundaryExpansion = 0.0f;
+    if (atChunkBoundaryX || atChunkBoundaryZ) {
+        boundaryExpansion = 0.1f; // Add extra margin at chunk boundaries
+        if (verboseDebug) {
+            std::cout << "At chunk boundary, expanding collision check range" << std::endl;
+        }
+    }
     
     // CRITICAL FIX: Treat position as the player's feet, and adjust the collision box calculation
     // The collision box should be centered horizontally around the player, but start at their feet
@@ -1495,13 +1514,13 @@ bool CollisionSystem::collidesWithBlocksGreedy(const glm::vec3& pos, const glm::
     float highestGroundY = -1.0f;
     
     // Calculate min/max chunk coordinates for checking collisions
-    // Add a minimal safety margin for chunk checks
-    int minChunkX = static_cast<int>(std::floor((min.x - 0.05f) / world->CHUNK_SIZE));
-    int maxChunkX = static_cast<int>(std::floor((max.x + 0.05f) / world->CHUNK_SIZE));
+    // Add a safety margin for chunk checks, increased at chunk boundaries
+    int minChunkX = static_cast<int>(std::floor((min.x - 0.05f - boundaryExpansion) / world->CHUNK_SIZE));
+    int maxChunkX = static_cast<int>(std::floor((max.x + 0.05f + boundaryExpansion) / world->CHUNK_SIZE));
     int minChunkY = static_cast<int>(std::floor((min.y - 0.05f) / world->CHUNK_HEIGHT));
     int maxChunkY = static_cast<int>(std::floor((max.y + 0.05f) / world->CHUNK_HEIGHT));
-    int minChunkZ = static_cast<int>(std::floor((min.z - 0.05f) / world->CHUNK_SIZE));
-    int maxChunkZ = static_cast<int>(std::floor((max.z + 0.05f) / world->CHUNK_SIZE));
+    int minChunkZ = static_cast<int>(std::floor((min.z - 0.05f - boundaryExpansion) / world->CHUNK_SIZE));
+    int maxChunkZ = static_cast<int>(std::floor((max.z + 0.05f + boundaryExpansion) / world->CHUNK_SIZE));
     
     if (verboseDebug) {
         std::cout << "Checking chunks from (" << minChunkX << ", " << minChunkY << ", " << minChunkZ << ") to ("
@@ -1593,6 +1612,52 @@ bool CollisionSystem::collidesWithBlocksGreedy(const glm::vec3& pos, const glm::
         // Place the player's feet exactly on top of the highest ground with a small offset
         // This prevents sinking through the surface due to floating point precision issues
         mutablePos.y = highestGroundY + 0.01f;
+    }
+    
+    // CRITICAL FIX: Special handling for chunk boundaries to prevent falling through
+    if (atChunkBoundaryX || atChunkBoundaryZ) {
+        // If we're at a chunk boundary and we're falling, do a more aggressive ground check
+        if (velocity.y < 0 && !groundCollision) {
+            // Check directly beneath player with a wider area 
+            float extraWidth = 0.2f;
+            glm::vec3 groundCheckMin = pos + glm::vec3(-m_collisionBox.width - extraWidth, -0.1f, -m_collisionBox.width - extraWidth);
+            glm::vec3 groundCheckMax = pos + glm::vec3(m_collisionBox.width + extraWidth, 0.0f, m_collisionBox.width + extraWidth);
+            
+            // Check chunks directly beneath
+            int checkChunkMinX = static_cast<int>(std::floor(groundCheckMin.x / world->CHUNK_SIZE));
+            int checkChunkMaxX = static_cast<int>(std::floor(groundCheckMax.x / world->CHUNK_SIZE));
+            int checkChunkY = static_cast<int>(std::floor((pos.y - 0.1f) / world->CHUNK_HEIGHT));
+            int checkChunkMinZ = static_cast<int>(std::floor(groundCheckMin.z / world->CHUNK_SIZE));
+            int checkChunkMaxZ = static_cast<int>(std::floor(groundCheckMax.z / world->CHUNK_SIZE));
+            
+            // Look for solid blocks in these chunks
+            for (int chunkX = checkChunkMinX; chunkX <= checkChunkMaxX; chunkX++) {
+                for (int chunkZ = checkChunkMinZ; chunkZ <= checkChunkMaxZ; chunkZ++) {
+                    glm::ivec3 checkChunkPos(chunkX, checkChunkY, chunkZ);
+                    const std::unordered_map<glm::ivec3, std::unique_ptr<Chunk>, ChunkPosHash>& chunks = world->getChunks();
+                    auto it = chunks.find(checkChunkPos);
+                    if (it != chunks.end()) {
+                        std::vector<AABB> collisionMesh = it->second->buildColliderMesh();
+                        
+                        for (const AABB& volume : collisionMesh) {
+                            // Check if this volume is directly below player
+                            if (volume.max.y <= pos.y + 0.1f && 
+                                groundCheckMin.x <= volume.max.x && groundCheckMax.x >= volume.min.x &&
+                                groundCheckMin.z <= volume.max.z && groundCheckMax.z >= volume.min.z) {
+                                
+                                if (verboseDebug) {
+                                    std::cout << "Chunk boundary safety: Found ground beneath player" << std::endl;
+                                }
+                                
+                                // Update player position to rest on this ground
+                                const_cast<glm::vec3&>(pos).y = volume.max.y + 0.01f;
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
     
     // FAILSAFE: If no chunks were checked, assume we're falling through the world

@@ -54,19 +54,29 @@ void Player::update(float deltaTime, World* world) {
     // Check if player is at chunk boundary
     bool isAtBoundary = false;
     if (world) {
-        // Check X boundaries
+        // Check X boundaries - improve detection for exact chunk boundaries
         if (std::abs(std::fmod(m_position.x, World::CHUNK_SIZE)) < 0.05f || 
-            std::abs(std::fmod(m_position.x, World::CHUNK_SIZE) - World::CHUNK_SIZE) < 0.05f) {
+            std::abs(std::fmod(m_position.x, World::CHUNK_SIZE) - World::CHUNK_SIZE) < 0.05f ||
+            std::abs(std::fmod(std::floor(m_position.x), World::CHUNK_SIZE)) < 0.001f) {
             isAtBoundary = true;
         }
-        // Check Z boundaries
+        // Check Z boundaries - improve detection for exact chunk boundaries
         if (std::abs(std::fmod(m_position.z, World::CHUNK_SIZE)) < 0.05f || 
-            std::abs(std::fmod(m_position.z, World::CHUNK_SIZE) - World::CHUNK_SIZE) < 0.05f) {
+            std::abs(std::fmod(m_position.z, World::CHUNK_SIZE) - World::CHUNK_SIZE) < 0.05f ||
+            std::abs(std::fmod(std::floor(m_position.z), World::CHUNK_SIZE)) < 0.001f) {
             isAtBoundary = true;
         }
-        // Check Y boundaries
+        // Check Y boundaries - improve detection for exact chunk boundaries
         if (std::abs(std::fmod(m_position.y, World::CHUNK_HEIGHT)) < 0.05f || 
-            std::abs(std::fmod(m_position.y, World::CHUNK_HEIGHT) - World::CHUNK_HEIGHT) < 0.05f) {
+            std::abs(std::fmod(m_position.y, World::CHUNK_HEIGHT) - World::CHUNK_HEIGHT) < 0.05f ||
+            std::abs(std::fmod(std::floor(m_position.y), World::CHUNK_HEIGHT)) < 0.001f) {
+            isAtBoundary = true;
+        }
+        
+        // CRITICAL FIX: Additional check for exact boundaries at x=16, z=16, etc.
+        glm::ivec3 localPos = world->worldToLocalPos(m_position);
+        if (localPos.x == 0 || localPos.x == World::CHUNK_SIZE - 1 ||
+            localPos.z == 0 || localPos.z == World::CHUNK_SIZE - 1) {
             isAtBoundary = true;
         }
     }
@@ -91,26 +101,44 @@ void Player::update(float deltaTime, World* world) {
                 // Apply strong boundary adjustment
                 m_collisionSystem.adjustPositionAtBlockBoundaries(m_position, true);
                 
-                // Try to move player away from the boundary with a small nudge
+                // Try to move player away from the boundary with a larger nudge
                 float nudgeX = 0, nudgeZ = 0;
                 
-                // Determine which boundary we're on and nudge away from it
+                // CRITICAL FIX: Better detect which boundary we're on
                 float xMod = std::fmod(m_position.x, World::CHUNK_SIZE);
                 float zMod = std::fmod(m_position.z, World::CHUNK_SIZE);
                 
+                // Check for exact boundary values and apply appropriate nudge
                 if (xMod < 0.05f)
-                    nudgeX = 0.15f;
+                    nudgeX = 0.2f; // Increased from 0.15f
                 else if (xMod > World::CHUNK_SIZE - 0.05f)
-                    nudgeX = -0.15f;
+                    nudgeX = -0.2f; // Increased from -0.15f
                 
                 if (zMod < 0.05f)
-                    nudgeZ = 0.15f;
+                    nudgeZ = 0.2f; // Increased from 0.15f
                 else if (zMod > World::CHUNK_SIZE - 0.05f)
-                    nudgeZ = -0.15f;
+                    nudgeZ = -0.2f; // Increased from -0.15f
+                
+                // Check for special case at exact boundary (like x=16.0)
+                if (std::abs(std::fmod(m_position.x, World::CHUNK_SIZE)) < 0.001f && 
+                    std::fmod(m_position.x, World::CHUNK_SIZE) > 0) {
+                    nudgeX = 0.25f; // Stronger nudge for exact boundaries
+                }
+                
+                if (std::abs(std::fmod(m_position.z, World::CHUNK_SIZE)) < 0.001f && 
+                    std::fmod(m_position.z, World::CHUNK_SIZE) > 0) {
+                    nudgeZ = 0.25f; // Stronger nudge for exact boundaries
+                }
                 
                 // Apply the nudge
                 m_position.x += nudgeX;
                 m_position.z += nudgeZ;
+                
+                // CRITICAL FIX: If we're still in a solid block after nudging, try to move upward
+                if (world->getBlock(glm::ivec3(m_position)) > 0) {
+                    m_position.y += 0.5f;
+                    std::cout << "Applied upward nudge to escape stuck position" << std::endl;
+                }
                 
                 stuckTime = 0.0f; // Reset timer
             }
