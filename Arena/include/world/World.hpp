@@ -7,6 +7,7 @@
 #include "Chunk.hpp"
 #include "WorldGenerator.hpp"
 #include <string>
+#include <unordered_set>
 
 // Custom hash for glm::ivec3
 namespace std {
@@ -66,7 +67,8 @@ public:
     bool deserialize(const std::string& filename);
 
     // Chunk management
-    void updateChunks(const glm::vec3& playerPos);
+    void evaluateChunksNeeded(const glm::vec3& playerPos);
+    void processChunkQueues();
     const std::unordered_map<glm::ivec3, std::unique_ptr<Chunk>>& getChunks() const { return m_chunks; }
     
     // Coordinate conversion
@@ -75,6 +77,7 @@ public:
     
     // Mesh management
     void updateChunkMeshes(const glm::ivec3& chunkPos, bool disableGreedyMeshing = false);
+    void updateDirtyChunkMeshes(int maxUpdatesPerFrame);
     
     // Greedy meshing control
     void setGreedyMeshingEnabled(bool enabled) { m_disableGreedyMeshing = !enabled; }
@@ -92,6 +95,13 @@ public:
 
     // Returns the approximate count of pending chunk operations
     int getPendingChunksCount() const;
+
+    // Chunk visibility system
+    bool isChunkVisible(const glm::ivec3& chunkPos, const glm::vec3& playerPos, const glm::vec3& playerForward) const;
+    void updateVisibleChunks(const glm::vec3& playerPos, const glm::vec3& playerForward);
+    bool shouldLoadChunk(const glm::ivec3& chunkPos, const glm::ivec3& playerChunkPos) const;
+    size_t getVisibleChunksCount() const { return m_visibleChunks.size(); }
+    int getDirtyChunkCount() const;
 
 private:
     Chunk* getChunkAt(const glm::ivec3& chunkPos);
@@ -111,4 +121,21 @@ private:
     
     // To track pending chunk operations
     mutable int m_pendingChunkOperations;
+
+    // Helper method to check if a chunk is potentially visible from the air
+    bool isVisibleFromAbove(const glm::ivec3& chunkPos, const glm::ivec3& playerChunkPos) const;
+    
+    // Helper methods for chunk visibility propagation
+    void markChunkVisible(const glm::ivec3& chunkPos);
+    void propagateVisibilityDownward(const glm::ivec3& chunkPos);
+    
+    // Chunk visibility tracking
+    std::unordered_set<glm::ivec3, std::hash<glm::ivec3>> m_visibleChunks;
+    
+    // Performance tracking
+    int m_maxSimultaneousChunksLoaded;
+    
+    // Internal queues for chunk loading/unloading
+    std::deque<glm::ivec3> m_chunksToLoadQueue;
+    std::deque<glm::ivec3> m_chunksToUnloadQueue;
 }; 

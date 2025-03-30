@@ -525,6 +525,11 @@ void Renderer::renderWorld(World* world, Player* player) {
         // Get chunk position
         glm::ivec3 chunkPos = chunk->getPosition();
         
+        // Check if this chunk should be visible using our new visibility system
+        if (!world->isChunkVisible(chunkPos, position, player->getForward())) {
+            continue; // Skip rendering invisible chunks
+        }
+        
         // Calculate chunk center in world space
         glm::vec3 chunkCenter = glm::vec3(
             (chunkPos.x * Chunk::CHUNK_SIZE) + (Chunk::CHUNK_SIZE / 2.0f),
@@ -571,6 +576,7 @@ void Renderer::renderWorld(World* world, Player* player) {
     if (renderDebugCounter++ % 300 == 0) { // Every 5 seconds at 60fps
         std::cout << "Rendering " << visibleChunks << " visible chunks of " 
                   << world->getChunks().size() << " total chunks" << std::endl;
+        std::cout << "Chunks in visibility system: " << world->getVisibleChunksCount() << std::endl;
         std::cout << "Backface culling: " << (m_disableBackfaceCulling ? "DISABLED" : "ENABLED") << std::endl;
         std::cout << "Greedy meshing: " << (m_disableGreedyMeshing ? "DISABLED" : "ENABLED") << std::endl;
         std::cout << "LOD rendering: " << (m_enableLodRendering ? "ENABLED" : "DISABLED") << std::endl;

@@ -41,6 +41,9 @@ public:
     bool isModified() const { return m_isModified; }
     void setModified(bool modified) { m_isModified = modified; }
     
+    // Check if chunk is empty (contains only air blocks)
+    bool isEmpty() const;
+    
     bool serialize(const std::string& filename) const;
     bool deserialize(const std::string& filename);
 

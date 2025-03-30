@@ -23,6 +23,10 @@ DebugStats::DebugStats()
     , m_fpsAccumulator(0)
     , m_fpsFrameCount(0)
     , m_lastUpdateTime(0.0f)
+    , m_loadedChunks(0)
+    , m_visibleChunks(0)
+    , m_pendingChunks(0)
+    , m_dirtyChunks(0)
 {
 }
 
@@ -47,6 +51,20 @@ void DebugStats::update(float deltaTime) {
     
     // Update FPS stats
     updateFpsStats(deltaTime);
+    
+    // Update chunk stats
+    if (m_game && m_game->getWorld()) {
+        World* world = m_game->getWorld();
+        m_loadedChunks = world->getChunks().size();
+        m_visibleChunks = world->getVisibleChunksCount();
+        m_pendingChunks = world->getPendingChunksCount();
+        m_dirtyChunks = world->getDirtyChunkCount();
+    } else {
+        m_loadedChunks = 0;
+        m_visibleChunks = 0;
+        m_pendingChunks = 0;
+        m_dirtyChunks = 0;
+    }
     
     // Update other stats as needed
     m_lastUpdateTime += deltaTime;
@@ -138,23 +156,29 @@ void DebugStats::render() {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     
+    // Define panel dimensions and position
+    float panelWidth = 450.0f; // Slightly wider for separate chunk lines
+    float panelHeight = 190.0f; // Increased height for more lines
+    float panelX = 5.0f;
+    float panelY = height - 5.0f - panelHeight; // Position from top-left, adjust y based on height
+
     // Draw a semi-transparent black background rectangle
     glColor4f(0.0f, 0.0f, 0.0f, 0.5f);
     glBegin(GL_QUADS);
-    glVertex2f(5.0f, height - 5.0f);           // Top-left (adjusted for bottom-left origin)
-    glVertex2f(400.0f, height - 5.0f);        // Top-right (adjusted for bottom-left origin)
-    glVertex2f(400.0f, height - 150.0f);      // Bottom-right (adjusted for bottom-left origin)
-    glVertex2f(5.0f, height - 150.0f);        // Bottom-left (adjusted for bottom-left origin)
+    glVertex2f(panelX, panelY + panelHeight); // Top-left
+    glVertex2f(panelX + panelWidth, panelY + panelHeight); // Top-right
+    glVertex2f(panelX + panelWidth, panelY); // Bottom-right
+    glVertex2f(panelX, panelY); // Bottom-left
     glEnd();
     
     // Draw a border around the debug panel
     glColor4f(1.0f, 1.0f, 1.0f, 0.7f);
     glLineWidth(1.0f);
     glBegin(GL_LINE_LOOP);
-    glVertex2f(5.0f, height - 5.0f);          // Top-left (adjusted for bottom-left origin)
-    glVertex2f(400.0f, height - 5.0f);       // Top-right (adjusted for bottom-left origin)
-    glVertex2f(400.0f, height - 150.0f);     // Bottom-right (adjusted for bottom-left origin)
-    glVertex2f(5.0f, height - 150.0f);       // Bottom-left (adjusted for bottom-left origin)
+    glVertex2f(panelX, panelY + panelHeight); // Top-left
+    glVertex2f(panelX + panelWidth, panelY + panelHeight); // Top-right
+    glVertex2f(panelX + panelWidth, panelY); // Bottom-right
+    glVertex2f(panelX, panelY); // Bottom-left
     glEnd();
     
     // Get debug info
@@ -164,6 +188,7 @@ void DebugStats::render() {
     int lowFps = static_cast<int>(m_lowFps);
     
     glm::ivec3 playerPos;
+    glm::ivec3 playerChunkPos;
     if (m_game->getPlayer()) {
         const glm::vec3& pos = m_game->getPlayer()->getPosition();
         playerPos = glm::ivec3(
@@ -171,26 +196,31 @@ void DebugStats::render() {
             static_cast<int>(floor(pos.y)),
             static_cast<int>(floor(pos.z))
         );
+        if (m_game->getWorld()) {
+             playerChunkPos = m_game->getWorld()->worldToChunkPos(pos);
+        }
     }
     
-    int loadedChunks = 0;
-    int pendingChunks = 0;
+    int loadedChunks = m_loadedChunks;
+    int visibleChunks = m_visibleChunks;
+    int pendingChunks = m_pendingChunks;
+    int dirtyChunks = m_dirtyChunks;
     int viewDistance = 0;
+    bool greedyMeshing = false;
     if (m_game->getWorld()) {
-        loadedChunks = m_game->getWorld()->getChunks().size();
-        pendingChunks = m_game->getWorld()->getPendingChunksCount();
         viewDistance = m_game->getWorld()->getViewDistance();
+        greedyMeshing = m_game->getWorld()->isGreedyMeshingEnabled();
     }
     
     // Draw text info using manual drawing
-    // Text positioning - adjust for bottom-left origin
-    float baseX = 15.0f;
-    float lineHeight = 24.0f;
-    float startY = height - 25.0f;  // Start from the top, adjusted for bottom-left origin
+    // Text positioning - Adjust Y based on new panel position
+    float baseX = panelX + 10.0f; 
+    float lineHeight = 20.0f; // Slightly reduced line height
+    float startY = panelY + panelHeight - 20.0f; // Start from the top of the panel
     
     // Title line
     glColor3f(0.7f, 0.7f, 0.7f);
-    drawManualText("VoxelGame v0.1 (F9 to hide)", baseX, startY);
+    drawManualText("VoxelGame Stats (F9 to hide)", baseX, startY);
     startY -= lineHeight;
     
     // FPS info
@@ -202,23 +232,37 @@ void DebugStats::render() {
     
     // Player position
     std::stringstream posStr;
-    posStr << "Position: [" << playerPos.x << ", " << playerPos.y << ", " << playerPos.z << "]";
+    posStr << "Player Pos: [" << playerPos.x << ", " << playerPos.y << ", " << playerPos.z << "]";
     glColor3f(0.0f, 1.0f, 1.0f);
     drawManualText(posStr.str(), baseX, startY);
     startY -= lineHeight;
-    
-    // Chunk information
-    std::stringstream chunksStr;
-    chunksStr << "Chunks: " << loadedChunks << " loaded, " << pendingChunks << " pending";
-    glColor3f(0.5f, 1.0f, 0.5f);
-    drawManualText(chunksStr.str(), baseX, startY);
+
+    // Player Chunk position
+    std::stringstream playerChunkStr;
+    playerChunkStr << "Player Chunk: [" << playerChunkPos.x << ", " << playerChunkPos.y << ", " << playerChunkPos.z << "]";
+    glColor3f(0.0f, 1.0f, 1.0f);
+    drawManualText(playerChunkStr.str(), baseX, startY);
     startY -= lineHeight;
     
-    // View distance
-    std::stringstream viewDistStr;
-    viewDistStr << "View distance: " << viewDistance << " chunks";
+    // Chunk information - Separate lines
+    std::stringstream loadedStr; loadedStr << "Loaded Chunks: " << loadedChunks;
     glColor3f(0.5f, 1.0f, 0.5f);
-    drawManualText(viewDistStr.str(), baseX, startY);
+    drawManualText(loadedStr.str(), baseX, startY); startY -= lineHeight;
+    
+    std::stringstream visibleStr; visibleStr << "Visible Chunks: " << visibleChunks;
+    drawManualText(visibleStr.str(), baseX, startY); startY -= lineHeight;
+    
+    std::stringstream pendingStr; pendingStr << "Pending Chunks: " << pendingChunks;
+    drawManualText(pendingStr.str(), baseX, startY); startY -= lineHeight;
+    
+    std::stringstream dirtyStr; dirtyStr << "Dirty Chunks: " << dirtyChunks;
+    drawManualText(dirtyStr.str(), baseX, startY); startY -= lineHeight;
+    
+    // View distance & Greedy Meshing
+    std::stringstream settingsStr;
+    settingsStr << "View: " << viewDistance << " chunks, Greedy: " << (greedyMeshing ? "ON" : "OFF");
+    glColor3f(0.8f, 0.8f, 1.0f);
+    drawManualText(settingsStr.str(), baseX, startY);
     
     // Restore matrix state
     glMatrixMode(GL_PROJECTION);

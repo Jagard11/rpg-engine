@@ -10,6 +10,7 @@
 #include "../debug/DebugStats.hpp"
 #include "../world/VoxelManipulator.hpp"
 #include "Window.hpp"
+#include <glm/glm.hpp>
 
 class Game {
 public:
@@ -56,4 +57,7 @@ private:
     bool m_isRunning;
     bool m_isInGame;
     int m_fps;
+    
+    // Track player's chunk position to optimize updates
+    glm::ivec3 m_lastPlayerChunkPos;
 }; 

@@ -8,14 +8,18 @@
 #include <thread>
 #include "debug/DebugMenu.hpp"
 #include "debug/VoxelDebug.hpp"
+#include "debug/DebugStats.hpp"
+#include "world/VoxelManipulator.hpp"
+#include <glm/gtc/constants.hpp>
 
 // Add this global variable and function at the top of the file
 static Game* g_gameInstance = nullptr;
 
 // Add mouse button callback
 static void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
-    if (g_gameInstance) {
-        g_gameInstance->handleMouseInput(button, action, mods);
+    Game* game = static_cast<Game*>(glfwGetWindowUserPointer(window));
+    if (game) {
+        game->handleMouseInput(button, action, mods);
     }
 }
 
@@ -31,6 +35,7 @@ Game::Game()
     , m_isInGame(false)
     , m_fps(0)
     , m_debugStats(nullptr)
+    , m_lastPlayerChunkPos(-1) // Initialize to an invalid position
 {
     // Store the global instance for callbacks
     g_gameInstance = this;
@@ -187,7 +192,25 @@ void Game::update(float deltaTime) {
     
     if (m_isInGame && m_world && m_player && !m_splashScreen->isActive()) {
         m_player->update(deltaTime, m_world.get());
-        m_world->updateChunks(m_player->getPosition());
+        
+        // Get current player chunk position
+        glm::ivec3 currentPlayerChunkPos = m_world->worldToChunkPos(m_player->getPosition());
+        
+        // Only *evaluate* chunks needed when the player moves to a new chunk
+        if (currentPlayerChunkPos != m_lastPlayerChunkPos) {
+            //std::cout << "Player moved to new chunk: [" 
+            //          << currentPlayerChunkPos.x << ", " << currentPlayerChunkPos.y << ", " << currentPlayerChunkPos.z
+            //          << "] - Evaluating chunks needed..." << std::endl;
+            m_world->evaluateChunksNeeded(m_player->getPosition());
+            m_lastPlayerChunkPos = currentPlayerChunkPos; // Update last known position
+        }
+        
+        // *Process* the load/unload queues every frame
+        m_world->processChunkQueues();
+        
+        // Process a limited number of dirty chunk meshes per frame (ALWAYS run this)
+        int meshUpdatesThisFrame = m_fps > 40 ? 3 : (m_fps > 20 ? 2 : 1);
+        m_world->updateDirtyChunkMeshes(meshUpdatesThisFrame);
     }
 }
 
@@ -546,7 +569,7 @@ bool Game::loadWorld(const std::string& savePath) {
     
     // Initialize chunks around player
     if (m_world && m_player) {
-        m_world->updateChunks(m_player->getPosition());
+        m_world->evaluateChunksNeeded(m_player->getPosition());
     }
     
     return true;

@@ -676,4 +676,18 @@ bool Chunk::isBlockTransparent(int blockType) const {
         default:
             return false;
     }
+}
+
+bool Chunk::isEmpty() const {
+    // Check if the chunk contains only air blocks (type 0)
+    for (int x = 0; x < CHUNK_SIZE; x++) {
+        for (int y = 0; y < CHUNK_HEIGHT; y++) {
+            for (int z = 0; z < CHUNK_SIZE; z++) {
+                if (m_blocks[x][y][z] != 0) {
+                    return false; // Found a non-air block
+                }
+            }
+        }
+    }
+    return true; // All blocks are air
 } 

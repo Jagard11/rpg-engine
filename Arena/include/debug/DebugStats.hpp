@@ -72,6 +72,12 @@ private:
     float m_fpsAccumulator;
     int m_fpsFrameCount;
     
+    // Chunk system tracking
+    int m_loadedChunks;
+    int m_visibleChunks;
+    int m_pendingChunks;
+    int m_dirtyChunks;
+    
     // History of FPS measurements for averaging
     std::deque<float> m_fpsHistory;
     
