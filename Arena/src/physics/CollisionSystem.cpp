@@ -1126,63 +1126,87 @@ void CollisionSystem::adjustPositionAtBlockBoundaries(glm::vec3& pos, bool verbo
     float xFraction = pos.x - std::floor(pos.x);
     float zFraction = pos.z - std::floor(pos.z);
     
-    // Also check for positions at chunk boundaries (multiples of 16)
-    bool atChunkBoundaryX = std::abs(fmod(pos.x, World::CHUNK_SIZE)) < 0.01f || 
-                           std::abs(fmod(pos.x, World::CHUNK_SIZE)) > (World::CHUNK_SIZE - 0.01f);
-    bool atChunkBoundaryZ = std::abs(fmod(pos.z, World::CHUNK_SIZE)) < 0.01f || 
-                           std::abs(fmod(pos.z, World::CHUNK_SIZE)) > (World::CHUNK_SIZE - 0.01f);
+    // Check for positions exactly at chunk boundaries (multiples of 16)
+    // Use more precise detection for chunk boundaries
+    bool atChunkBoundaryX = std::abs(std::fmod(pos.x, World::CHUNK_SIZE)) < 0.015f || 
+                           std::abs(std::fmod(pos.x, World::CHUNK_SIZE) - World::CHUNK_SIZE) < 0.015f;
+    bool atChunkBoundaryZ = std::abs(std::fmod(pos.z, World::CHUNK_SIZE)) < 0.015f || 
+                           std::abs(std::fmod(pos.z, World::CHUNK_SIZE) - World::CHUNK_SIZE) < 0.015f;
+    bool atChunkBoundaryY = std::abs(std::fmod(pos.y, World::CHUNK_HEIGHT)) < 0.015f || 
+                           std::abs(std::fmod(pos.y, World::CHUNK_HEIGHT) - World::CHUNK_HEIGHT) < 0.015f;
     
     glm::vec3 adjustment(0.0f);
     bool madeAdjustment = false;
     
-    // Only adjust in extreme cases where the player is almost exactly on a boundary
-    // Use a much smaller threshold (0.01f instead of 0.05f)
-    // And use a much smaller adjustment (0.02f instead of 0.15f)
-    if (xFraction < 0.01f) {
-        adjustment.x = 0.02f;
-        madeAdjustment = true;
-    } else if (xFraction > 0.99f) {
-        adjustment.x = -0.02f;
-        madeAdjustment = true;
-    }
-    
-    if (zFraction < 0.01f) {
-        adjustment.z = 0.02f;
-        madeAdjustment = true;
-    } else if (zFraction > 0.99f) {
-        adjustment.z = -0.02f;
-        madeAdjustment = true;
-    }
-    
-    // Apply a minimal adjustment at chunk boundaries - only for extreme cases
-    // This prevents getting completely stuck without being too aggressive
-    if (atChunkBoundaryX) {
+    // Only adjust if we're at a chunk boundary
+    if (atChunkBoundaryX || atChunkBoundaryZ || atChunkBoundaryY) {
         // Determine direction based on which side of the chunk boundary we're on
-        float xChunkRemainder = fmod(pos.x, World::CHUNK_SIZE);
-        if (xChunkRemainder < 0.01f) {
-            adjustment.x = 0.03f; // Very slight push
-        } else if (xChunkRemainder > (World::CHUNK_SIZE - 0.01f)) {
-            adjustment.x = -0.03f; // Very slight push
+        if (atChunkBoundaryX) {
+            float xChunkRemainder = std::fmod(pos.x, World::CHUNK_SIZE);
+            // Push away from the boundary
+            if (xChunkRemainder < 0.015f) {
+                adjustment.x = 0.025f; // Small push inward from lower boundary
+            } else if (xChunkRemainder > (World::CHUNK_SIZE - 0.015f)) {
+                adjustment.x = -0.025f; // Small push inward from upper boundary
+            }
+            madeAdjustment = true;
         }
-        madeAdjustment = true;
+        
+        if (atChunkBoundaryZ) {
+            float zChunkRemainder = std::fmod(pos.z, World::CHUNK_SIZE);
+            // Push away from the boundary
+            if (zChunkRemainder < 0.015f) {
+                adjustment.z = 0.025f; // Small push inward from lower boundary
+            } else if (zChunkRemainder > (World::CHUNK_SIZE - 0.015f)) {
+                adjustment.z = -0.025f; // Small push inward from upper boundary
+            }
+            madeAdjustment = true;
+        }
+        
+        if (atChunkBoundaryY) {
+            float yChunkRemainder = std::fmod(pos.y, World::CHUNK_HEIGHT);
+            // Push away from the boundary
+            if (yChunkRemainder < 0.015f) {
+                adjustment.y = 0.025f; // Small push upward from lower boundary
+            } else if (yChunkRemainder > (World::CHUNK_HEIGHT - 0.015f)) {
+                adjustment.y = -0.025f; // Small push downward from upper boundary
+            }
+            madeAdjustment = true;
+        }
     }
-    
-    if (atChunkBoundaryZ) {
-        // Determine direction based on which side of the chunk boundary we're on
-        float zChunkRemainder = fmod(pos.z, World::CHUNK_SIZE);
-        if (zChunkRemainder < 0.01f) {
-            adjustment.z = 0.03f; // Very slight push
-        } else if (zChunkRemainder > (World::CHUNK_SIZE - 0.01f)) {
-            adjustment.z = -0.03f; // Very slight push
+    // Only adjust for block boundaries if we're not at a chunk boundary
+    // and if we're very close to a block boundary
+    else if (xFraction < 0.015f || xFraction > 0.985f || 
+            zFraction < 0.015f || zFraction > 0.985f) {
+        // Use a much smaller adjustment for block boundaries
+        if (xFraction < 0.015f) {
+            adjustment.x = 0.02f;
+            madeAdjustment = true;
+        } else if (xFraction > 0.985f) {
+            adjustment.x = -0.02f;
+            madeAdjustment = true;
         }
-        madeAdjustment = true;
+        
+        if (zFraction < 0.015f) {
+            adjustment.z = 0.02f;
+            madeAdjustment = true;
+        } else if (zFraction > 0.985f) {
+            adjustment.z = -0.02f;
+            madeAdjustment = true;
+        }
     }
     
     // Apply adjustment if needed
     if (madeAdjustment) {
+        // Use a small-magnitude consistent adjustment to reduce jitter
+        // Normalize adjustment if it's not zero
+        if (glm::length(adjustment) > 0.0f) {
+            adjustment = glm::normalize(adjustment) * 0.025f;
+        }
+        
         if (verbose) {
             std::cout << "Adjusted position away from ";
-            if (atChunkBoundaryX || atChunkBoundaryZ) {
+            if (atChunkBoundaryX || atChunkBoundaryZ || atChunkBoundaryY) {
                 std::cout << "chunk boundary";
             } else {
                 std::cout << "block boundary";

@@ -2,10 +2,21 @@
 
 #include <string>
 #include <chrono>
+#include <glm/glm.hpp>
 #include "world/World.hpp"
 #include "player/Player.hpp"
 
 namespace Debug {
+
+// Structure to track player position/movement at chunk boundaries
+struct PlayerBoundaryEvent {
+    int64_t timestamp;        // Microseconds since epoch
+    glm::vec3 position;       // Player position
+    glm::vec3 velocity;       // Player velocity
+    bool isAtXBoundary;       // Is at X chunk boundary
+    bool isAtZBoundary;       // Is at Z chunk boundary
+    bool isAtYBoundary;       // Is at Y chunk boundary
+};
 
 /**
  * @brief Debug tools for voxel/chunk manipulation issues
@@ -16,6 +27,11 @@ public:
      * @brief Initialize the debug system
      */
     static void initialize();
+    
+    /**
+     * @brief Check if the debug system is initialized
+     */
+    static bool isInitialized();
     
     /**
      * @brief Called when F12 is pressed to dump debug information
@@ -42,9 +58,36 @@ public:
     
     /**
      * @brief Record a stack trace with the provided context message
-     * @param context Context message describing the trace
+     * @param contextMessage Context message describing the trace
      */
-    static void recordStackTrace(const std::string& context);
+    static void recordStackTrace(const std::string& contextMessage);
+    
+    /**
+     * @brief Start or stop tracking player movement at chunk boundaries
+     * @param enable Whether to enable tracking
+     */
+    static void enableBoundaryTracking(bool enable);
+    
+    /**
+     * @brief Check if boundary tracking is enabled
+     */
+    static bool isBoundaryTrackingEnabled();
+    
+    /**
+     * @brief Record a player position at a chunk boundary
+     * @param position The player's position
+     * @param velocity The player's velocity
+     * @param isAtXBoundary Whether player is at an X chunk boundary
+     * @param isAtZBoundary Whether player is at a Z chunk boundary
+     * @param isAtYBoundary Whether player is at a Y chunk boundary
+     */
+    static void recordBoundaryEvent(const glm::vec3& position, const glm::vec3& velocity, 
+                                   bool isAtXBoundary, bool isAtZBoundary, bool isAtYBoundary);
+    
+    /**
+     * @brief Save the recorded boundary events to a CSV file
+     */
+    static void saveChunkBoundaryEvents();
 
 private:
     // Record keeping for debug operations

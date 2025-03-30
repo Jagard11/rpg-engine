@@ -51,40 +51,109 @@ void Player::update(float deltaTime, World* world) {
     static float stuckTime = 0.0f;
     static bool wasAtBoundary = false;
     
+    // Add position smoothing to reduce jitter
+    static glm::vec3 smoothedPosition = m_position;
+    static bool usePositionSmoothing = false;
+    
     // Check if player is at chunk boundary
     bool isAtBoundary = false;
     if (world) {
-        // Check X boundaries - improve detection for exact chunk boundaries
+        // Check X boundaries - more precise boundary detection
         if (std::abs(std::fmod(m_position.x, World::CHUNK_SIZE)) < 0.05f || 
-            std::abs(std::fmod(m_position.x, World::CHUNK_SIZE) - World::CHUNK_SIZE) < 0.05f ||
-            std::abs(std::fmod(std::floor(m_position.x), World::CHUNK_SIZE)) < 0.001f) {
+            std::abs(std::fmod(m_position.x, World::CHUNK_SIZE) - World::CHUNK_SIZE) < 0.05f) {
             isAtBoundary = true;
         }
-        // Check Z boundaries - improve detection for exact chunk boundaries
+        // Check Z boundaries - more precise boundary detection
         if (std::abs(std::fmod(m_position.z, World::CHUNK_SIZE)) < 0.05f || 
-            std::abs(std::fmod(m_position.z, World::CHUNK_SIZE) - World::CHUNK_SIZE) < 0.05f ||
-            std::abs(std::fmod(std::floor(m_position.z), World::CHUNK_SIZE)) < 0.001f) {
+            std::abs(std::fmod(m_position.z, World::CHUNK_SIZE) - World::CHUNK_SIZE) < 0.05f) {
             isAtBoundary = true;
         }
-        // Check Y boundaries - improve detection for exact chunk boundaries
+        // Check Y boundaries - more precise boundary detection
         if (std::abs(std::fmod(m_position.y, World::CHUNK_HEIGHT)) < 0.05f || 
-            std::abs(std::fmod(m_position.y, World::CHUNK_HEIGHT) - World::CHUNK_HEIGHT) < 0.05f ||
-            std::abs(std::fmod(std::floor(m_position.y), World::CHUNK_HEIGHT)) < 0.001f) {
+            std::abs(std::fmod(m_position.y, World::CHUNK_HEIGHT) - World::CHUNK_HEIGHT) < 0.05f) {
             isAtBoundary = true;
         }
         
-        // CRITICAL FIX: Additional check for exact boundaries at x=16, z=16, etc.
+        // Get local position in chunk for boundary checking
         glm::ivec3 localPos = world->worldToLocalPos(m_position);
         if (localPos.x == 0 || localPos.x == World::CHUNK_SIZE - 1 ||
-            localPos.z == 0 || localPos.z == World::CHUNK_SIZE - 1) {
+            localPos.z == 0 || localPos.z == World::CHUNK_SIZE - 1 ||
+            localPos.y == 0 || localPos.y == World::CHUNK_HEIGHT - 1) {
             isAtBoundary = true;
         }
     }
     
+    // Detect jitter by measuring rapid position changes that aren't from player input
+    static glm::vec3 lastGoodPosition = m_position;
+    static float timeSincePositionCheck = 0.0f;
+    static float totalJitterMagnitude = 0.0f;
+    static int jitterCounter = 0;
+    
+    // Calculate position delta from last frame
+    float positionDelta = glm::distance(m_position, lastPosition);
+    timeSincePositionCheck += deltaTime;
+    
+    // If we observe small jitters (not intentional player movement), activate smoothing
+    if (isAtBoundary && positionDelta > 0.001f && positionDelta < 0.1f) {
+        totalJitterMagnitude += positionDelta;
+        jitterCounter++;
+    }
+    
+    // Check for jitter every 0.2 seconds
+    if (timeSincePositionCheck >= 0.2f) {
+        // If we've had multiple small jitters, activate smoothing
+        if (jitterCounter >= 3 && totalJitterMagnitude < 0.5f) {
+            usePositionSmoothing = true;
+            std::cout << "Jitter detected at boundaries, activating position smoothing" << std::endl;
+        } else if (jitterCounter == 0) {
+            // No jitters detected, gradually reduce smoothing
+            usePositionSmoothing = false;
+        }
+        
+        // Reset jitter tracking
+        timeSincePositionCheck = 0.0f;
+        totalJitterMagnitude = 0.0f;
+        jitterCounter = 0;
+        lastGoodPosition = m_position;
+    }
+    
+    // Apply position smoothing when at boundaries to reduce jitter
+    if (isAtBoundary && usePositionSmoothing) {
+        // If we've moved significantly, don't smooth (allow player control)
+        if (positionDelta > 0.2f) {
+            smoothedPosition = m_position;
+        } else {
+            // Smooth position with exponential interpolation
+            float smoothFactor = 0.7f; // Higher = less smoothing
+            smoothedPosition = smoothedPosition * (1.0f - smoothFactor) + m_position * smoothFactor;
+            
+            // Apply the smoothed position
+            m_position = smoothedPosition;
+            
+            if (verboseUpdate) {
+                std::cout << "Applied position smoothing at boundary" << std::endl;
+            }
+        }
+    } else {
+        // When not smoothing, keep the smoothed position updated
+        smoothedPosition = m_position;
+    }
+    
     // Check if we've been stuck in the same position for a while
     if (isAtBoundary) {
+        // Add boundary tracking for debugging
+        bool isAtXBoundary = std::abs(std::fmod(m_position.x, World::CHUNK_SIZE)) < 0.05f || 
+                            std::abs(std::fmod(m_position.x, World::CHUNK_SIZE) - World::CHUNK_SIZE) < 0.05f;
+        bool isAtZBoundary = std::abs(std::fmod(m_position.z, World::CHUNK_SIZE)) < 0.05f || 
+                            std::abs(std::fmod(m_position.z, World::CHUNK_SIZE) - World::CHUNK_SIZE) < 0.05f;
+        bool isAtYBoundary = std::abs(std::fmod(m_position.y, World::CHUNK_HEIGHT)) < 0.05f || 
+                            std::abs(std::fmod(m_position.y, World::CHUNK_HEIGHT) - World::CHUNK_HEIGHT) < 0.05f;
+        
+        // Record boundary event if tracking is enabled
+        Debug::VoxelDebug::recordBoundaryEvent(m_position, m_velocity, 
+            isAtXBoundary, isAtZBoundary, isAtYBoundary);
+        
         // Check if position hasn't changed much
-        float positionDelta = glm::distance(m_position, lastPosition);
         if (positionDelta < 0.01f) {
             // At boundary and not moving
             stuckTime += deltaTime;
@@ -104,41 +173,53 @@ void Player::update(float deltaTime, World* world) {
                 // Try to move player away from the boundary with a larger nudge
                 float nudgeX = 0, nudgeZ = 0;
                 
-                // CRITICAL FIX: Better detect which boundary we're on
+                // Better detect which boundary we're on
                 float xMod = std::fmod(m_position.x, World::CHUNK_SIZE);
                 float zMod = std::fmod(m_position.z, World::CHUNK_SIZE);
                 
                 // Check for exact boundary values and apply appropriate nudge
                 if (xMod < 0.05f)
-                    nudgeX = 0.2f; // Increased from 0.15f
+                    nudgeX = 0.25f; // Increased from 0.2f
                 else if (xMod > World::CHUNK_SIZE - 0.05f)
-                    nudgeX = -0.2f; // Increased from -0.15f
+                    nudgeX = -0.25f; // Increased from -0.2f
                 
                 if (zMod < 0.05f)
-                    nudgeZ = 0.2f; // Increased from 0.15f
+                    nudgeZ = 0.25f; // Increased from 0.2f
                 else if (zMod > World::CHUNK_SIZE - 0.05f)
-                    nudgeZ = -0.2f; // Increased from -0.15f
+                    nudgeZ = -0.25f; // Increased from -0.2f
                 
-                // Check for special case at exact boundary (like x=16.0)
-                if (std::abs(std::fmod(m_position.x, World::CHUNK_SIZE)) < 0.001f && 
-                    std::fmod(m_position.x, World::CHUNK_SIZE) > 0) {
-                    nudgeX = 0.25f; // Stronger nudge for exact boundaries
+                // Apply nudge toward the center of the current chunk when stuck
+                glm::ivec3 currentChunk = world->worldToChunkPos(m_position);
+                glm::vec3 chunkCenter(
+                    currentChunk.x * World::CHUNK_SIZE + World::CHUNK_SIZE * 0.5f,
+                    m_position.y, // Keep same Y
+                    currentChunk.z * World::CHUNK_SIZE + World::CHUNK_SIZE * 0.5f
+                );
+                
+                // Calculate vector toward chunk center
+                glm::vec3 towardCenter = chunkCenter - m_position;
+                if (glm::length(towardCenter) > 0.0f) {
+                    towardCenter = glm::normalize(towardCenter) * 0.25f;
+                    // Apply chunk-center nudge if we're close to a boundary
+                    if (std::abs(nudgeX) > 0.0f || std::abs(nudgeZ) > 0.0f) {
+                        // Combine calculated nudge with center-direction nudge
+                        m_position.x += (nudgeX + towardCenter.x) * 0.5f;
+                        m_position.z += (nudgeZ + towardCenter.z) * 0.5f;
+                    }
+                } else {
+                    // Fallback if we can't calculate toward center
+                    m_position.x += nudgeX;
+                    m_position.z += nudgeZ;
                 }
                 
-                if (std::abs(std::fmod(m_position.z, World::CHUNK_SIZE)) < 0.001f && 
-                    std::fmod(m_position.z, World::CHUNK_SIZE) > 0) {
-                    nudgeZ = 0.25f; // Stronger nudge for exact boundaries
-                }
-                
-                // Apply the nudge
-                m_position.x += nudgeX;
-                m_position.z += nudgeZ;
-                
-                // CRITICAL FIX: If we're still in a solid block after nudging, try to move upward
+                // If we're still in a solid block after nudging, try to move upward
                 if (world->getBlock(glm::ivec3(m_position)) > 0) {
                     m_position.y += 0.5f;
                     std::cout << "Applied upward nudge to escape stuck position" << std::endl;
                 }
+                
+                // Reset the smoothed position to match the new adjusted position
+                smoothedPosition = m_position;
                 
                 stuckTime = 0.0f; // Reset timer
             }

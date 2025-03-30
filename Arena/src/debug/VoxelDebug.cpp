@@ -6,12 +6,23 @@
 #include <sstream>
 #include <iomanip>
 #include <ctime>
+#include <cstdlib>
+#include <vector>
+#include <algorithm>
+#include <mutex>
 
 namespace Debug {
 
 // Static member initialization
 bool VoxelDebug::s_initialized = false;
 std::chrono::steady_clock::time_point VoxelDebug::s_startTime;
+
+namespace {
+    // Track player positions at chunk boundaries for jitter analysis
+    std::vector<PlayerBoundaryEvent> boundaryEvents;
+    std::mutex boundaryEventsMutex;
+    bool trackingBoundaries = false;
+}
 
 void VoxelDebug::initialize() {
     // Create the debug directory if it doesn't exist
@@ -214,13 +225,124 @@ void VoxelDebug::recordPlayerStuck(Player* player, const glm::vec3& position) {
     Core::StackTrace::recordTrace(context.str());
 }
 
-void VoxelDebug::recordStackTrace(const std::string& context) {
-    if (!s_initialized) {
-        initialize();
+void VoxelDebug::recordStackTrace(const std::string& contextMessage) {
+    // Create debug directory if it doesn't exist
+    std::system("mkdir -p debug_output");
+    
+    // Generate timestamp
+    std::time_t t = std::time(nullptr);
+    std::tm tm = *std::localtime(&t);
+    
+    // Format timestamp
+    std::stringstream timestamp;
+    timestamp << std::put_time(&tm, "%Y%m%d-%H%M%S");
+    
+    // Create filename with timestamp
+    std::string filename = "debug_output/stack_trace_" + timestamp.str() + ".txt";
+    
+    // Write context message
+    std::ofstream file(filename);
+    if (file.is_open()) {
+        file << "============ CONTEXT ============" << std::endl;
+        file << contextMessage << std::endl;
+        file << "========== STACK TRACE ==========" << std::endl;
+        file.close();
+        
+        // Generate stack trace using GDB and append to file
+        std::string cmd = "echo 'bt' | gdb -p $(pgrep VoxelGame) -batch >> " + filename + " 2>&1";
+        std::system(cmd.c_str());
+        
+        std::cout << "Stack trace saved to " << filename << std::endl;
+    } else {
+        std::cerr << "Failed to open file for stack trace: " << filename << std::endl;
+    }
+}
+
+void VoxelDebug::enableBoundaryTracking(bool enable) {
+    std::lock_guard<std::mutex> lock(boundaryEventsMutex);
+    trackingBoundaries = enable;
+    
+    if (enable) {
+        boundaryEvents.clear();
+        std::cout << "Chunk boundary tracking enabled" << std::endl;
+    } else if (!boundaryEvents.empty()) {
+        // Save boundary events to file when disabling tracking
+        saveChunkBoundaryEvents();
+    }
+}
+
+bool VoxelDebug::isBoundaryTrackingEnabled() {
+    return trackingBoundaries;
+}
+
+void VoxelDebug::recordBoundaryEvent(const glm::vec3& position, const glm::vec3& velocity, bool isAtXBoundary, bool isAtZBoundary, bool isAtYBoundary) {
+    if (!trackingBoundaries) return;
+    
+    std::lock_guard<std::mutex> lock(boundaryEventsMutex);
+    
+    auto now = std::chrono::high_resolution_clock::now();
+    auto timestamp = std::chrono::duration_cast<std::chrono::microseconds>(now.time_since_epoch()).count();
+    
+    PlayerBoundaryEvent event;
+    event.timestamp = timestamp;
+    event.position = position;
+    event.velocity = velocity;
+    event.isAtXBoundary = isAtXBoundary;
+    event.isAtZBoundary = isAtZBoundary;
+    event.isAtYBoundary = isAtYBoundary;
+    
+    boundaryEvents.push_back(event);
+    
+    // Print debugging info
+    if (boundaryEvents.size() % 100 == 0) {
+        std::cout << "Recorded " << boundaryEvents.size() << " boundary events" << std::endl;
     }
     
-    // Record the stack trace with the given context
-    Core::StackTrace::recordTrace(context);
+    // Automatically save if we have too many events
+    if (boundaryEvents.size() >= 10000) {
+        saveChunkBoundaryEvents();
+        boundaryEvents.clear();
+    }
+}
+
+void VoxelDebug::saveChunkBoundaryEvents() {
+    std::lock_guard<std::mutex> lock(boundaryEventsMutex);
+    
+    if (boundaryEvents.empty()) return;
+    
+    // Create debug directory if it doesn't exist
+    std::system("mkdir -p debug_output");
+    
+    // Generate timestamp
+    std::time_t t = std::time(nullptr);
+    std::tm tm = *std::localtime(&t);
+    
+    // Format timestamp
+    std::stringstream timestamp;
+    timestamp << std::put_time(&tm, "%Y%m%d-%H%M%S");
+    
+    // Create filename with timestamp
+    std::string filename = "debug_output/boundary_events_" + timestamp.str() + ".csv";
+    
+    // Write data
+    std::ofstream file(filename);
+    if (file.is_open()) {
+        file << "timestamp,pos_x,pos_y,pos_z,vel_x,vel_y,vel_z,x_boundary,z_boundary,y_boundary" << std::endl;
+        
+        for (const auto& event : boundaryEvents) {
+            file << event.timestamp << ","
+                 << event.position.x << "," << event.position.y << "," << event.position.z << ","
+                 << event.velocity.x << "," << event.velocity.y << "," << event.velocity.z << ","
+                 << (event.isAtXBoundary ? "1" : "0") << ","
+                 << (event.isAtZBoundary ? "1" : "0") << ","
+                 << (event.isAtYBoundary ? "1" : "0") << std::endl;
+        }
+        
+        file.close();
+        std::cout << "Saved " << boundaryEvents.size() << " boundary events to " << filename << std::endl;
+    } else {
+        std::cerr << "Failed to open file for boundary events: " << filename << std::endl;
+    }
 }
 
 } // namespace Debug 

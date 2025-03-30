@@ -335,7 +335,7 @@ void World::updateChunks(const glm::vec3& playerPos) {
     // Convert player position to chunk coordinates
     glm::ivec3 playerChunkPos = worldToChunkPos(playerPos);
     
-    // Keep track of chunks to load and unload
+    // Track chunks to load and unload
     std::vector<glm::ivec3> chunksToLoad;
     std::vector<glm::ivec3> chunksToUnload;
     
@@ -384,7 +384,8 @@ void World::updateChunks(const glm::vec3& playerPos) {
         int squaredDist = dx * dx + dz * dz;
         
         // Keep chunks that are within an extended unload distance to prevent frequent loading/unloading
-        int unloadDistance = m_viewDistance + 3;
+        // Increase unload distance to reduce chunk loading/unloading jitter
+        int unloadDistance = m_viewDistance + 4; // Increased from 3 to 4
         bool tooFarHorizontal = squaredDist > unloadDistance * unloadDistance;
         bool tooFarVertical = chunkPos.y < (playerChunkPos.y - 4) || chunkPos.y > (playerChunkPos.y + 6);
         
@@ -411,35 +412,56 @@ void World::updateChunks(const glm::vec3& playerPos) {
     // Update the pending chunk operations count
     m_pendingChunkOperations = chunksToLoad.size();
     
-    // Limit chunk operations per frame to avoid frame drops
-    const int maxChunksToLoadPerFrame = 2;
-    const int maxChunksToUnloadPerFrame = 2;
+    // Increase the number of chunks loaded per frame to reduce jittering
+    const int maxChunksToLoadPerFrame = 3; // Increased from 2 to 3
+    const int maxChunksToUnloadPerFrame = 2; // Keep this the same
     
-    // Always load the chunk the player is in first to prevent falling through ground
-    for (auto it = chunksToLoad.begin(); it != chunksToLoad.end();) {
-        if (*it == playerChunkPos || 
-            *it == glm::ivec3(playerChunkPos.x, playerChunkPos.y - 1, playerChunkPos.z)) {
-            loadChunk(*it);
-            it = chunksToLoad.erase(it);
-        } else {
-            ++it;
+    // Always load the chunk the player is in and adjacent chunks first to prevent falling through ground
+    // Add additional safety by loading more surrounding chunks
+    std::vector<glm::ivec3> criticalChunks = {
+        playerChunkPos, // Player's current chunk
+        glm::ivec3(playerChunkPos.x, playerChunkPos.y - 1, playerChunkPos.z), // Below player
+        glm::ivec3(playerChunkPos.x + 1, playerChunkPos.y, playerChunkPos.z), // +X
+        glm::ivec3(playerChunkPos.x - 1, playerChunkPos.y, playerChunkPos.z), // -X
+        glm::ivec3(playerChunkPos.x, playerChunkPos.y, playerChunkPos.z + 1), // +Z
+        glm::ivec3(playerChunkPos.x, playerChunkPos.y, playerChunkPos.z - 1)  // -Z
+    };
+    
+    // Process critical chunks first
+    for (const auto& chunkPos : criticalChunks) {
+        if (m_chunks.find(chunkPos) == m_chunks.end()) {
+            loadChunk(chunkPos);
+            
+            // Remove from chunksToLoad if it was there
+            auto it = std::find(chunksToLoad.begin(), chunksToLoad.end(), chunkPos);
+            if (it != chunksToLoad.end()) {
+                chunksToLoad.erase(it);
+            }
         }
     }
     
     // Load limited number of chunks per frame
     int chunksLoaded = 0;
-    for (const auto& chunkPos : chunksToLoad) {
-        if (chunksLoaded >= maxChunksToLoadPerFrame) break;
-        loadChunk(chunkPos);
+    auto it = chunksToLoad.begin();
+    while (it != chunksToLoad.end() && chunksLoaded < maxChunksToLoadPerFrame) {
+        loadChunk(*it);
         chunksLoaded++;
+        it = chunksToLoad.erase(it);
     }
     
-    // Unload limited number of chunks per frame
+    // Delay unloading chunks to reduce jitter - only unload if we're not actively loading
+    // This prioritizes loading over unloading to keep the game smoother
     int chunksUnloaded = 0;
-    for (const auto& chunkPos : chunksToUnload) {
-        if (chunksUnloaded >= maxChunksToUnloadPerFrame) break;
-        unloadChunk(chunkPos);
-        chunksUnloaded++;
+    if (chunksLoaded < maxChunksToLoadPerFrame) {
+        for (const auto& chunkPos : chunksToUnload) {
+            if (chunksUnloaded >= maxChunksToUnloadPerFrame) break;
+            
+            // Don't unload critical chunks around the player
+            if (std::find(criticalChunks.begin(), criticalChunks.end(), chunkPos) == criticalChunks.end()) {
+                unloadChunk(chunkPos);
+                chunksUnloaded++;
+            }
+        }
     }
     
     // Update pending chunk operations count after processing
@@ -463,38 +485,68 @@ glm::ivec3 World::worldToChunkPos(const glm::vec3& worldPos) const {
 }
 
 glm::ivec3 World::worldToLocalPos(const glm::vec3& worldPos) const {
-    // CRITICAL FIX: When the position is exactly at a chunk boundary
-    // (like x=16.0 which is technically 0 in the next chunk),
-    // we need special handling to ensure consistency
+    // More robust handling of coordinate conversion that reduces jitter at boundaries
     
-    int localX = static_cast<int>(std::floor(worldPos.x)) % CHUNK_SIZE;
-    int localY = static_cast<int>(std::floor(worldPos.y)) % CHUNK_HEIGHT;
-    int localZ = static_cast<int>(std::floor(worldPos.z)) % CHUNK_SIZE;
+    // First, calculate the chunk coordinate
+    glm::ivec3 chunkPos = worldToChunkPos(worldPos);
     
-    // Handle negative coordinates
-    if (worldPos.x < 0 && localX != 0) localX += CHUNK_SIZE;
-    if (worldPos.y < 0 && localY != 0) localY += CHUNK_HEIGHT;
-    if (worldPos.z < 0 && localZ != 0) localZ += CHUNK_SIZE;
+    // Calculate local coordinates within the chunk
+    int localX = static_cast<int>(std::floor(worldPos.x)) - (chunkPos.x * CHUNK_SIZE);
+    int localY = static_cast<int>(std::floor(worldPos.y)) - (chunkPos.y * CHUNK_HEIGHT);
+    int localZ = static_cast<int>(std::floor(worldPos.z)) - (chunkPos.z * CHUNK_SIZE);
     
-    // Check for exact chunk boundary cases (e.g. exactly at x=16.0, z=16.0)
-    // In these cases, we want to ensure they're treated as the 0 coordinate
-    // of the next chunk, not as 16 of the current chunk
-    if (std::abs(std::fmod(worldPos.x, CHUNK_SIZE)) < 0.001f && 
-        std::fmod(worldPos.x, CHUNK_SIZE) > 0) {
-        // Move to previous chunk's edge if we're at exact boundary
-        localX = 0;
-    }
+    // Handle negative coordinates more robustly
+    if (localX < 0) localX += CHUNK_SIZE;
+    if (localY < 0) localY += CHUNK_HEIGHT;
+    if (localZ < 0) localZ += CHUNK_SIZE;
     
-    if (std::abs(std::fmod(worldPos.y, CHUNK_HEIGHT)) < 0.001f && 
-        std::fmod(worldPos.y, CHUNK_HEIGHT) > 0) {
-        // Move to previous chunk's edge if we're at exact boundary
-        localY = 0;
-    }
+    // Ensure the values are within valid range for the chunk
+    localX = glm::clamp(localX, 0, CHUNK_SIZE - 1);
+    localY = glm::clamp(localY, 0, CHUNK_HEIGHT - 1);
+    localZ = glm::clamp(localZ, 0, CHUNK_SIZE - 1);
     
-    if (std::abs(std::fmod(worldPos.z, CHUNK_SIZE)) < 0.001f && 
-        std::fmod(worldPos.z, CHUNK_SIZE) > 0) {
-        // Move to previous chunk's edge if we're at exact boundary
-        localZ = 0;
+    // Handle the special case of exact chunk boundaries
+    // If position is exactly at a chunk border, assign it to the appropriate chunk
+    const float EPSILON = 0.0001f;
+    
+    // Check if position is exactly at chunk boundaries
+    bool xAtBoundary = std::abs(std::fmod(worldPos.x, CHUNK_SIZE)) < EPSILON || 
+                      std::abs(std::fmod(worldPos.x, CHUNK_SIZE) - CHUNK_SIZE) < EPSILON;
+    bool yAtBoundary = std::abs(std::fmod(worldPos.y, CHUNK_HEIGHT)) < EPSILON || 
+                      std::abs(std::fmod(worldPos.y, CHUNK_HEIGHT) - CHUNK_HEIGHT) < EPSILON;
+    bool zAtBoundary = std::abs(std::fmod(worldPos.z, CHUNK_SIZE)) < EPSILON || 
+                      std::abs(std::fmod(worldPos.z, CHUNK_SIZE) - CHUNK_SIZE) < EPSILON;
+                      
+    // If we're exactly at a boundary, make a consistent choice about which chunk it belongs to
+    if (xAtBoundary || yAtBoundary || zAtBoundary) {
+        // Assign more consistently based on the fractional part
+        // For coordinates like 16.0, 32.0, etc., use the next chunk
+        if (xAtBoundary) {
+            float xFrac = worldPos.x - std::floor(worldPos.x);
+            if (xFrac < EPSILON && std::floor(worldPos.x) > 0 && 
+                std::fmod(std::floor(worldPos.x), CHUNK_SIZE) == 0) {
+                // At upper boundary like 16.0, 32.0 - we're at x=0 of the next chunk
+                localX = 0;
+            }
+        }
+        
+        if (yAtBoundary) {
+            float yFrac = worldPos.y - std::floor(worldPos.y);
+            if (yFrac < EPSILON && std::floor(worldPos.y) > 0 && 
+                std::fmod(std::floor(worldPos.y), CHUNK_HEIGHT) == 0) {
+                // At upper boundary like 16.0, 32.0 - we're at y=0 of the next chunk 
+                localY = 0;
+            }
+        }
+        
+        if (zAtBoundary) {
+            float zFrac = worldPos.z - std::floor(worldPos.z);
+            if (zFrac < EPSILON && std::floor(worldPos.z) > 0 && 
+                std::fmod(std::floor(worldPos.z), CHUNK_SIZE) == 0) {
+                // At upper boundary like 16.0, 32.0 - we're at z=0 of the next chunk
+                localZ = 0;
+            }
+        }
     }
     
     return glm::ivec3(localX, localY, localZ);
