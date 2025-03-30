@@ -468,7 +468,7 @@ void Player::handleInput(float deltaTime, World* world) {
             movement.y += m_moveSpeed * deltaTime * 1.5f;
             
             // Consume fuel
-            m_jetpackFuel = std::max(0.0f, m_jetpackFuel - 15.0f * deltaTime);
+            m_jetpackFuel = std::max(0.0f, m_jetpackFuel - 7.5f * deltaTime);
             
             if (m_jetpackFuel <= 0) {
                 std::cout << "Jetpack out of fuel!" << std::endl;
@@ -482,12 +482,12 @@ void Player::handleInput(float deltaTime, World* world) {
     }
     
     // Fly down with Shift when jetpack is enabled
-    if (m_jetpackEnabled && m_jetpackFuel > 0 && glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
+    if (m_jetpackEnabled && m_jetpackFuel > 0 && (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS)) {
         m_isFlying = true;
         movement.y -= m_moveSpeed * deltaTime;
         
         // Consume less fuel when descending
-        m_jetpackFuel = std::max(0.0f, m_jetpackFuel - 5.0f * deltaTime);
+        m_jetpackFuel = std::max(0.0f, m_jetpackFuel - 2.5f * deltaTime);
     }
     
     // Recharge jetpack when not flying
@@ -583,7 +583,7 @@ void Player::jump() {
         m_velocity.y = std::max(m_velocity.y + 5.0f, 10.0f); // Increased from 8.0f to maintain advantage over regular jump
         
         // Consume fuel for the boost
-        m_jetpackFuel = std::max(0.0f, m_jetpackFuel - 5.0f);
+        m_jetpackFuel = std::max(0.0f, m_jetpackFuel - 2.5f);
         
         // Activate flying mode
         m_isFlying = true;
