@@ -6,21 +6,44 @@
 #include <deque>
 #include "Chunk.hpp"
 #include "WorldGenerator.hpp"
+#include <string>
 
-// Hash function for glm::ivec3 to use in unordered_map (for 3D chunk coordinates)
-struct ChunkPosHash {
-    size_t operator()(const glm::ivec3& pos) const {
-        return std::hash<int>()(pos.x) ^ 
-               (std::hash<int>()(pos.y) << 1) ^ 
-               (std::hash<int>()(pos.z) << 2);
-    }
-};
+// Custom hash for glm::ivec3
+namespace std {
+    template<>
+    struct hash<glm::ivec3> {
+        size_t operator()(const glm::ivec3& vec) const {
+            // Combine the hash of the components
+            size_t h1 = hash<int>()(vec.x);
+            size_t h2 = hash<int>()(vec.y);
+            size_t h3 = hash<int>()(vec.z);
+            return h1 ^ (h2 << 1) ^ (h3 << 2);
+        }
+    };
+}
 
 class World {
 public:
     static const int CHUNK_SIZE = 16;
     static const int CHUNK_HEIGHT = 16; // Changed to match Chunk's height
     
+    // Modified block tracking
+    struct ModifiedBlock {
+        glm::ivec3 position;
+        int oldType;
+        int newType;
+        double timeModified;
+    };
+    
+    // Raycast result struct
+    struct RaycastResult {
+        bool hit;
+        glm::ivec3 blockPos;
+        glm::vec3 hitPoint;
+        glm::vec3 faceNormal;
+        float distance;
+    };
+
     World(uint64_t seed);
     ~World();
 
@@ -39,12 +62,12 @@ public:
     bool checkPlayerPhysicsUpdate(const glm::vec3& playerPosition, float playerWidth, float playerHeight);
     
     // Serialization
-    bool saveToFile(const std::string& filename);
-    bool loadFromFile(const std::string& filename);
+    bool serialize(const std::string& filename) const;
+    bool deserialize(const std::string& filename);
 
     // Chunk management
     void updateChunks(const glm::vec3& playerPos);
-    const std::unordered_map<glm::ivec3, std::unique_ptr<Chunk>, ChunkPosHash>& getChunks() const { return m_chunks; }
+    const std::unordered_map<glm::ivec3, std::unique_ptr<Chunk>>& getChunks() const { return m_chunks; }
     
     // Coordinate conversion
     glm::ivec3 worldToChunkPos(const glm::vec3& worldPos) const;
@@ -54,39 +77,38 @@ public:
     void updateChunkMeshes(const glm::ivec3& chunkPos, bool disableGreedyMeshing = false);
     
     // Greedy meshing control
-    void setDisableGreedyMeshing(bool disable) { m_disableGreedyMeshing = disable; }
-    bool isGreedyMeshingDisabled() const { return m_disableGreedyMeshing; }
+    void setGreedyMeshingEnabled(bool enabled) { m_disableGreedyMeshing = !enabled; }
+    bool isGreedyMeshingEnabled() const { return !m_disableGreedyMeshing; }
+
+    // View distance
+    void setViewDistance(int distance) { m_viewDistance = distance; }
+    int getViewDistance() const { return m_viewDistance; }
 
     // Raycast functionality
-    struct RaycastResult {
-        glm::ivec3 blockPos;  // Position of the hit block
-        glm::ivec3 faceNormal;  // Normal of the hit face
-        float distance;  // Distance to the hit point
-        bool hit;  // Whether the ray hit anything
-    };
-    RaycastResult raycast(const glm::vec3& start, const glm::vec3& direction, float maxDistance = 5.0f) const;
+    RaycastResult raycast(const glm::vec3& start, const glm::vec3& direction, float maxDistance) const;
+
+    // Get seed
+    uint64_t getSeed() const { return m_seed; }
+
+    // Returns the approximate count of pending chunk operations
+    int getPendingChunksCount() const;
 
 private:
-    // Structure to track modified blocks for physics updates
-    struct ModifiedBlock {
-        glm::ivec3 position;    // World position of the block
-        int oldType;            // Previous block type
-        int newType;            // New block type
-        double timeModified;    // Time when the block was modified
-    };
-    
     Chunk* getChunkAt(const glm::ivec3& chunkPos);
 
-    std::unordered_map<glm::ivec3, std::unique_ptr<Chunk>, ChunkPosHash> m_chunks;
+    std::unordered_map<glm::ivec3, std::unique_ptr<Chunk>> m_chunks;
     std::unique_ptr<WorldGenerator> m_worldGenerator;
     uint64_t m_seed;
     
-    // View distance in chunks
+    // Track recently modified blocks for physics updates
+    std::deque<ModifiedBlock> m_recentlyModifiedBlocks;
+    
+    // View distance (in chunks)
     int m_viewDistance;
     
-    // Global greedy meshing setting
-    bool m_disableGreedyMeshing = false;
+    // Disable greedy meshing (for debugging)
+    bool m_disableGreedyMeshing;
     
-    // List of recently modified blocks for physics updates
-    std::deque<ModifiedBlock> m_recentlyModifiedBlocks;
+    // To track pending chunk operations
+    mutable int m_pendingChunkOperations;
 }; 

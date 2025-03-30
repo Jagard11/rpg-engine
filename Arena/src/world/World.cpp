@@ -10,6 +10,7 @@ World::World(uint64_t seed)
     : m_seed(seed)
     , m_viewDistance(8)
     , m_disableGreedyMeshing(false)  // Enable greedy meshing by default
+    , m_pendingChunkOperations(0)
 {
     m_worldGenerator = std::make_unique<WorldGenerator>(seed);
     std::cout << "World created with seed: " << seed << std::endl;
@@ -224,7 +225,7 @@ void World::setBlock(const glm::ivec3& worldPos, int blockType) {
     }
 }
 
-bool World::saveToFile(const std::string& filename) {
+bool World::serialize(const std::string& filename) const {
     // Create directories for the save file and chunk data
     std::filesystem::path saveDir = std::filesystem::path(filename).parent_path();
     std::filesystem::create_directories(saveDir);
@@ -273,7 +274,7 @@ bool World::saveToFile(const std::string& filename) {
     return true;
 }
 
-bool World::loadFromFile(const std::string& filename) {
+bool World::deserialize(const std::string& filename) {
     std::ifstream file(filename, std::ios::binary);
     if (!file.is_open()) {
         std::cerr << "Failed to open file for reading: " << filename << std::endl;
@@ -407,6 +408,9 @@ void World::updateChunks(const glm::vec3& playerPos) {
         }
     }
     
+    // Update the pending chunk operations count
+    m_pendingChunkOperations = chunksToLoad.size();
+    
     // Limit chunk operations per frame to avoid frame drops
     const int maxChunksToLoadPerFrame = 2;
     const int maxChunksToUnloadPerFrame = 2;
@@ -438,12 +442,15 @@ void World::updateChunks(const glm::vec3& playerPos) {
         chunksUnloaded++;
     }
     
+    // Update pending chunk operations count after processing
+    m_pendingChunkOperations = chunksToLoad.size() - chunksLoaded;
+    
     // Only log if operations were performed
     if (chunksLoaded > 0 || chunksUnloaded > 0) {
         std::cout << "Updated chunks: loaded " << chunksLoaded 
                   << ", unloaded " << chunksUnloaded
                   << ", total active: " << m_chunks.size() 
-                  << ", remaining to load: " << (chunksToLoad.size() - chunksLoaded) << std::endl;
+                  << ", remaining to load: " << m_pendingChunkOperations << std::endl;
     }
 }
 
@@ -807,4 +814,12 @@ bool World::checkPlayerPhysicsUpdate(const glm::vec3& playerPosition, float play
     }
     
     return false;
+}
+
+int World::getPendingChunksCount() const {
+    // This is an approximation since we don't have a queue of pending chunks
+    // Instead we'll estimate based on current operations and what chunks should be loaded
+    
+    // Get a copy of the last known pending count
+    return m_pendingChunkOperations;
 } 

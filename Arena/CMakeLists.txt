@@ -41,6 +41,7 @@ set(SOURCES
     src/debug/DebugMenu.cpp
     src/debug/DebugUtils.cpp
     src/debug/VoxelDebug.cpp
+    src/debug/DebugStats.cpp
     src/stb_image_impl.cpp
     src/texture/TextureManager.cpp
 )
@@ -64,6 +65,7 @@ set(HEADERS
     include/debug/DebugMenu.hpp
     include/debug/DebugUtils.hpp
     include/debug/VoxelDebug.hpp
+    include/debug/DebugStats.hpp
 )
 
 # Create executable

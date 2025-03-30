@@ -92,7 +92,7 @@ bool VoxelManipulator::addVoxel(World* world, Player* player, const World::Rayca
     }
     
     // Get block position in front of face (add face normal to block position)
-    glm::ivec3 newBlockPos = raycastResult.blockPos + raycastResult.faceNormal;
+    glm::ivec3 newBlockPos = raycastResult.blockPos + glm::ivec3(raycastResult.faceNormal);
     
     // Check if placement is valid (not inside player, etc.)
     if (!isValidPlacement(world, newBlockPos)) {

@@ -30,6 +30,7 @@ Game::Game()
     , m_isRunning(false)
     , m_isInGame(false)
     , m_fps(0)
+    , m_debugStats(nullptr)
 {
     // Store the global instance for callbacks
     g_gameInstance = this;
@@ -104,6 +105,10 @@ bool Game::initialize() {
 
         // Initialize debug menu
         initializeDebugMenu();
+        
+        // Initialize debug stats
+        m_debugStats = std::make_unique<Debug::DebugStats>();
+        m_debugStats->initialize(m_window->getHandle(), this);
 
         // Initialize player
         m_player = std::make_unique<Player>();
@@ -175,6 +180,11 @@ void Game::update(float deltaTime) {
         m_debugMenu->update(deltaTime);
     }
     
+    // Update debug stats
+    if (m_debugStats) {
+        m_debugStats->update(deltaTime);
+    }
+    
     if (m_isInGame && m_world && m_player && !m_splashScreen->isActive()) {
         m_player->update(deltaTime, m_world.get());
         m_world->updateChunks(m_player->getPosition());
@@ -222,6 +232,11 @@ void Game::render() {
     // UI elements come next
     if (m_splashScreen && m_splashScreen->isActive()) {
         m_splashScreen->render();
+    }
+    
+    // Debug stats are rendered before debug menu
+    if (m_debugStats && m_isInGame) {
+        m_debugStats->render();
     }
     
     // Debug menu is rendered last
@@ -389,6 +404,12 @@ void Game::handleInput(float deltaTime) {
         }
     }
     
+    // Check for F9 key to toggle debug stats
+    if (m_debugStats && m_window->isKeyJustPressed(GLFW_KEY_F9)) {
+        m_debugStats->toggleVisibility();
+        std::cout << "Debug stats " << (m_debugStats->isVisible() ? "enabled" : "disabled") << std::endl;
+    }
+    
     // Check for F12 key to dump debug information
     if (m_window->isKeyJustPressed(GLFW_KEY_F12)) {
         std::cout << "F12 pressed - Dumping debug information..." << std::endl;
@@ -401,7 +422,7 @@ void Game::handleInput(float deltaTime) {
         
         // Handle special keys
         for (int key : {GLFW_KEY_ENTER, GLFW_KEY_BACKSPACE, GLFW_KEY_ESCAPE, 
-                       GLFW_KEY_UP, GLFW_KEY_DOWN}) {
+                  GLFW_KEY_UP, GLFW_KEY_DOWN, GLFW_KEY_TAB}) {
             if (m_window->isKeyJustPressed(key)) {
                 if (m_debugMenu->handleKeyPress(key, GLFW_PRESS)) {
                     return; // Key was handled by debug menu
@@ -443,14 +464,6 @@ void Game::handleInput(float deltaTime) {
                 if (m_window->isKeyJustPressed(key)) {
                     m_splashScreen->handleInput(key, GLFW_PRESS);
                 }
-            }
-            
-            // Also handle backspace and enter
-            if (m_window->isKeyJustPressed(GLFW_KEY_BACKSPACE)) {
-                m_splashScreen->handleInput(GLFW_KEY_BACKSPACE, GLFW_PRESS);
-            }
-            if (m_window->isKeyJustPressed(GLFW_KEY_ENTER)) {
-                m_splashScreen->handleInput(GLFW_KEY_ENTER, GLFW_PRESS);
             }
         }
     }
@@ -508,64 +521,51 @@ void Game::createNewWorld(uint64_t seed) {
 }
 
 bool Game::loadWorld(const std::string& savePath) {
-    try {
-        std::cout << "Loading world from: " << savePath << std::endl;
-        m_world = std::make_unique<World>(0); // Seed will be overwritten by load
-        if (!m_world->loadFromFile(savePath)) {
-            std::cerr << "Failed to load world from file: " << savePath << std::endl;
-            return false;
-        }
-        
-        m_player = std::make_unique<Player>();
-        
-        // Load player data too if available
-        std::string playerSavePath = savePath + ".player";
-        if (std::filesystem::exists(playerSavePath)) {
-            m_player->loadFromFile(playerSavePath);
-        }
-        
-        // Reinitialize renderer buffers to fix the "Cannot render world - buffers not initialized" error
-        if (m_renderer) {
-            std::cout << "Reinitializing renderer buffers after game load..." << std::endl;
-            m_renderer->setupBuffers();
-        }
-        
-        // Initialize voxel manipulator with the loaded world
-        if (m_voxelManipulator) {
-            m_voxelManipulator->initialize(m_world.get());
-        }
-        
-        m_isInGame = true;
-        
-        // Lock cursor for game mode
-        m_window->setInputMode(GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-        return true;
-    }
-    catch (const std::exception& e) {
-        std::cerr << "Exception while loading world: " << e.what() << std::endl;
+    // Ensure the save directory exists
+    std::filesystem::create_directories(std::filesystem::path(savePath).parent_path());
+    
+    // Create a new world with seed 0 (will be overwritten by load)
+    m_world = std::make_unique<World>(0);
+    
+    // Try to load world data
+    if (!m_world->deserialize(savePath)) {
+        std::cerr << "Failed to load world: " << savePath << std::endl;
         return false;
     }
+    
+    // Load player data if it exists
+    std::string playerSavePath = savePath + ".player";
+    if (std::filesystem::exists(playerSavePath)) {
+        m_player = std::make_unique<Player>();
+        m_player->loadFromFile(playerSavePath);
+    } else {
+        // Create a new player at a reasonable position
+        m_player = std::make_unique<Player>();
+        m_player->setPosition(glm::vec3(0.0f, 100.0f, 0.0f));
+    }
+    
+    // Initialize chunks around player
+    if (m_world && m_player) {
+        m_world->updateChunks(m_player->getPosition());
+    }
+    
+    return true;
 }
 
 void Game::saveWorld(const std::string& savePath) {
-    if (m_world && m_player) {
-        try {
-            std::cout << "Saving world to: " << savePath << std::endl;
-            
-            // Create saves directory if it doesn't exist
-            std::filesystem::path saveDir = std::filesystem::path(savePath).parent_path();
-            if (!std::filesystem::exists(saveDir)) {
-                std::filesystem::create_directories(saveDir);
-            }
-            
-            // Save world and player data
-            m_world->saveToFile(savePath);
-            m_player->saveToFile(savePath + ".player");
-        }
-        catch (const std::exception& e) {
-            std::cerr << "Error saving world: " << e.what() << std::endl;
-        }
+    if (!m_world || !m_player) {
+        std::cerr << "Cannot save world: world or player is null" << std::endl;
+        return;
     }
+    
+    // Ensure the save directory exists
+    std::filesystem::create_directories(std::filesystem::path(savePath).parent_path());
+    
+    // Save world data
+    m_world->serialize(savePath);
+    m_player->saveToFile(savePath + ".player");
+    
+    std::cout << "World saved to: " << savePath << std::endl;
 }
 
 void Game::cleanup() {
@@ -579,99 +579,120 @@ void Game::initializeDebugMenu() {
     m_debugMenu = std::make_unique<Debug::DebugMenu>();
     m_debugMenu->initialize(m_window->getHandle(), this);
     
-    // Register debug commands
-    m_debugMenu->registerCommand("tp", "Teleport player to x y z coordinates",
+    // Register command to toggle flying mode
+    m_debugMenu->registerCommand("fly", "Toggle flying mode (no gravity)",
         [this](const std::vector<std::string>& args) {
-            if (args.size() < 4) {
+            if (m_player) {
+                m_player->toggleFlying();
+                m_debugMenu->commandOutput("Flying mode " + 
+                    std::string(m_player->isFlying() ? "enabled" : "disabled"));
+            } else {
+                m_debugMenu->commandOutput("No player exists!");
+            }
+        });
+    
+    // Register command to toggle collision
+    m_debugMenu->registerCommand("noclip", "Toggle collision detection",
+        [this](const std::vector<std::string>& args) {
+            if (m_player) {
+                bool currentCollision = m_player->hasCollision();
+                m_player->setCollision(!currentCollision);
+                m_debugMenu->commandOutput("Collision " + 
+                    std::string(!currentCollision ? "enabled" : "disabled"));
+            } else {
+                m_debugMenu->commandOutput("No player exists!");
+            }
+        });
+        
+    // Register command to toggle greedy meshing
+    m_debugMenu->registerCommand("greedy", "Toggle greedy meshing algorithm",
+        [this](const std::vector<std::string>& args) {
+            if (m_world) {
+                bool currentState = m_world->isGreedyMeshingEnabled();
+                m_world->setGreedyMeshingEnabled(!currentState);
+                m_debugMenu->commandOutput("Greedy meshing " + 
+                    std::string(!currentState ? "enabled" : "disabled"));
+            } else {
+                m_debugMenu->commandOutput("No world exists!");
+            }
+        });
+        
+    // Register command to change view distance
+    m_debugMenu->registerCommand("viewdist", "Set view distance in chunks (e.g., 'viewdist 8')",
+        [this](const std::vector<std::string>& args) {
+            if (args.size() < 1) {
+                m_debugMenu->commandOutput("Usage: viewdist <distance>");
+                return;
+            }
+            
+            try {
+                int distance = std::stoi(args[0]);
+                if (distance < 1) distance = 1;
+                if (distance > 16) distance = 16; // Cap at 16 chunks for performance
+                
+                if (m_world) {
+                    m_world->setViewDistance(distance);
+                    m_debugMenu->commandOutput("View distance set to " + std::to_string(distance) + " chunks");
+                } else {
+                    m_debugMenu->commandOutput("No world exists!");
+                }
+            } catch (const std::exception& e) {
+                m_debugMenu->commandOutput("Invalid distance. Usage: viewdist <distance>");
+            }
+        });
+        
+    // Register command to get current position
+    m_debugMenu->registerCommand("pos", "Display current player position",
+        [this](const std::vector<std::string>& args) {
+            if (m_player) {
+                const glm::vec3& pos = m_player->getPosition();
+                std::stringstream ss;
+                ss << "Position: X=" << pos.x << ", Y=" << pos.y << ", Z=" << pos.z;
+                m_debugMenu->commandOutput(ss.str());
+            } else {
+                m_debugMenu->commandOutput("No player exists!");
+            }
+        });
+        
+    // Register command to toggle stats display
+    m_debugMenu->registerCommand("stats", "Toggle debug statistics display",
+        [this](const std::vector<std::string>& args) {
+            if (m_debugStats) {
+                m_debugStats->toggleVisibility();
+                m_debugMenu->commandOutput("Debug stats " + 
+                    std::string(m_debugStats->isVisible() ? "enabled" : "disabled"));
+            } else {
+                m_debugMenu->commandOutput("Debug stats not available!");
+            }
+        });
+        
+    // Register command to teleport
+    m_debugMenu->registerCommand("tp", "Teleport to coordinates (e.g., 'tp 0 100 0')",
+        [this](const std::vector<std::string>& args) {
+            if (args.size() < 3) {
                 m_debugMenu->commandOutput("Usage: tp <x> <y> <z>");
                 return;
             }
             
             try {
-                float x = std::stof(args[1]);
-                float y = std::stof(args[2]);
-                float z = std::stof(args[3]);
+                float x = std::stof(args[0]);
+                float y = std::stof(args[1]);
+                float z = std::stof(args[2]);
                 
                 if (m_player) {
                     m_player->setPosition(glm::vec3(x, y, z));
-                    m_debugMenu->commandOutput("Teleported to (" + args[1] + ", " + args[2] + ", " + args[3] + ")");
+                    std::stringstream ss;
+                    ss << "Teleported to X=" << x << ", Y=" << y << ", Z=" << z;
+                    m_debugMenu->commandOutput(ss.str());
                 } else {
-                    m_debugMenu->commandOutput("ERROR: Player not initialized");
+                    m_debugMenu->commandOutput("No player exists!");
                 }
             } catch (const std::exception& e) {
-                m_debugMenu->commandOutput("ERROR: Invalid coordinates");
+                m_debugMenu->commandOutput("Invalid coordinates. Usage: tp <x> <y> <z>");
             }
         });
-    
-    m_debugMenu->registerCommand("fly", "Toggle player flying mode",
-        [this](const std::vector<std::string>& args) {
-            if (m_player) {
-                bool isFlying = m_player->isFlying();
-                m_player->setFlying(!isFlying);
-                m_debugMenu->commandOutput(std::string("Flying mode ") + (!isFlying ? "ENABLED" : "DISABLED"));
-            } else {
-                m_debugMenu->commandOutput("ERROR: Player not initialized");
-            }
-        });
-    
-    m_debugMenu->registerCommand("noclip", "Toggle player collision",
-        [this](const std::vector<std::string>& args) {
-            if (m_player) {
-                bool hasCollision = m_player->hasCollision();
-                m_player->setCollision(!hasCollision);
-                m_debugMenu->commandOutput(std::string("Collision ") + (!hasCollision ? "ENABLED" : "DISABLED"));
-            } else {
-                m_debugMenu->commandOutput("ERROR: Player not initialized");
-            }
-        });
-        
-    // Add renderer debug commands
-    m_debugMenu->registerCommand("toggle_backface", "Toggle backface culling",
-        [this](const std::vector<std::string>& args) {
-            if (m_renderer) {
-                bool isDisabled = m_renderer->isBackfaceCullingDisabled();
-                m_renderer->setDisableBackfaceCulling(!isDisabled);
-                m_debugMenu->commandOutput(std::string("Backface culling ") + 
-                    (isDisabled ? "ENABLED" : "DISABLED"));
-            } else {
-                m_debugMenu->commandOutput("ERROR: Renderer not initialized");
-            }
-        });
-    
-    m_debugMenu->registerCommand("toggle_greedy", "Toggle greedy meshing",
-        [this](const std::vector<std::string>& args) {
-            if (m_renderer && m_world) {
-                bool isDisabled = m_renderer->isGreedyMeshingDisabled();
-                
-                // Toggle the setting in both renderer and world
-                m_renderer->setDisableGreedyMeshing(!isDisabled);
-                m_world->setDisableGreedyMeshing(!isDisabled);
-                
-                m_debugMenu->commandOutput(std::string("Greedy meshing ") + 
-                    (isDisabled ? "ENABLED" : "DISABLED"));
-                
-                // Regenerate meshes for all visible chunks
-                glm::ivec3 playerChunkPos = m_world->worldToChunkPos(m_player->getPosition());
-                m_debugMenu->commandOutput("Regenerating meshes for visible chunks...");
-                
-                // Increase the radius to ensure proper rendering of visible chunks
-                const int REGEN_RADIUS = 4; // Increased from 2 to 4
-                for (int x = -REGEN_RADIUS; x <= REGEN_RADIUS; x++) {
-                    for (int y = -REGEN_RADIUS; y <= REGEN_RADIUS; y++) {
-                        for (int z = -REGEN_RADIUS; z <= REGEN_RADIUS; z++) {
-                            glm::ivec3 chunkPos = playerChunkPos + glm::ivec3(x, y, z);
-                            m_world->updateChunkMeshes(chunkPos, !isDisabled);
-                        }
-                    }
-                }
-                
-                m_debugMenu->commandOutput("Mesh regeneration complete");
-            } else {
-                m_debugMenu->commandOutput("ERROR: Renderer or World not initialized");
-            }
-        });
-    
-    // Pass the debug menu to the renderer
+
+    // Pass the debug menu to the renderer if needed
     if (m_renderer) {
         m_renderer->setDebugMenu(m_debugMenu.get());
     }
