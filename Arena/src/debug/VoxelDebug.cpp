@@ -178,6 +178,181 @@ void VoxelDebug::dumpDebugInfo(World* world, Player* player) {
     
     std::cout << "Debug information dumped to " << filename.str() << std::endl;
     std::cout << "Stack traces dumped to " << traceFilename << std::endl;
+    
+    // Generate chunk report
+    generateChunkReport(world, player);
+}
+
+std::string VoxelDebug::generateChunkReport(World* world, Player* player, int radius) {
+    if (!s_initialized) {
+        initialize();
+    }
+    
+    if (!world || !player) {
+        std::cerr << "Cannot generate chunk report: world or player is null" << std::endl;
+        return "";
+    }
+    
+    // Generate a filename with the current timestamp
+    auto now = std::chrono::system_clock::now();
+    auto time_t = std::chrono::system_clock::to_time_t(now);
+    std::stringstream filename;
+    filename << DEBUG_DIR << "/chunk_report_" 
+             << std::put_time(std::localtime(&time_t), "%Y%m%d_%H%M%S") << ".log";
+    
+    // Open the report file
+    std::ofstream reportFile(filename.str());
+    if (!reportFile.is_open()) {
+        std::cerr << "Failed to open chunk report file: " << filename.str() << std::endl;
+        return "";
+    }
+    
+    // Write report header
+    reportFile << "===== Chunk Debug Report =====" << std::endl;
+    reportFile << "Timestamp: " << std::put_time(std::localtime(&time_t), "%Y-%m-%d %H:%M:%S") << std::endl;
+    reportFile << "Player Position: " << player->getPosition().x << ", " 
+               << player->getPosition().y << ", " << player->getPosition().z << std::endl;
+    
+    // Get current player chunk position
+    glm::ivec3 playerChunkPos = world->worldToChunkPos(player->getPosition());
+    reportFile << "Player Chunk: (" << playerChunkPos.x << ", " 
+               << playerChunkPos.y << ", " << playerChunkPos.z << ")" << std::endl;
+    reportFile << "Reporting chunks within " << radius << " chunks horizontally" << std::endl;
+    reportFile << std::endl;
+    
+    // Get all loaded chunks
+    const auto& chunks = world->getChunks();
+    
+    // Header for the chunk table
+    reportFile << "=============================================================================" << std::endl;
+    reportFile << "Chunk Position | Loaded | Rendered | Vertices | Indices | Modified | Dirty  " << std::endl;
+    reportFile << "=============================================================================" << std::endl;
+    
+    // Determine min/max Y values to scan all vertical chunks
+    int minY = 0;  // Bottom of the world
+    int maxY = 16; // Top of the world (adjust if your world is taller)
+    
+    // Track statistics
+    int totalReported = 0;
+    int loadedCount = 0;
+    int visibleCount = 0;
+    int dirtyCount = 0;
+    int modifiedCount = 0;
+    
+    // For each chunk in the specified radius
+    for (int y = minY; y < maxY; y++) {
+        reportFile << "\n--- Layer Y = " << y << " ---" << std::endl;
+        
+        for (int z = playerChunkPos.z - radius; z <= playerChunkPos.z + radius; z++) {
+            for (int x = playerChunkPos.x - radius; x <= playerChunkPos.x + radius; x++) {
+                glm::ivec3 chunkPos(x, y, z);
+                bool isLoaded = chunks.find(chunkPos) != chunks.end();
+                
+                // Get info about this chunk
+                std::string loadedStatus = isLoaded ? "YES" : "NO";
+                std::string renderedStatus = "NO"; // Default
+                int vertexCount = 0;
+                int indexCount = 0;
+                bool isModified = false;
+                bool isDirty = false;
+                
+                // If chunk is loaded, get more detailed information
+                if (isLoaded) {
+                    const auto& chunk = chunks.at(chunkPos);
+                    vertexCount = chunk->getMeshVertices().size() / 5; // Assuming 5 floats per vertex
+                    indexCount = chunk->getMeshIndices().size();
+                    isModified = chunk->isModified();
+                    isDirty = chunk->isDirty();
+                    
+                    // Consider a chunk rendered if it has vertices
+                    renderedStatus = (vertexCount > 0) ? "YES" : "NO";
+                    
+                    // Update statistics
+                    loadedCount++;
+                    if (vertexCount > 0) visibleCount++;
+                    if (isDirty) dirtyCount++;
+                    if (isModified) modifiedCount++;
+                }
+                
+                // Format the chunk position
+                std::stringstream posStr;
+                posStr << "(" << chunkPos.x << "," << chunkPos.y << "," << chunkPos.z << ")";
+                std::string position = posStr.str();
+                
+                // Pad all fields for alignment
+                position.resize(14, ' ');
+                loadedStatus.resize(8, ' ');
+                renderedStatus.resize(10, ' ');
+                
+                std::stringstream vertStr, indStr;
+                vertStr << vertexCount;
+                indStr << indexCount;
+                std::string vertString = vertStr.str();
+                std::string indString = indStr.str();
+                
+                vertString.resize(10, ' ');
+                indString.resize(9, ' ');
+                
+                std::string modifiedStatus = isModified ? "YES" : "NO";
+                std::string dirtyStatus = isDirty ? "YES" : "NO";
+                modifiedStatus.resize(10, ' ');
+                dirtyStatus.resize(7, ' ');
+                
+                // Write the formatted line
+                reportFile << position << "| " << loadedStatus << "| " << renderedStatus << "| " 
+                          << vertString << "| " << indString << "| " << modifiedStatus << "| " << dirtyStatus << std::endl;
+                
+                totalReported++;
+            }
+        }
+    }
+    
+    // Write summary statistics
+    reportFile << "\n===== Summary Statistics =====" << std::endl;
+    reportFile << "Total chunks reported: " << totalReported << std::endl;
+    reportFile << "Loaded chunks: " << loadedCount << " (" << (loadedCount * 100.0f / totalReported) << "%)" << std::endl;
+    reportFile << "Rendered chunks: " << visibleCount << " (" << (visibleCount * 100.0f / totalReported) << "%)" << std::endl;
+    reportFile << "Dirty chunks: " << dirtyCount << " (" << (dirtyCount * 100.0f / loadedCount) << "% of loaded)" << std::endl;
+    reportFile << "Modified chunks: " << modifiedCount << " (" << (modifiedCount * 100.0f / loadedCount) << "% of loaded)" << std::endl;
+
+    // Add additional chunk detail section
+    reportFile << "\n===== Detailed Chunk Information =====" << std::endl;
+    for (int z = playerChunkPos.z - radius; z <= playerChunkPos.z + radius; z++) {
+        for (int x = playerChunkPos.x - radius; x <= playerChunkPos.x + radius; x++) {
+            for (int y = minY; y < maxY; y++) {
+                glm::ivec3 chunkPos(x, y, z);
+                auto it = chunks.find(chunkPos);
+                if (it != chunks.end()) {
+                    const auto& chunk = it->second;
+                    
+                    // Calculate distance from player's chunk
+                    float distance = glm::length(glm::vec3(chunkPos - playerChunkPos));
+                    
+                    reportFile << "\nChunk(" << chunkPos.x << "," << chunkPos.y << "," << chunkPos.z << "):" << std::endl;
+                    reportFile << "  Distance from player: " << distance << " chunks" << std::endl;
+                    reportFile << "  Vertex count: " << chunk->getMeshVertices().size() / 5 << std::endl;
+                    reportFile << "  Index count: " << chunk->getMeshIndices().size() << std::endl;
+                    reportFile << "  Modified by player: " << (chunk->isModified() ? "YES" : "NO") << std::endl;
+                    reportFile << "  Needs mesh update: " << (chunk->isDirty() ? "YES" : "NO") << std::endl;
+                    
+                    // Report if chunk is potentially visible from player's position
+                    bool isVisible = false;
+                    if (world->isChunkVisible(chunkPos, player->getPosition(), player->getForward())) {
+                        isVisible = true;
+                    }
+                    reportFile << "  Is visible from player: " << (isVisible ? "YES" : "NO") << std::endl;
+                    
+                    // Check for empty chunks
+                    reportFile << "  Is empty: " << (chunk->isEmpty() ? "YES" : "NO") << std::endl;
+                }
+            }
+        }
+    }
+    
+    reportFile.close();
+    
+    std::cout << "Chunk report generated at " << filename.str() << std::endl;
+    return filename.str();
 }
 
 void VoxelDebug::recordVoxelOperation(World* world, const glm::ivec3& blockPos, bool success, const std::string& action) {

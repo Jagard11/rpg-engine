@@ -41,6 +41,15 @@ public:
     static void dumpDebugInfo(World* world, Player* player);
     
     /**
+     * @brief Generate a report of chunks around the player's current position
+     * @param world The current world instance
+     * @param player The current player instance
+     * @param radius The horizontal radius in chunks to report around the player
+     * @return Path to the generated report file
+     */
+    static std::string generateChunkReport(World* world, Player* player, int radius = 8);
+    
+    /**
      * @brief Record information about an attempted voxel manipulation
      * @param world The world instance
      * @param blockPos The position of the block being manipulated
