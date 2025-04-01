@@ -26,6 +26,8 @@ public:
     const glm::vec3& getPosition() const { return m_position; }
     void setPosition(const glm::vec3& position) { m_position = position; }
     
+    const glm::vec3& getVelocity() const { return m_velocity; }
+    
     float getYaw() const { return m_yaw; }
     float getPitch() const { return m_pitch; }
     

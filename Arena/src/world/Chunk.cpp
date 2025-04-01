@@ -20,6 +20,9 @@ Chunk::Chunk(int x, int y, int z)
             }
         }
     }
+    
+    // Initialize exposure mask - will be calculated properly later
+    m_exposureMask.setAll(false);
 }
 
 Chunk::~Chunk() {
@@ -53,6 +56,19 @@ void Chunk::setBlock(int x, int y, int z, int blockType) {
         m_isDirty = true;
         m_isModified = true; // Mark as modified when blocks are changed by the player
         m_collisionMeshDirty = true; // Mark collision mesh dirty when blocks change
+        
+        // If we changed a block on a boundary, recalculate face exposure
+        if (isBoundary) {
+            // Determine which face(s) need to be recalculated
+            if (x == 0) calculateFaceExposure(2);          // Left face (-X)
+            else if (x == CHUNK_SIZE - 1) calculateFaceExposure(3); // Right face (+X)
+            
+            if (y == 0) calculateFaceExposure(5);          // Bottom face (-Y)
+            else if (y == CHUNK_HEIGHT - 1) calculateFaceExposure(4); // Top face (+Y)
+            
+            if (z == 0) calculateFaceExposure(1);          // Back face (-Z)
+            else if (z == CHUNK_SIZE - 1) calculateFaceExposure(0); // Front face (+Z)
+        }
     } else {
         std::cout << "Chunk::setBlock - Block already has type " << blockType 
                   << " at (" << x << "," << y << "," << z 
@@ -69,6 +85,10 @@ int Chunk::getBlock(int x, int y, int z) const {
 }
 
 void Chunk::generateMesh(bool disableGreedyMeshing) {
+    // Calculate exposure mask before generating mesh
+    // This ensures we have up-to-date exposure information
+    calculateExposureMask();
+    
     m_meshVertices.clear();
     m_meshIndices.clear();
     
@@ -83,7 +103,8 @@ void Chunk::generateMesh(bool disableGreedyMeshing) {
     };
     
     std::cout << "Generating mesh for chunk (" << m_x << ", " << m_y << ", " << m_z 
-              << ") with greedy meshing " << (disableGreedyMeshing ? "DISABLED" : "ENABLED") << std::endl;
+              << ") with greedy meshing " << (disableGreedyMeshing ? "DISABLED" : "ENABLED") 
+              << ", exposure: " << m_exposureMask.countExposedFaces() << " faces exposed" << std::endl;
     
     // STEP 1: FACE CULLING - Determine which faces need to be rendered
     // Face culling rules:
@@ -511,53 +532,106 @@ void Chunk::addFace(const std::vector<float>& vertices, const glm::vec3& positio
 }
 
 bool Chunk::serialize(const std::string& filename) const {
-    // Create directory if it doesn't exist
-    std::filesystem::path dir = std::filesystem::path(filename).parent_path();
-    std::filesystem::create_directories(dir);
-    
-    std::ofstream file(filename, std::ios::binary);
-    if (!file.is_open()) {
-        std::cerr << "Failed to open file for writing: " << filename << std::endl;
+    try {
+        std::ofstream file(filename, std::ios::binary);
+        if (!file.is_open()) {
+            std::cerr << "Failed to open file for writing: " << filename << std::endl;
+            return false;
+        }
+        
+        // Write chunk position
+        file.write(reinterpret_cast<const char*>(&m_x), sizeof(m_x));
+        file.write(reinterpret_cast<const char*>(&m_y), sizeof(m_y));
+        file.write(reinterpret_cast<const char*>(&m_z), sizeof(m_z));
+        
+        // Write chunk data
+        for (int x = 0; x < CHUNK_SIZE; x++) {
+            for (int y = 0; y < CHUNK_HEIGHT; y++) {
+                for (int z = 0; z < CHUNK_SIZE; z++) {
+                    file.write(reinterpret_cast<const char*>(&m_blocks[x][y][z]), sizeof(m_blocks[x][y][z]));
+                }
+            }
+        }
+        
+        // Write exposure mask
+        bool exposureBits[6] = {
+            m_exposureMask.posX, m_exposureMask.negX, 
+            m_exposureMask.posY, m_exposureMask.negY, 
+            m_exposureMask.posZ, m_exposureMask.negZ
+        };
+        file.write(reinterpret_cast<const char*>(exposureBits), 6 * sizeof(bool));
+        
+        // Write modified flag
+        file.write(reinterpret_cast<const char*>(&m_isModified), sizeof(m_isModified));
+        
+        file.close();
+        return true;
+    } catch (const std::exception& e) {
+        std::cerr << "Error serializing chunk: " << e.what() << std::endl;
         return false;
     }
-
-    // Write chunk position (3D)
-    file.write(reinterpret_cast<const char*>(&m_x), sizeof(m_x));
-    file.write(reinterpret_cast<const char*>(&m_y), sizeof(m_y));
-    file.write(reinterpret_cast<const char*>(&m_z), sizeof(m_z));
-    
-    // Write modification flag
-    file.write(reinterpret_cast<const char*>(&m_isModified), sizeof(m_isModified));
-
-    // Write block data
-    file.write(reinterpret_cast<const char*>(m_blocks.data()), 
-               sizeof(int) * CHUNK_SIZE * CHUNK_HEIGHT * CHUNK_SIZE);
-
-    return true;
 }
 
 bool Chunk::deserialize(const std::string& filename) {
-    std::ifstream file(filename, std::ios::binary);
-    if (!file.is_open()) {
+    try {
+        std::ifstream file(filename, std::ios::binary);
+        if (!file.is_open()) {
+            std::cerr << "Failed to open file for reading: " << filename << std::endl;
+            return false;
+        }
+        
+        // Read chunk position
+        int x, y, z;
+        file.read(reinterpret_cast<char*>(&x), sizeof(x));
+        file.read(reinterpret_cast<char*>(&y), sizeof(y));
+        file.read(reinterpret_cast<char*>(&z), sizeof(z));
+        
+        // Verify position matches
+        if (x != m_x || y != m_y || z != m_z) {
+            std::cerr << "Position mismatch in chunk file! Expected ("
+                      << m_x << "," << m_y << "," << m_z << ") but got ("
+                      << x << "," << y << "," << z << ")" << std::endl;
+            return false;
+        }
+        
+        // Read chunk data
+        for (int x = 0; x < CHUNK_SIZE; x++) {
+            for (int y = 0; y < CHUNK_HEIGHT; y++) {
+                for (int z = 0; z < CHUNK_SIZE; z++) {
+                    file.read(reinterpret_cast<char*>(&m_blocks[x][y][z]), sizeof(m_blocks[x][y][z]));
+                }
+            }
+        }
+        
+        // Read exposure mask
+        bool exposureBits[6];
+        file.read(reinterpret_cast<char*>(exposureBits), 6 * sizeof(bool));
+        m_exposureMask.posX = exposureBits[0];
+        m_exposureMask.negX = exposureBits[1];
+        m_exposureMask.posY = exposureBits[2];
+        m_exposureMask.negY = exposureBits[3];
+        m_exposureMask.posZ = exposureBits[4];
+        m_exposureMask.negZ = exposureBits[5];
+        
+        // Read modified flag (newer files)
+        if (file.peek() != EOF) {
+            file.read(reinterpret_cast<char*>(&m_isModified), sizeof(m_isModified));
+        } else {
+            m_isModified = false; // Default for older files
+        }
+        
+        // If exposure mask wasn't saved (older version), calculate it now
+        if (!m_exposureMask.isExposed()) {
+            calculateExposureMask();
+        }
+        
+        m_isDirty = true; // Force mesh update
+        file.close();
+        return true;
+    } catch (const std::exception& e) {
+        std::cerr << "Error deserializing chunk: " << e.what() << std::endl;
         return false;
     }
-
-    // Read chunk position (3D)
-    file.read(reinterpret_cast<char*>(&m_x), sizeof(m_x));
-    file.read(reinterpret_cast<char*>(&m_y), sizeof(m_y));
-    file.read(reinterpret_cast<char*>(&m_z), sizeof(m_z));
-    
-    // Read modification flag
-    file.read(reinterpret_cast<char*>(&m_isModified), sizeof(m_isModified));
-
-    // Read block data
-    file.read(reinterpret_cast<char*>(m_blocks.data()),
-              sizeof(int) * CHUNK_SIZE * CHUNK_HEIGHT * CHUNK_SIZE);
-
-    m_isDirty = true;
-    m_collisionMeshDirty = true;
-    
-    return true;
 }
 
 std::vector<AABB> Chunk::buildColliderMesh() const {
@@ -690,4 +764,186 @@ bool Chunk::isEmpty() const {
         }
     }
     return true; // All blocks are air
+}
+
+// Calculate exposure mask based on current blocks
+void Chunk::calculateExposureMask() {
+    // Reset the exposure mask
+    m_exposureMask.setAll(false);
+    
+    // Calculate each face
+    for (int faceIndex = 0; faceIndex < 6; faceIndex++) {
+        calculateFaceExposure(faceIndex);
+    }
+    
+    // Log the result
+    std::cout << "Calculated exposure mask for chunk (" << m_x << ", " << m_y << ", " << m_z << "): "
+              << "Face exposure: +X=" << m_exposureMask.posX 
+              << ", -X=" << m_exposureMask.negX
+              << ", +Y=" << m_exposureMask.posY
+              << ", -Y=" << m_exposureMask.negY
+              << ", +Z=" << m_exposureMask.posZ
+              << ", -Z=" << m_exposureMask.negZ
+              << ", Total exposed faces: " << m_exposureMask.countExposedFaces() << std::endl;
+}
+
+// Calculate exposure for a specific face (0-5)
+void Chunk::calculateFaceExposure(int faceIndex) {
+    // Define the six face directions (same order as in generateMesh)
+    const glm::ivec3 directions[6] = {
+        glm::ivec3(0, 0, 1),   // Front  (+Z) - index 0
+        glm::ivec3(0, 0, -1),  // Back   (-Z) - index 1
+        glm::ivec3(-1, 0, 0),  // Left   (-X) - index 2
+        glm::ivec3(1, 0, 0),   // Right  (+X) - index 3
+        glm::ivec3(0, 1, 0),   // Top    (+Y) - index 4
+        glm::ivec3(0, -1, 0)   // Bottom (-Y) - index 5
+    };
+    
+    // Validate face index
+    if (faceIndex < 0 || faceIndex > 5) {
+        std::cerr << "Invalid face index: " << faceIndex << std::endl;
+        return;
+    }
+    
+    // Get the normal vector for this face
+    const glm::ivec3& normal = directions[faceIndex];
+    
+    // Determine which slice of the chunk to examine based on the face
+    int w;        // The axis perpendicular to the face (x=0, y=1, z=2)
+    int wPos;     // The position along that axis
+    
+    // Set the appropriate coordinate based on the face
+    if (normal.x != 0) {
+        w = 0;  // x-axis
+        wPos = (normal.x > 0) ? CHUNK_SIZE - 1 : 0;  // Right face (+X) or Left face (-X)
+    } else if (normal.y != 0) {
+        w = 1;  // y-axis
+        wPos = (normal.y > 0) ? CHUNK_HEIGHT - 1 : 0;  // Top face (+Y) or Bottom face (-Y)
+    } else {
+        w = 2;  // z-axis
+        wPos = (normal.z > 0) ? CHUNK_SIZE - 1 : 0;  // Front face (+Z) or Back face (-Z)
+    }
+    
+    // Check each block on this face to see if it's exposed
+    bool faceIsExposed = false;
+    
+    // Loop through the 2D face
+    for (int u = 0; u < CHUNK_SIZE && !faceIsExposed; u++) {
+        for (int v = 0; v < CHUNK_SIZE && !faceIsExposed; v++) {
+            // Convert to x,y,z coordinates
+            int x, y, z;
+            if (w == 0) {
+                // x-face: we vary y,z
+                x = wPos;
+                y = u;
+                z = v;
+            } else if (w == 1) {
+                // y-face: we vary x,z
+                x = u;
+                y = wPos;
+                z = v;
+            } else {
+                // z-face: we vary x,y
+                x = u;
+                y = v;
+                z = wPos;
+            }
+            
+            // Get the block at this position
+            int blockType = getBlock(x, y, z);
+            
+            // Skip air blocks - they don't contribute to exposure
+            if (blockType == 0) continue;
+            
+            // Check the adjacent block in the direction of the face normal
+            int adjacentX = x + normal.x;
+            int adjacentY = y + normal.y;
+            int adjacentZ = z + normal.z;
+            
+            // If we're at a chunk boundary, check the adjacent chunk
+            if (adjacentX < 0 || adjacentX >= CHUNK_SIZE || 
+                adjacentY < 0 || adjacentY >= CHUNK_HEIGHT || 
+                adjacentZ < 0 || adjacentZ >= CHUNK_SIZE) {
+                
+                if (m_world) {
+                    // Convert to world coordinates
+                    int worldX = m_x * CHUNK_SIZE + adjacentX;
+                    int worldY = m_y * CHUNK_HEIGHT + adjacentY;
+                    int worldZ = m_z * CHUNK_SIZE + adjacentZ;
+                    
+                    // Get the adjacent block in world space
+                    int adjacentBlockType = m_world->getBlock(glm::ivec3(worldX, worldY, worldZ));
+                    
+                    // If the adjacent block is air (or transparent), this face is exposed
+                    if (isBlockTransparent(adjacentBlockType)) {
+                        faceIsExposed = true;
+                        break;
+                    }
+                } else {
+                    // No world reference, treat as exposed
+                    faceIsExposed = true;
+                    break;
+                }
+            }
+        }
+    }
+    
+    // Set the appropriate flag in the exposure mask
+    switch (faceIndex) {
+        case 0: // Front (+Z)
+            m_exposureMask.posZ = faceIsExposed;
+            break;
+        case 1: // Back (-Z)
+            m_exposureMask.negZ = faceIsExposed;
+            break;
+        case 2: // Left (-X)
+            m_exposureMask.negX = faceIsExposed;
+            break;
+        case 3: // Right (+X)
+            m_exposureMask.posX = faceIsExposed;
+            break;
+        case 4: // Top (+Y)
+            m_exposureMask.posY = faceIsExposed;
+            break;
+        case 5: // Bottom (-Y)
+            m_exposureMask.negY = faceIsExposed;
+            break;
+    }
+}
+
+// Check if a specific face (0-5) is exposed
+bool Chunk::isFaceExposed(int faceIndex) const {
+    switch (faceIndex) {
+        case 0: return m_exposureMask.posZ; // Front (+Z)
+        case 1: return m_exposureMask.negZ; // Back (-Z)
+        case 2: return m_exposureMask.negX; // Left (-X)
+        case 3: return m_exposureMask.posX; // Right (+X)
+        case 4: return m_exposureMask.posY; // Top (+Y)
+        case 5: return m_exposureMask.negY; // Bottom (-Y)
+        default: return false;
+    }
+}
+
+// Check if a specific face between this chunk and an adjacent chunk is exposed
+bool Chunk::isFaceExposedToChunk(const glm::ivec3& adjacentChunkPos) const {
+    // Get this chunk's position
+    glm::ivec3 thisPos(m_x, m_y, m_z);
+    
+    // Calculate the direction from this chunk to the adjacent chunk
+    glm::ivec3 direction = adjacentChunkPos - thisPos;
+    
+    // Ensure the chunks are adjacent
+    if (glm::length(glm::vec3(direction)) != 1.0f) {
+        return false; // Chunks are not adjacent
+    }
+    
+    // Determine which face to check based on the direction
+    if (direction.x == 1) return m_exposureMask.posX;       // +X face
+    else if (direction.x == -1) return m_exposureMask.negX; // -X face
+    else if (direction.y == 1) return m_exposureMask.posY;  // +Y face
+    else if (direction.y == -1) return m_exposureMask.negY; // -Y face
+    else if (direction.z == 1) return m_exposureMask.posZ;  // +Z face
+    else if (direction.z == -1) return m_exposureMask.negZ; // -Z face
+    
+    return false; // Should never get here
 } 

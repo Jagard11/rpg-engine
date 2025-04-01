@@ -499,14 +499,14 @@ void Renderer::renderWorld(World* world, Player* player) {
     // Calculate frustum planes for frustum culling
     glm::vec3 right = player->getRight();
     glm::vec3 up = player->getUp();
-    float renderDistance = 16 * Chunk::CHUNK_SIZE; // 16 chunks of render distance
+    
+    // Make sure render distance corresponds to our 16x16 grid
+    // Maximum distance from player chunk to furthest chunk is 8 chunks
+    // Add a small buffer to avoid edge cases
+    float renderDistance = 8.5f * Chunk::CHUNK_SIZE;
     
     // Get player chunk position
-    glm::ivec3 playerChunkPos(
-        static_cast<int>(std::floor(player->getPosition().x / Chunk::CHUNK_SIZE)),
-        static_cast<int>(std::floor(player->getPosition().y / Chunk::CHUNK_HEIGHT)),
-        static_cast<int>(std::floor(player->getPosition().z / Chunk::CHUNK_SIZE))
-    );
+    glm::ivec3 playerChunkPos = world->worldToChunkPos(player->getPosition());
     
     // Do raycast before chunk rendering to know what to highlight
     World::RaycastResult highlightResult;
@@ -530,6 +530,11 @@ void Renderer::renderWorld(World* world, Player* player) {
             continue; // Skip rendering invisible chunks
         }
         
+        // Also check if the chunk has any visible faces
+        if (!chunk->hasVisibleFaces()) {
+            continue; // Skip rendering chunks with no visible faces
+        }
+        
         // Calculate chunk center in world space
         glm::vec3 chunkCenter = glm::vec3(
             (chunkPos.x * Chunk::CHUNK_SIZE) + (Chunk::CHUNK_SIZE / 2.0f),
@@ -540,17 +545,30 @@ void Renderer::renderWorld(World* world, Player* player) {
         // Calculate distance to chunk
         float distToChunk = glm::length(chunkCenter - position);
         
-        // Skip chunks that are too far away
-        if (distToChunk > renderDistance) {
+        // Get chunk coordinates relative to player chunk
+        int relativeX = chunkPos.x - playerChunkPos.x;
+        int relativeZ = chunkPos.z - playerChunkPos.z;
+        
+        // Check if within our 16x16 grid boundaries
+        // Per the specified approach:
+        // - Forward 8 chunks INCLUDING the player's chunk: (0 to +7)
+        // - Backward 8 chunks NOT including the player's chunk: (-8 to -1)
+        // - Left 8 chunks INCLUDING the player's chunk: (0 to -7) 
+        // - Right 8 chunks NOT including the player's chunk: (+1 to +8)
+        bool withinXBounds = (relativeX >= -8 && relativeX <= 7);
+        bool withinZBounds = (relativeZ >= -7 && relativeZ <= 8);
+        
+        // Skip chunks outside our grid boundaries
+        if (!withinXBounds || !withinZBounds) {
             continue;
         }
         
-        // Simple frustum culling
+        // Simple frustum culling - only cull chunks that are definitely behind camera
         // Calculate vector from camera to chunk center
         glm::vec3 toCenterVec = glm::normalize(chunkCenter - position);
         
-        // If the dot product is negative, the chunk is behind the camera
-        if (glm::dot(forward, toCenterVec) < 0.0f && distToChunk > Chunk::CHUNK_SIZE * 1.5f) {
+        // If the dot product is negative and chunk is far enough away, it's behind the camera
+        if (glm::dot(forward, toCenterVec) < -0.8f && distToChunk > Chunk::CHUNK_SIZE * 1.5f) {
             continue;
         }
         
@@ -577,6 +595,13 @@ void Renderer::renderWorld(World* world, Player* player) {
         std::cout << "Rendering " << visibleChunks << " visible chunks of " 
                   << world->getChunks().size() << " total chunks" << std::endl;
         std::cout << "Chunks in visibility system: " << world->getVisibleChunksCount() << std::endl;
+        
+        // Log the grid boundaries for debugging
+        std::cout << "Player chunk position: [" << playerChunkPos.x << ", " 
+                  << playerChunkPos.y << ", " << playerChunkPos.z << "]" << std::endl;
+        std::cout << "Grid boundaries: X [" << (playerChunkPos.x - 8) << " to " << (playerChunkPos.x + 7)
+                  << "], Z [" << (playerChunkPos.z - 7) << " to " << (playerChunkPos.z + 8) << "]" << std::endl;
+        
         std::cout << "Backface culling: " << (m_disableBackfaceCulling ? "DISABLED" : "ENABLED") << std::endl;
         std::cout << "Greedy meshing: " << (m_disableGreedyMeshing ? "DISABLED" : "ENABLED") << std::endl;
         std::cout << "LOD rendering: " << (m_enableLodRendering ? "ENABLED" : "DISABLED") << std::endl;

@@ -117,11 +117,19 @@ bool Game::initialize() {
 
         // Initialize player
         m_player = std::make_unique<Player>();
-        m_player->setPosition(glm::vec3(0.0f, 65.0f, 0.0f));
-
+        m_player->setPosition(glm::vec3(0.0f, 100.0f, 0.0f));
+        
         // Initialize world with a default seed
         m_world = std::make_unique<World>(12345);
-        m_world->generateChunk(glm::ivec3(0, 0, 0)); // Generate initial chunk
+        m_world->initialize(); // Initialize the world properly
+        
+        // Initialize player chunk position tracking
+        if (m_player && m_world) {
+            m_lastPlayerChunkPos = m_world->worldToChunkPos(m_player->getPosition());
+            
+            // Force an initial chunk evaluation to load chunks around spawn
+            m_world->evaluateChunksNeeded(*m_player);
+        }
 
         // Set up mouse button callback for voxel manipulation
         glfwSetMouseButtonCallback(m_window->getHandle(), mouse_button_callback);
@@ -196,16 +204,51 @@ void Game::update(float deltaTime) {
         // Get current player chunk position
         glm::ivec3 currentPlayerChunkPos = m_world->worldToChunkPos(m_player->getPosition());
         
-        // Only *evaluate* chunks needed when the player moves to a new chunk
-        if (currentPlayerChunkPos != m_lastPlayerChunkPos) {
-            //std::cout << "Player moved to new chunk: [" 
-            //          << currentPlayerChunkPos.x << ", " << currentPlayerChunkPos.y << ", " << currentPlayerChunkPos.z
-            //          << "] - Evaluating chunks needed..." << std::endl;
-            m_world->evaluateChunksNeeded(m_player->getPosition());
-            m_lastPlayerChunkPos = currentPlayerChunkPos; // Update last known position
+        // Evaluate chunks when player moves to a new chunk or changes vertical height significantly
+        static int lastPlayerY = currentPlayerChunkPos.y;
+        bool playerMovedHorizontally = (currentPlayerChunkPos.x != m_lastPlayerChunkPos.x || 
+                                      currentPlayerChunkPos.z != m_lastPlayerChunkPos.z);
+        bool playerMovedVertically = (std::abs(currentPlayerChunkPos.y - lastPlayerY) >= 1);
+        
+        // CRITICAL FIX: Always check when player gets near a chunk boundary so we can preload ahead
+        bool isNearXBoundary = false;
+        bool isNearZBoundary = false;
+        float playerPosX = m_player->getPosition().x;
+        float playerPosZ = m_player->getPosition().z;
+        
+        // Calculate fractional position within current chunk
+        float fracX = playerPosX - (currentPlayerChunkPos.x * World::CHUNK_SIZE);
+        float fracZ = playerPosZ - (currentPlayerChunkPos.z * World::CHUNK_SIZE);
+        
+        // Check if we're within 2 blocks of a chunk boundary
+        if (fracX < 2.0f || fracX > (World::CHUNK_SIZE - 2.0f)) {
+            isNearXBoundary = true;
         }
         
-        // *Process* the load/unload queues every frame
+        if (fracZ < 2.0f || fracZ > (World::CHUNK_SIZE - 2.0f)) {
+            isNearZBoundary = true;
+        }
+        
+        // Log when player is near boundaries (debugging)
+        static int logCounter = 0;
+        if ((isNearXBoundary || isNearZBoundary) && ++logCounter % 60 == 0) {
+            std::cout << "Player near chunk boundary: "
+                      << "Position (" << playerPosX << ", " << playerPosZ << ") "
+                      << "Chunk [" << currentPlayerChunkPos.x << ", " << currentPlayerChunkPos.z << "] "
+                      << "FracPos (" << fracX << ", " << fracZ << ")" << std::endl;
+        }
+        
+        // Force evaluation when player moves to a new chunk, changes height significantly, or is near boundaries
+        if (playerMovedHorizontally || playerMovedVertically || isNearXBoundary || isNearZBoundary) {
+            // Evaluate chunks around the player
+            m_world->evaluateChunksNeeded(*m_player);
+            
+            // Save player positions for next check
+            m_lastPlayerChunkPos = currentPlayerChunkPos;
+            lastPlayerY = currentPlayerChunkPos.y;
+        }
+        
+        // Always process chunk queues to ensure loading continues
         m_world->processChunkQueues();
         
         // Process a limited number of dirty chunk meshes per frame (ALWAYS run this)
@@ -495,6 +538,7 @@ void Game::handleInput(float deltaTime) {
 void Game::createNewWorld(uint64_t seed) {
     std::cout << "Creating new world with seed: " << seed << std::endl;
     
+    // Create world
     m_world = std::make_unique<World>(seed);
     m_world->initialize();
     
@@ -503,6 +547,19 @@ void Game::createNewWorld(uint64_t seed) {
     
     // Set initial player position - significantly higher to ensure the player doesn't get stuck
     m_player->setPosition(glm::vec3(0.0f, 100.0f, 0.0f));
+    
+    // Initialize player chunk position tracking
+    if (m_world && m_player) {
+        m_lastPlayerChunkPos = m_world->worldToChunkPos(m_player->getPosition());
+        
+        // Force an initial chunk evaluation to load chunks around spawn
+        m_world->evaluateChunksNeeded(*m_player);
+        
+        // Process chunk loading immediately
+        for (int i = 0; i < 10; i++) { // Process more chunk operations to ensure chunks are loaded
+            m_world->processChunkQueues();
+        }
+    }
     
     // Initialize voxel manipulator with the world
     if (m_voxelManipulator) {
@@ -514,11 +571,6 @@ void Game::createNewWorld(uint64_t seed) {
     // Lock cursor for game mode
     m_window->setInputMode(GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     
-    // Set up world debugging
-    if (m_debugMenu) {
-        // Register debug commands for the world if needed in the future
-    }
-    
     // Force an initial render to ensure chunks are visible
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
@@ -529,15 +581,13 @@ void Game::createNewWorld(uint64_t seed) {
             m_renderer->setupBuffers();
         }
         
+        // Set player pointer in renderer
+        m_renderer->setPlayer(m_player.get());
+        
         // Force initial rendering of the world
         std::cout << "Performing initial world render..." << std::endl;
         m_renderer->render(m_world.get(), m_player.get());
         m_window->swapBuffers();
-    }
-    
-    // Set player pointer in renderer
-    if (m_renderer && m_player) {
-        m_renderer->setPlayer(m_player.get());
     }
     
     std::cout << "World creation complete" << std::endl;
@@ -686,6 +736,22 @@ void Game::initializeDebugMenu() {
                     std::string(m_debugStats->isVisible() ? "enabled" : "disabled"));
             } else {
                 m_debugMenu->commandOutput("Debug stats not available!");
+            }
+        });
+        
+    // Register command to report chunk statistics
+    m_debugMenu->registerCommand("chunks", "Display chunk loading statistics",
+        [this](const std::vector<std::string>& args) {
+            if (m_world) {
+                std::stringstream ss;
+                ss << "Chunks in memory: " << m_world->getChunks().size() << "\n";
+                ss << "Visible chunks: " << m_world->getVisibleChunksCount() << "\n";
+                ss << "Dirty chunks: " << m_world->getDirtyChunkCount() << "\n";
+                ss << "Pending chunks: " << m_world->getPendingChunksCount() << "\n";
+                ss << "View distance: " << m_world->getViewDistance() << " chunks";
+                m_debugMenu->commandOutput(ss.str());
+            } else {
+                m_debugMenu->commandOutput("No world exists!");
             }
         });
         

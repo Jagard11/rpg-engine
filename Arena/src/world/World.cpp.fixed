@@ -5,9 +5,9 @@
 #include <algorithm>
 #include <filesystem>
 #include <GLFW/glfw3.h>
+#include <set>
 #include "player/Player.hpp"
 #include "world/ChunkVisibilityManager.hpp"
-#include <set>
 
 World::World(uint64_t seed)
     : m_seed(seed)
@@ -78,7 +78,7 @@ void World::generateInitialArea(const glm::vec3& spawnPosition) {
     // First pass - generate all chunks and calculate exposure
     // Only mark as dirty if exposed (needing a mesh)
     std::vector<glm::ivec3> exposedChunks;
-
+    
     // Generate all chunks and calculate exposure during generation
     for (int x = minX; x <= maxX; x++) {
         for (int z = minZ; z <= maxZ; z++) {
@@ -250,6 +250,7 @@ void World::generateChunk(const glm::ivec3& chunkPos) {
             
             // Calculate range for this chunk
             int chunkMinY = chunkPos.y * CHUNK_HEIGHT;
+            int chunkMaxY = chunkMinY + CHUNK_HEIGHT;
             
             // Fill blocks within this chunk's y-range
             for (int localY = 0; localY < CHUNK_HEIGHT; localY++) {
@@ -272,24 +273,24 @@ void World::generateChunk(const glm::ivec3& chunkPos) {
     // Calculate exposure mask for the new chunk
     chunk->calculateExposureMask();
     
-    // Store the chunk
+    // Store the chunk before updating metadata or meshes
     m_chunks[chunkPos] = std::move(chunk);
     
-    // Update column metadata for exposure-based loading if the chunk is exposed
-    Chunk* generatedChunk = m_chunks[chunkPos].get();
-    if (generatedChunk && generatedChunk->isExposed() && !chunkIsEmpty) {
+    // Update column metadata for exposure-based loading if chunk isn't empty
+    if (!chunkIsEmpty) {
         updateColumnMetadata(chunkPos);
     }
     
     // Only mark as dirty if it's near the player and exposed (needs mesh)
-    glm::ivec3 playerChunkPos = worldToChunkPos(m_lastPlayerPosition);
-    bool inPlayerGrid = (chunkPos.x >= playerChunkPos.x - 8 && chunkPos.x <= playerChunkPos.x + 7 && 
-                       chunkPos.z >= playerChunkPos.z - 7 && chunkPos.z <= playerChunkPos.z + 8);
-    bool nearPlayerHeight = std::abs(chunkPos.y - playerChunkPos.y) <= 2;
-    
-    // Only mark as dirty if it's in the player's view area AND exposed
-    if (generatedChunk && inPlayerGrid && nearPlayerHeight && generatedChunk->isExposed()) {
+    Chunk* generatedChunk = m_chunks[chunkPos].get();
+    if (generatedChunk) {
+        glm::ivec3 playerChunkPos = worldToChunkPos(m_lastPlayerPosition);
+        bool inPlayerGrid = (chunkPos.x >= playerChunkPos.x - 8 && chunkPos.x <= playerChunkPos.x + 7 && 
+                           chunkPos.z >= playerChunkPos.z - 7 && chunkPos.z <= playerChunkPos.z + 8);
+        
+        if (inPlayerGrid && generatedChunk->isExposed()) {
         generatedChunk->setDirty(true);
+        }
     }
 }
 
@@ -317,34 +318,33 @@ void World::loadChunk(const glm::ivec3& chunkPos) {
             std::cout << "Loaded existing chunk from file: " << filename << std::endl;
         }
         
-        // Ensure the exposure mask is calculated accurately
-        chunk->calculateExposureMask();
-        
-        // Add chunk to the world
+        // Add chunk to the chunks map
         m_chunks[chunkPos] = std::move(chunk);
         
-        // Update column metadata only if this chunk is exposed
+        // Ensure exposure mask is up to date
         Chunk* loadedChunk = m_chunks[chunkPos].get();
-        if (loadedChunk && loadedChunk->isExposed()) {
-            updateColumnMetadata(chunkPos);
-        }
-        
-        // Only mark as dirty if the chunk is in the player's view area
-        // This prevents excessive mesh generation on initial load
-        glm::ivec3 playerChunkPos = worldToChunkPos(m_lastPlayerPosition);
-        bool inPlayerGrid = (chunkPos.x >= playerChunkPos.x - 8 && chunkPos.x <= playerChunkPos.x + 7 && 
-                           chunkPos.z >= playerChunkPos.z - 7 && chunkPos.z <= playerChunkPos.z + 8);
-        
-        // Also consider if it's within the player's height range
-        bool nearPlayerHeight = std::abs(chunkPos.y - playerChunkPos.y) <= 2;
-        
-        // Only mark initially as dirty if it's both in grid AND near player height AND exposed
-        if (inPlayerGrid && nearPlayerHeight && loadedChunk->isExposed()) {
+        if (loadedChunk) {
+            // Recalculate exposure mask to make sure it's accurate
+            loadedChunk->calculateExposureMask();
+            
+            // Update column metadata for exposure-based chunk loading
+            if (loadedChunk->isExposed()) {
+                updateColumnMetadata(chunkPos);
+            }
+            
+            // Only mark chunk as dirty if it's in the player's view area
+            glm::ivec3 playerChunkPos = worldToChunkPos(m_lastPlayerPosition);
+            bool inPlayerGrid = (chunkPos.x >= playerChunkPos.x - 8 && chunkPos.x <= playerChunkPos.x + 7 && 
+                               chunkPos.z >= playerChunkPos.z - 7 && chunkPos.z <= playerChunkPos.z + 8);
+            
+            if (inPlayerGrid && loadedChunk->isExposed()) {
             loadedChunk->setDirty(true);
+            }
         }
     } else {
         // If file doesn't exist or can't be loaded, generate a new chunk
         generateChunk(chunkPos);
+        return; // Return since generateChunk adds the chunk to m_chunks
     }
 }
 
@@ -604,190 +604,482 @@ bool World::deserialize(const std::string& filename) {
     return true;
 }
 
-void World::evaluateChunksNeeded(const Player& player) {
-    // Simply call the position-based version with the player's position
-    glm::vec3 playerPos = player.getPosition();
-    evaluateChunksNeeded(playerPos);
-}
-
-void World::processChunkQueues() {
-    // Only process if the world is initialized
-    if (!m_initialized) {
-        return;
-    }
-    
-    // Get current time for timeout tracking
-    double startProcessingTime = glfwGetTime();
-    const double MAX_PROCESSING_TIME = 0.016; // 16ms max (~1 frame at 60 FPS)
-    
-    // Get player chunk position for distance-based checks
-    glm::ivec3 playerChunkPos = worldToChunkPos(m_lastPlayerPosition);
-    
-    // Track if player has moved since last frame
-    static glm::ivec3 lastPlayerPosForQueue = playerChunkPos;
-    bool playerMoved = (lastPlayerPosForQueue != playerChunkPos);
-    lastPlayerPosForQueue = playerChunkPos;
-    
-    // Define the 16x16 grid boundaries around the player
-    int minX = playerChunkPos.x - 8;
-    int maxX = playerChunkPos.x + 7;
-    int minZ = playerChunkPos.z - 7;
-    int maxZ = playerChunkPos.z + 8;
-    
-    // Process the queue of chunks to load
-    const int maxChunksToLoadPerFrame = 2;  // Limit to maintain frame rate
-    const int maxChunksToUnloadPerFrame = 5; // Can unload more as it's less intensive
-    
-    int chunksLoaded = 0;
-    
-    // First, process loading queue up to the maximum limit
-    while (!m_chunksToLoadQueue.empty() && chunksLoaded < maxChunksToLoadPerFrame) {
-        // Check timeout - if we're taking too long, pause until next frame
-        if (glfwGetTime() - startProcessingTime > MAX_PROCESSING_TIME) {
-            break;
+void World::evaluateChunksNeeded(const glm::vec3& playerPos) {
+    try {
+        // Track when we last evaluated
+        static float lastEvaluationTime = 0.0f;
+        float currentTime = glfwGetTime();
+        
+        // Only evaluate once per second to prevent oscillation/thrashing
+        if (currentTime - lastEvaluationTime < 1.0f) {
+            return;
+        }
+        lastEvaluationTime = currentTime;
+        
+        // Safety check for invalid positions
+        if (std::isnan(playerPos.x) || std::isnan(playerPos.y) || std::isnan(playerPos.z) ||
+            std::isinf(playerPos.x) || std::isinf(playerPos.y) || std::isinf(playerPos.z)) {
+            std::cerr << "ERROR: Invalid player position detected: " 
+                    << playerPos.x << ", " << playerPos.y << ", " << playerPos.z << std::endl;
+            return;
         }
         
-        // Get the next chunk to load
-        glm::ivec3 chunkPos = m_chunksToLoadQueue.front();
-        m_chunksToLoadQueue.pop_front();
+        // Update the stored position if valid
+        m_lastPlayerPosition = playerPos;
         
-        // Skip if the chunk already exists
-        if (m_chunks.find(chunkPos) != m_chunks.end()) {
-            continue;
+        // Convert player position to chunk coordinates
+        glm::ivec3 playerChunkPos = worldToChunkPos(playerPos);
+        
+        std::cout << "*** EXPOSURE-BASED CHUNK EVALUATION *** at player position (" 
+                  << playerPos.x << ", " << playerPos.y << ", " << playerPos.z 
+                  << "), chunk: (" << playerChunkPos.x << ", " << playerChunkPos.y << ", " << playerChunkPos.z << ")" << std::endl;
+        
+        // Define the 16x16 grid boundaries
+        int minX = playerChunkPos.x - 8;
+        int maxX = playerChunkPos.x + 7;
+        int minZ = playerChunkPos.z - 7;
+        int maxZ = playerChunkPos.z + 8;
+        
+        // Temporary collections for chunk operations
+        std::vector<glm::ivec3> newChunksToLoad;
+        std::vector<glm::ivec3> newChunksToUnload;
+        
+        // STEP 1: Identify all columns that need to be evaluated
+        std::set<ColumnXZ> columnsToCheck;
+        
+        // First, all columns in the 16x16 grid
+        for (int x = minX; x <= maxX; ++x) {
+            for (int z = minZ; z <= maxZ; ++z) {
+                columnsToCheck.insert(ColumnXZ(x, z));
+            }
         }
         
-        try {
-            // Check again if this chunk should be loaded (player may have moved)
-            bool isInGrid = (chunkPos.x >= minX && chunkPos.x <= maxX &&
-                            chunkPos.z >= minZ && chunkPos.z <= maxZ);
+        // Add columns for any currently loaded chunks (might be outside the grid)
+        for (const auto& pair : m_chunks) {
+            columnsToCheck.insert(ColumnXZ(pair.first.x, pair.first.z));
+        }
+        
+        // STEP 2: For each column, determine which chunks should be loaded
+        int exposedChunksInGrid = 0;
+        
+        for (const auto& columnKey : columnsToCheck) {
+            int x = columnKey.first;
+            int z = columnKey.second;
+            bool inGrid = (x >= minX && x <= maxX && z >= minZ && z <= maxZ);
             
-            bool shouldLoad = isInGrid;
+            // Get column metadata if it exists
+            auto colIt = m_columnMetadata.find(columnKey);
             
-            // For chunks outside the grid, only load if they're exposed or adjacent
-            if (!shouldLoad) {
-                shouldLoad = shouldLoadBasedOnExposure(chunkPos);
+            // Determine Y-range to examine
+            int minY = 0;
+            int maxY = 255;
+            
+            // If we have column metadata, use it to focus our search
+            if (colIt != m_columnMetadata.end()) {
+                minY = std::max(0, colIt->second.bottomExposedHeight - 1);
+                maxY = std::min(255, colIt->second.topExposedHeight + 1);
+            } else if (inGrid) {
+                // Only check near player's height for columns in grid without metadata
+                minY = std::max(0, playerChunkPos.y - 2);
+                maxY = std::min(255, playerChunkPos.y + 2);
             }
             
-            if (shouldLoad) {
-                // Load or generate the chunk
-                loadChunk(chunkPos);
-                chunksLoaded++;
+            // First pass: Check existing chunks in this column
+            std::vector<glm::ivec3> exposedChunksInColumn;
+            
+            for (int y = minY; y <= maxY; ++y) {
+                glm::ivec3 chunkPos(x, y, z);
+                auto it = m_chunks.find(chunkPos);
                 
-                // Only mark adjacent chunks as dirty if the player has moved
-                // This prevents cascading mesh regeneration when standing still
-                if (playerMoved) {
-                    // Mark adjacent chunks as dirty if they're already loaded
-                    // This ensures proper meshing at chunk boundaries
-                    const glm::ivec3 adjacentOffsets[6] = {
-                        glm::ivec3(1, 0, 0),  // +X
-                        glm::ivec3(-1, 0, 0), // -X
-                        glm::ivec3(0, 1, 0),  // +Y
-                        glm::ivec3(0, -1, 0), // -Y
-                        glm::ivec3(0, 0, 1),  // +Z
-                        glm::ivec3(0, 0, -1)  // -Z
-                    };
+                if (it != m_chunks.end()) {
+                    // If the chunk is already loaded, check its exposure
+                    if (it->second->isExposed()) {
+                        exposedChunksInColumn.push_back(chunkPos);
+                        
+                        if (inGrid) {
+                            exposedChunksInGrid++;
+                        }
+                    }
+                } else if (inGrid) {
+                    // For chunks in grid that don't exist, see if they should be loaded
                     
-                    // Only mark adjacent chunks as dirty if they exist, are exposed, and are visible
-                    for (int i = 0; i < 6; i++) {
-                        glm::ivec3 adjacentPos = chunkPos + adjacentOffsets[i];
-                        auto it = m_chunks.find(adjacentPos);
-                        if (it != m_chunks.end() && it->second->isExposed() && 
-                            m_visibleChunks.count(adjacentPos) > 0) {
-                            it->second->setDirty(true);
+                    // Either check column metadata or load based on height relative to player
+                    bool shouldLoad = false;
+                    
+                    if (colIt != m_columnMetadata.end()) {
+                        // Use column metadata to determine if should load
+                        shouldLoad = (y >= colIt->second.bottomExposedHeight - 1 && 
+                                      y <= colIt->second.topExposedHeight + 1);
+                    } else {
+                        // No metadata, load chunks near player's height
+                        shouldLoad = (y >= playerChunkPos.y - 1 && y <= playerChunkPos.y + 1);
+                    }
+                    
+                    if (shouldLoad) {
+                        newChunksToLoad.push_back(chunkPos);
+                    }
+                }
+            }
+            
+            // Second pass: For each exposed chunk in this column, add its adjacent chunks
+            for (const auto& exposedPos : exposedChunksInColumn) {
+                auto it = m_chunks.find(exposedPos);
+                if (it == m_chunks.end()) continue;
+                
+                Chunk* chunk = it->second.get();
+                
+                // Check each face
+                for (int face = 0; face < 6; ++face) {
+                    if (chunk->isFaceExposed(face)) {
+                        glm::ivec3 adjPos = exposedPos;
+                        
+                        // Apply offset based on face
+                        switch (face) {
+                            case 0: adjPos.z += 1; break; // +Z
+                            case 1: adjPos.z -= 1; break; // -Z
+                            case 2: adjPos.x -= 1; break; // -X
+                            case 3: adjPos.x += 1; break; // +X
+                            case 4: adjPos.y += 1; break; // +Y
+                            case 5: adjPos.y -= 1; break; // -Y
+                        }
+                        
+                        // If this adjacent chunk doesn't exist, load it
+                        if (m_chunks.find(adjPos) == m_chunks.end()) {
+                            newChunksToLoad.push_back(adjPos);
                         }
                     }
                 }
             }
-        } catch (const std::exception& e) {
-            std::cerr << "ERROR loading chunk at [" << chunkPos.x << "," 
-                     << chunkPos.y << "," << chunkPos.z << "]: " << e.what() << std::endl;
-        }
-    }
-    
-    // If still processing loading, skip unloading for this frame
-    if (!m_chunksToLoadQueue.empty() || chunksLoaded >= maxChunksToLoadPerFrame) {
-        // Update the pending chunk operations count
-        m_pendingChunkOperations = m_chunksToLoadQueue.size();
-        return;
-    }
-    
-    // Process unloading queue (only if loading is complete)
-    int chunksUnloaded = 0;
-    while (!m_chunksToUnloadQueue.empty() && chunksUnloaded < maxChunksToUnloadPerFrame) {
-        // Check timeout
-        if (glfwGetTime() - startProcessingTime > MAX_PROCESSING_TIME) {
-            break;
         }
         
-        glm::ivec3 chunkPos = m_chunksToUnloadQueue.front();
-        m_chunksToUnloadQueue.pop_front();
-        
-        // Skip chunks in the 16x16 grid around player
-        bool withinGrid = (chunkPos.x >= minX && chunkPos.x <= maxX &&
-                           chunkPos.z >= minZ && chunkPos.z <= maxZ);
-        if (withinGrid) {
-            continue;
-        }
-        
-        // Recheck if this chunk should be kept loaded based on exposure
-        bool keepLoaded = false;
-        
-        // Don't unload chunks that are:
-        // 1. Visible within the view frustum
-        if (m_visibleChunks.count(chunkPos) > 0) {
-            keepLoaded = true;
-        }
-        // 2. Exposed to air or water
-        else if (isChunkExposed(chunkPos)) {
-            keepLoaded = true;
-        }
-        // 3. Adjacent to an exposed chunk
-        else if (isAdjacentToExposedChunk(chunkPos)) {
-            keepLoaded = true;
-        }
-        // 4. At ground level (important for world continuity)
-        else if (chunkPos.y < 4) {
-            keepLoaded = true;
-        }
-        
-        // If we need to keep this chunk loaded, skip unloading
-        if (keepLoaded) {
-            continue;
-        }
-        
-        // Only unload chunks that actually exist
-        auto it = m_chunks.find(chunkPos);
-        if (it != m_chunks.end()) {
-            try {
-                // Only save modified chunks
-                if (it->second->isModified()) {
-                    std::string filename = "chunks/" + std::to_string(chunkPos.x) + "_" + 
-                                         std::to_string(chunkPos.y) + "_" + 
-                                         std::to_string(chunkPos.z) + ".chunk";
-                    std::filesystem::create_directories("chunks");
-                    it->second->serialize(filename);
+        // STEP 3: Identify chunks to unload (outside grid and not exposed or adjacent to exposed)
+        for (const auto& pair : m_chunks) {
+            const glm::ivec3& chunkPos = pair.first;
+            
+            // Skip chunks in the 16x16 grid - they should remain loaded
+            if (chunkPos.x >= minX && chunkPos.x <= maxX && 
+                chunkPos.z >= minZ && chunkPos.z <= maxZ) {
+                continue;
+            }
+            
+            // Only unload chunks that are not exposed or adjacent to exposed chunks
+            bool isExposed = pair.second->isExposed();
+            bool isAdjacentToExposed = false;
+            
+            if (!isExposed) {
+                // Check if adjacent to any exposed chunk
+                for (int face = 0; face < 6; ++face) {
+                    glm::ivec3 neighborPos = chunkPos;
+                    
+                    switch (face) {
+                        case 0: neighborPos.z += 1; break; // +Z
+                        case 1: neighborPos.z -= 1; break; // -Z
+                        case 2: neighborPos.x -= 1; break; // -X
+                        case 3: neighborPos.x += 1; break; // +X
+                        case 4: neighborPos.y += 1; break; // +Y
+                        case 5: neighborPos.y -= 1; break; // -Y
+                    }
+                    
+                    auto neighborIt = m_chunks.find(neighborPos);
+                    if (neighborIt != m_chunks.end() && neighborIt->second->isExposed() && 
+                        neighborIt->second->isFaceExposed(5 - face)) { // opposite face
+                        isAdjacentToExposed = true;
+                        break;
+                    }
                 }
-                
-                // Unload the chunk
-                m_chunks.erase(it);
-                chunksUnloaded++;
-            } catch (const std::exception& e) {
-                std::cerr << "ERROR unloading chunk at [" << chunkPos.x << "," 
-                         << chunkPos.y << "," << chunkPos.z << "]: " << e.what() << std::endl;
+            }
+            
+            // If not exposed and not adjacent to an exposed chunk, mark for unloading
+            if (!isExposed && !isAdjacentToExposed) {
+                newChunksToUnload.push_back(chunkPos);
             }
         }
+        
+        // Sort load candidates by distance (closest first)
+        std::sort(newChunksToLoad.begin(), newChunksToLoad.end(),
+            [playerChunkPos](const glm::ivec3& a, const glm::ivec3& b) {
+                float distA = glm::distance(glm::vec3(a), glm::vec3(playerChunkPos));
+                float distB = glm::distance(glm::vec3(b), glm::vec3(playerChunkPos));
+                return distA < distB;
+            }
+        );
+        
+        // Sort unload candidates by distance (furthest first)
+        std::sort(newChunksToUnload.begin(), newChunksToUnload.end(),
+            [playerChunkPos](const glm::ivec3& a, const glm::ivec3& b) {
+                float distA = glm::distance(glm::vec3(a), glm::vec3(playerChunkPos));
+                float distB = glm::distance(glm::vec3(b), glm::vec3(playerChunkPos));
+                return distA > distB;
+            }
+        );
+        
+        // Append new chunks to existing queues
+        for (const auto& chunkPos : newChunksToLoad) {
+            m_chunksToLoadQueue.push_back(chunkPos);
+        }
+        
+        for (const auto& chunkPos : newChunksToUnload) {
+            m_chunksToUnloadQueue.push_back(chunkPos);
+        }
+        
+        // Update the pending chunk operations count
+        m_pendingChunkOperations = m_chunksToLoadQueue.size();
+        
+        // Log what happened
+        std::cout << "Exposure-based chunk evaluation complete: " << newChunksToLoad.size() 
+                  << " new chunks to load (" << exposedChunksInGrid << " exposed in grid), " 
+                  << newChunksToUnload.size() << " marked for unloading" << std::endl;
+        std::cout << "Current queue sizes: Load=" << m_chunksToLoadQueue.size() 
+                  << ", Unload=" << m_chunksToUnloadQueue.size() 
+                  << ", Active chunks=" << m_chunks.size() << std::endl;
+        
+    } catch (const std::exception& e) {
+        std::cerr << "ERROR in evaluateChunksNeeded: " << e.what() << std::endl;
     }
+}
+
+void World::processChunkQueues() {
+    try {
+        // Track current FPS for adaptive loading
+        static float lastFrameTime = glfwGetTime();
+        float currentTime = glfwGetTime();
+        float deltaTime = currentTime - lastFrameTime;
+        lastFrameTime = currentTime;
+        
+        float currentFps = 1.0f / (deltaTime > 0.001f ? deltaTime : 0.001f);
+        
+        // Get current player chunk position
+        glm::ivec3 playerChunkPos = worldToChunkPos(m_lastPlayerPosition);
     
-    // Update the pending chunk operations count
-    m_pendingChunkOperations = m_chunksToLoadQueue.size();
+        // Dynamically adjust chunk processing based on FPS
+        // Significantly increase chunk processing limits to load chunks more quickly
+        int maxChunksToLoadPerFrame = 40; // Increased from 30 to 40
+        int maxChunksToUnloadPerFrame = 5; // Keep at 5
+        
+        // If queue is large and FPS is good, process even more chunks
+        if (m_chunksToLoadQueue.size() > 100 && currentFps > 30.0f) {
+            maxChunksToLoadPerFrame = 60; // Increased from 40 to 60
+        }
+        // If FPS is low, reduce processing
+        else if (currentFps < 15.0f) {
+            maxChunksToLoadPerFrame = 20; // Keep at 20
+            maxChunksToUnloadPerFrame = 2; // Reduced from 3 to 2
+        } 
+        // Normal processing at good FPS
+        else if (currentFps >= 15.0f && currentFps < 40.0f) {
+            maxChunksToLoadPerFrame = 30; // Increased from 25 to 30
+            maxChunksToUnloadPerFrame = 3; // Reduced from 4 to 3
+        }
+        
+        // Add stricter timeout to prevent freezing
+        const float MAX_PROCESSING_TIME = 0.1f; // Keep at 100ms maximum time budget
+        float startProcessingTime = glfwGetTime();
     
-    // Occasional logging
-    static int processLogCounter = 0;
-    if (processLogCounter++ % 100 == 0 && (chunksLoaded > 0 || chunksUnloaded > 0)) {
-        std::cout << "Processed chunks: " << chunksLoaded << " loaded, " 
-                 << chunksUnloaded << " unloaded. Remaining queues: " 
-                 << m_chunksToLoadQueue.size() << " to load, " 
-                 << m_chunksToUnloadQueue.size() << " to unload" << std::endl;
+        // Process loading queue
+        int chunksLoaded = 0;
+        std::vector<glm::ivec3> failedChunks;
+        std::vector<glm::ivec3> deferredChunks;
+        
+        // First, identify chunks in the 16x16 grid for priority loading
+        std::deque<glm::ivec3> priorityChunks;
+        std::deque<glm::ivec3> normalChunks;
+        
+        // Define the 16x16 grid boundaries
+        int minX = playerChunkPos.x - 8;
+        int maxX = playerChunkPos.x + 7;
+        int minZ = playerChunkPos.z - 7;
+        int maxZ = playerChunkPos.z + 8;
+        
+        // Split the queue into priority and normal chunks
+        while (!m_chunksToLoadQueue.empty()) {
+            glm::ivec3 chunkPos = m_chunksToLoadQueue.front();
+            m_chunksToLoadQueue.pop_front();
+            
+            // Check if this chunk is within the current 16x16 grid
+            bool withinGrid = (chunkPos.x >= minX && chunkPos.x <= maxX && 
+                              chunkPos.z >= minZ && chunkPos.z <= maxZ);
+            
+            // Check if it's at or near player's height level
+            bool nearPlayerHeight = (std::abs(chunkPos.y - playerChunkPos.y) <= 1); // Reduced from 2 to 1
+            
+            // Super high priority: chunks at exact player height within small radius
+            bool immediateArea = withinGrid && nearPlayerHeight && 
+                                std::abs(chunkPos.x - playerChunkPos.x) <= 3 && 
+                                std::abs(chunkPos.z - playerChunkPos.z) <= 3;
+            
+            if (immediateArea) {
+                // Highest priority: immediate surroundings
+                priorityChunks.push_front(chunkPos);
+            } else if (withinGrid && nearPlayerHeight) {
+                // High priority: in grid AND near player's height
+                priorityChunks.push_back(chunkPos);
+            } else if (withinGrid) {
+                // Medium priority: in grid but not near player's height
+                normalChunks.push_front(chunkPos);
+            } else {
+                // Low priority: outside the grid
+                normalChunks.push_back(chunkPos);
+            }
+        }
+        
+        // Process priority chunks first
+        while (!priorityChunks.empty() && chunksLoaded < maxChunksToLoadPerFrame) {
+            // Check timeout - give more time since this is high priority
+            if (glfwGetTime() - startProcessingTime > MAX_PROCESSING_TIME * 0.6f) {
+                std::cerr << "WARNING: Priority chunk loading timed out after " << chunksLoaded << " chunks" << std::endl;
+                break;
+            }
+            
+            glm::ivec3 chunkPos = priorityChunks.front();
+            priorityChunks.pop_front();
+            
+            // Skip if already loaded
+            if (m_chunks.find(chunkPos) != m_chunks.end()) {
+                continue;
+            }
+            
+            try {
+                loadChunk(chunkPos);
+                chunksLoaded++;
+            } catch (const std::exception& e) {
+                std::cerr << "ERROR loading chunk at " << chunkPos.x << "," 
+                          << chunkPos.y << "," << chunkPos.z 
+                          << ": " << e.what() << std::endl;
+                
+                // Add to failed chunks list to retry later
+                failedChunks.push_back(chunkPos);
+            }
+        }
+        
+        // Then process normal chunks if we have room left
+        while (!normalChunks.empty() && chunksLoaded < maxChunksToLoadPerFrame) {
+            // Check timeout - use remaining time budget
+            if (glfwGetTime() - startProcessingTime > MAX_PROCESSING_TIME) {
+                break;
+            }
+            
+            glm::ivec3 chunkPos = normalChunks.front();
+            normalChunks.pop_front();
+            
+            // Skip if already loaded
+            if (m_chunks.find(chunkPos) != m_chunks.end()) {
+                continue;
+            }
+            
+            try {
+                loadChunk(chunkPos);
+                chunksLoaded++;
+            } catch (const std::exception& e) {
+                std::cerr << "ERROR loading chunk at " << chunkPos.x << "," 
+                          << chunkPos.y << "," << chunkPos.z 
+                          << ": " << e.what() << std::endl;
+                
+                // Add to failed chunks list to retry later
+                failedChunks.push_back(chunkPos);
+            }
+        }
+        
+        // Put unprocessed chunks back in the queue
+        std::copy(priorityChunks.begin(), priorityChunks.end(), std::back_inserter(m_chunksToLoadQueue));
+        std::copy(normalChunks.begin(), normalChunks.end(), std::back_inserter(m_chunksToLoadQueue));
+        
+        // Put failed chunks back in the queue at the end
+        for (const auto& chunkPos : failedChunks) {
+            m_chunksToLoadQueue.push_back(chunkPos);
+        }
+        
+        // Log loading progress if we loaded any chunks
+        if (chunksLoaded > 0) {
+            std::cout << "Loaded " << chunksLoaded << " chunks, " 
+                      << m_chunksToLoadQueue.size() << " chunks remaining in queue"
+                      << std::endl;
+        }
+        
+        // Skip unloading if there are still chunks to load in the 16x16 grid
+        // This ensures we prioritize loading over unloading
+        if (!m_chunksToLoadQueue.empty() || chunksLoaded >= maxChunksToLoadPerFrame) {
+            // Update the pending chunk operations count
+            m_pendingChunkOperations = m_chunksToLoadQueue.size();
+            return;
+        }
+        
+        // Process unloading queue (only if loading is complete)
+        int chunksUnloaded = 0;
+        while (!m_chunksToUnloadQueue.empty() && chunksUnloaded < maxChunksToUnloadPerFrame) {
+            // Check timeout
+            if (glfwGetTime() - startProcessingTime > MAX_PROCESSING_TIME) {
+                std::cerr << "WARNING: Chunk unloading timed out after " << chunksUnloaded << " chunks" << std::endl;
+                break;
+            }
+            
+            glm::ivec3 chunkPos = m_chunksToUnloadQueue.front();
+            m_chunksToUnloadQueue.pop_front();
+            
+            // Skip chunks that are in the standard 16x16 grid regardless of height
+            bool withinGrid = (chunkPos.x >= minX && chunkPos.x <= maxX &&
+                               chunkPos.z >= minZ && chunkPos.z <= maxZ);
+            if (withinGrid) {
+                // Requeue at end if still within the grid
+                m_chunksToUnloadQueue.push_back(chunkPos);
+                continue;
+            }
+            
+            // Skip chunks that are exposed or adjacent to exposed chunks
+            bool isExposed = isChunkExposed(chunkPos);
+            bool isAdjacentToExposed = isAdjacentToExposedChunk(chunkPos);
+            
+            if (isExposed || isAdjacentToExposed) {
+                // Keep exposed chunks and their neighbors loaded
+                // But push to back of queue for potential unloading later
+                m_chunksToUnloadQueue.push_back(chunkPos);
+                continue;
+            }
+            
+            // Only unload chunks that actually exist
+            if (m_chunks.find(chunkPos) != m_chunks.end()) {
+                try {
+                    // To improve performance, we'll skip saving chunks if they're not modified
+                    Chunk* chunk = getChunkAt(chunkPos);
+                    if (chunk && chunk->isModified()) {
+                        std::string filename = "chunks/" + std::to_string(chunkPos.x) + "_" + 
+                                              std::to_string(chunkPos.y) + "_" + 
+                                              std::to_string(chunkPos.z) + ".chunk";
+                        std::filesystem::create_directories("chunks");
+                        chunk->serialize(filename);
+                    }
+                    
+                    unloadChunk(chunkPos);
+                    chunksUnloaded++;
+                } catch (const std::exception& e) {
+                    std::cerr << "ERROR unloading chunk at " << chunkPos.x << "," 
+                              << chunkPos.y << "," << chunkPos.z 
+                              << ": " << e.what() << std::endl;
+                }
+            }
+        }
+        
+        // Update the final pending chunk operations count
+        m_pendingChunkOperations = m_chunksToLoadQueue.size();
+        
+        // Log processing results (only occasionally)
+        static int procLogCounter = 0;
+        if ((chunksLoaded > 0 || chunksUnloaded > 0) && procLogCounter++ % 120 == 0) {
+            std::cout << "Processed chunks: loaded " << chunksLoaded 
+                     << ", unloaded " << chunksUnloaded
+                     << ", total active: " << m_chunks.size() 
+                     << ", pending load: " << m_pendingChunkOperations 
+                     << ", pending unload: " << m_chunksToUnloadQueue.size()
+                     << ", FPS: " << currentFps << std::endl;
+        }
+        
+        // Clear blocks older than 1 second to manage memory
+        double cutoffTime = currentTime - 1.0;
+        while (!m_recentlyModifiedBlocks.empty() && m_recentlyModifiedBlocks.front().timeModified < cutoffTime) {
+            m_recentlyModifiedBlocks.pop_front();
+        }
+    } catch (const std::exception& e) {
+        // Recovery from any unexpected errors
+        std::cerr << "ERROR in processChunkQueues: " << e.what() << std::endl;
     }
 }
 
@@ -1284,9 +1576,6 @@ void World::updateVisibleChunks(const glm::vec3& playerPos, const glm::vec3& pla
         static float lastVisibilityUpdateTime = 0.0f;
         float currentTime = glfwGetTime();
         
-        // Call periodic reset if it's been a while
-        resetChunkStates();
-        
         // Only update visibility at most once per second
         if (currentTime - lastVisibilityUpdateTime < 1.0f) {
             return;
@@ -1307,97 +1596,75 @@ void World::updateVisibleChunks(const glm::vec3& playerPos, const glm::vec3& pla
         // Track which chunks should be visible (new visibility set)
         std::unordered_set<glm::ivec3, Vec3Hash> newVisibleChunks;
         
-        // First stage: Add all chunks in the 16x16 grid that have exposed faces
+        // STEP 1: First, identify all exposed chunks within the 16x16 grid
         for (int x = minX; x <= maxX; ++x) {
             for (int z = minZ; z <= maxZ; ++z) {
-                // Find all chunks in this column
-                for (int y = 0; y < 255; ++y) {
+                // Get the column metadata to determine height range
+                ColumnXZ columnKey(x, z);
+                auto colIt = m_columnMetadata.find(columnKey);
+                
+                // If we don't have metadata, just check a small range around player
+                int minY = 0;
+                int maxY = 255;
+                
+                // If we have column metadata, use it to restrict search range
+                if (colIt != m_columnMetadata.end()) {
+                    minY = std::max(0, colIt->second.bottomExposedHeight - 1);
+                    maxY = std::min(255, colIt->second.topExposedHeight + 1);
+                } else {
+                    // No column data, check near player's height only
+                    minY = std::max(0, playerChunkPos.y - 2);
+                    maxY = std::min(255, playerChunkPos.y + 2);
+                }
+                
+                // Check each chunk in the height range
+                for (int y = minY; y <= maxY; ++y) {
                     glm::ivec3 chunkPos(x, y, z);
                     
-                    // Skip if chunk doesn't exist
+                    // Only consider chunks that exist and are exposed
                     auto it = m_chunks.find(chunkPos);
                     if (it == m_chunks.end()) {
                         continue;
                     }
                     
-                    // If chunk has any exposed face, add it to visible set
-                    if (it->second->isExposed()) {
+                    Chunk* chunk = it->second.get();
+                    if (chunk && chunk->isExposed()) {
                         newVisibleChunks.insert(chunkPos);
-                        
-                        // Also add chunks adjacent to exposed faces
-                        // Check each face of this chunk
-                        for (int face = 0; face < 6; ++face) {
-                            if (it->second->isFaceExposed(face)) {
-                                // Get the position of the adjacent chunk in this direction
-                                glm::ivec3 adjacentPos = chunkPos;
-                                
-                                // Apply offset based on face index
-                                switch (face) {
-                                    case 0: adjacentPos.z += 1; break; // +Z
-                                    case 1: adjacentPos.z -= 1; break; // -Z
-                                    case 2: adjacentPos.x -= 1; break; // -X
-                                    case 3: adjacentPos.x += 1; break; // +X
-                                    case 4: adjacentPos.y += 1; break; // +Y
-                                    case 5: adjacentPos.y -= 1; break; // -Y
-                                }
-                                
-                                // Add the adjacent chunk to visible set if it exists
-                                if (m_chunks.find(adjacentPos) != m_chunks.end()) {
-                                    newVisibleChunks.insert(adjacentPos);
-                                }
-                            }
-                        }
                     }
                 }
             }
         }
         
-        // Second stage: Handle chunks outside the 16x16 grid
-        // Only consider chunks that are already loaded and either:
-        // 1. Have exposed faces themselves, or
-        // 2. Are adjacent to chunks with exposed faces pointing toward them
-        for (const auto& pair : m_chunks) {
-            const glm::ivec3& chunkPos = pair.first;
+        // STEP 2: Add chunks adjacent to exposed faces
+        std::vector<glm::ivec3> exposedChunks(newVisibleChunks.begin(), newVisibleChunks.end());
+        for (const auto& chunkPos : exposedChunks) {
+            auto it = m_chunks.find(chunkPos);
+            if (it == m_chunks.end()) continue;
             
-            // Skip chunks in the 16x16 grid (already handled)
-            if (chunkPos.x >= minX && chunkPos.x <= maxX && 
-                chunkPos.z >= minZ && chunkPos.z <= maxZ) {
-                continue;
-            }
-            
-            // If this chunk has exposed faces, add it to visible set
-            if (pair.second->isExposed()) {
-                newVisibleChunks.insert(chunkPos);
-                
-                // Also add chunks adjacent to exposed faces
-                for (int face = 0; face < 6; ++face) {
-                    if (pair.second->isFaceExposed(face)) {
-                        glm::ivec3 adjacentPos = chunkPos;
-                        
-                        // Apply offset based on face index
-                        switch (face) {
-                            case 0: adjacentPos.z += 1; break; // +Z
-                            case 1: adjacentPos.z -= 1; break; // -Z
-                            case 2: adjacentPos.x -= 1; break; // -X
-                            case 3: adjacentPos.x += 1; break; // +X
-                            case 4: adjacentPos.y += 1; break; // +Y
-                            case 5: adjacentPos.y -= 1; break; // -Y
-                        }
-                        
-                        // Add the adjacent chunk to visible set if it exists
-                        if (m_chunks.find(adjacentPos) != m_chunks.end()) {
-                            newVisibleChunks.insert(adjacentPos);
-                        }
+            // Check each face of the exposed chunk
+            Chunk* chunk = it->second.get();
+            for (int face = 0; face < 6; ++face) {
+                if (chunk->isFaceExposed(face)) {
+                    // Get adjacent chunk position
+                    glm::ivec3 adjPos = chunkPos;
+                    switch (face) {
+                        case 0: adjPos.z += 1; break; // +Z
+                        case 1: adjPos.z -= 1; break; // -Z
+                        case 2: adjPos.x -= 1; break; // -X
+                        case 3: adjPos.x += 1; break; // +X
+                        case 4: adjPos.y += 1; break; // +Y
+                        case 5: adjPos.y -= 1; break; // -Y
+                    }
+                    
+                    // Add adjacent chunk if it exists
+                    if (m_chunks.find(adjPos) != m_chunks.end()) {
+                        newVisibleChunks.insert(adjPos);
                     }
                 }
             }
-            // Check if this chunk is adjacent to an exposed chunk with a face toward it
-            else if (isAdjacentToExposedChunk(chunkPos)) {
-                newVisibleChunks.insert(chunkPos);
-            }
         }
         
-        // If we exceed the maximum visible chunks, prioritize chunks closer to the player
+        // STEP 3: Apply the visible chunk limit with distance-based priority
         if (newVisibleChunks.size() > m_maxVisibleChunks) {
             std::cout << "WARNING: " << newVisibleChunks.size() << " visible chunks exceeds limit of " 
                      << m_maxVisibleChunks << ". Prioritizing closest chunks." << std::endl;
@@ -1405,17 +1672,13 @@ void World::updateVisibleChunks(const glm::vec3& playerPos, const glm::vec3& pla
             // Convert to vector for sorting
             std::vector<glm::ivec3> sortedChunks(newVisibleChunks.begin(), newVisibleChunks.end());
             
-            // Sort by Manhattan distance from player
+            // Sort by 3D distance from player (simpler and more accurate)
             std::sort(sortedChunks.begin(), sortedChunks.end(),
                 [playerChunkPos](const glm::ivec3& a, const glm::ivec3& b) {
-                    int distA = std::abs(a.x - playerChunkPos.x) + 
-                                std::abs(a.y - playerChunkPos.y) * 2 + // Weight Y more
-                                std::abs(a.z - playerChunkPos.z);
-                                
-                    int distB = std::abs(b.x - playerChunkPos.x) + 
-                                std::abs(b.y - playerChunkPos.y) * 2 + 
-                                std::abs(b.z - playerChunkPos.z);
-                                
+                    // Use squared distance to avoid square root operations
+                    float distA = glm::distance(glm::vec3(a), glm::vec3(playerChunkPos));
+                    float distB = glm::distance(glm::vec3(b), glm::vec3(playerChunkPos));
+                    
                     return distA < distB; // Closest first
                 }
             );
@@ -1427,7 +1690,7 @@ void World::updateVisibleChunks(const glm::vec3& playerPos, const glm::vec3& pla
             }
         }
         
-        // Calculate debugging stats
+        // Log visibility change statistics
         int chunksAdded = 0;
         int chunksRemoved = 0;
         
@@ -1473,70 +1736,72 @@ void World::dumpColumnDebugInfo() const {
 
 // Helper method to determine if a chunk should be loaded based on exposure rules
 bool World::shouldLoadBasedOnExposure(const glm::ivec3& chunkPos) const {
-    // First, if the chunk is already loaded, check its exposure directly
-    auto chunkIt = m_chunks.find(chunkPos);
-    if (chunkIt != m_chunks.end()) {
-        return chunkIt->second->isExposed();
-    }
-    
     // Get the column for this chunk
     ColumnXZ columnKey(chunkPos.x, chunkPos.z);
     
-    // If we have column metadata for this column, use it
+    // If we don't have metadata for this column, check adjacent columns
     auto columnIt = m_columnMetadata.find(columnKey);
-    if (columnIt != m_columnMetadata.end()) {
-        // This column has exposed chunks
-        // Check if this chunk's Y-coordinate is within the exposed range or adjacent to it
-        if (chunkPos.y >= columnIt->second.bottomExposedHeight - 1 && 
-            chunkPos.y <= columnIt->second.topExposedHeight + 1) {
+    if (columnIt == m_columnMetadata.end()) {
+        // This column has no exposed chunks
+        // Let's check if this chunk could be adjacent to an exposed chunk in a neighboring column
+        // This is important for correctly identifying chunks that need to be loaded at column boundaries
+        
+        // Check the 4 adjacent columns (N, S, E, W)
+        const std::pair<int, int> adjacentColumnOffsets[4] = {
+            {1, 0}, {-1, 0}, {0, 1}, {0, -1}
+        };
+        
+        for (int i = 0; i < 4; i++) {
+            ColumnXZ adjacentColumnKey(
+                columnKey.first + adjacentColumnOffsets[i].first, 
+                columnKey.second + adjacentColumnOffsets[i].second
+            );
+            
+            auto adjacentColumnIt = m_columnMetadata.find(adjacentColumnKey);
+            if (adjacentColumnIt != m_columnMetadata.end()) {
+                // This chunk is at the edge of its column and adjacent to another column with exposed chunks
+                // We need to check if it's adjacent to any exposed chunk
+                
+                // For X-adjacent columns, we check if this chunk is adjacent to the column edge
+                if (adjacentColumnOffsets[i].first != 0) {
+                    // If this chunk is at the edge of its column in the X direction
+                    if ((adjacentColumnOffsets[i].first > 0 && chunkPos.x == columnKey.first) || 
+                        (adjacentColumnOffsets[i].first < 0 && chunkPos.x == columnKey.first)) {
+                        // Check if chunk Y is within the exposed range of the adjacent column
+                        if (chunkPos.y >= adjacentColumnIt->second.bottomExposedHeight - 1 && 
+                            chunkPos.y <= adjacentColumnIt->second.topExposedHeight + 1) {
             return true;
-        }
-    }
-    
-    // If no column metadata, check adjacent columns for exposure
-    const std::pair<int, int> adjacentColumnOffsets[4] = {
-        {1, 0}, {-1, 0}, {0, 1}, {0, -1}
-    };
-    
-    for (int i = 0; i < 4; i++) {
-        ColumnXZ adjacentColumnKey(
-            columnKey.first + adjacentColumnOffsets[i].first, 
-            columnKey.second + adjacentColumnOffsets[i].second
-        );
-        
-        auto adjacentColumnIt = m_columnMetadata.find(adjacentColumnKey);
-        if (adjacentColumnIt != m_columnMetadata.end()) {
-            // Check if this chunk's Y is within the adjacent column's exposed range
-            if (chunkPos.y >= adjacentColumnIt->second.bottomExposedHeight - 1 && 
-                chunkPos.y <= adjacentColumnIt->second.topExposedHeight + 1) {
-                return true;
+                        }
+                    }
+                }
+                
+                // For Z-adjacent columns, we check if this chunk is adjacent to the column edge
+                if (adjacentColumnOffsets[i].second != 0) {
+                    // If this chunk is at the edge of its column in the Z direction
+                    if ((adjacentColumnOffsets[i].second > 0 && chunkPos.z == columnKey.second) || 
+                        (adjacentColumnOffsets[i].second < 0 && chunkPos.z == columnKey.second)) {
+                        // Check if chunk Y is within the exposed range of the adjacent column
+                        if (chunkPos.y >= adjacentColumnIt->second.bottomExposedHeight - 1 && 
+                            chunkPos.y <= adjacentColumnIt->second.topExposedHeight + 1) {
+            return true;
+                        }
+                    }
+                }
             }
         }
-    }
-    
-    // Finally, check if any adjacent chunks are loaded and exposed
-    const glm::ivec3 directions[6] = {
-        glm::ivec3(1, 0, 0),   // +X
-        glm::ivec3(-1, 0, 0),  // -X
-        glm::ivec3(0, 1, 0),   // +Y
-        glm::ivec3(0, -1, 0),  // -Y
-        glm::ivec3(0, 0, 1),   // +Z
-        glm::ivec3(0, 0, -1)   // -Z
-    };
-    
-    for (const auto& dir : directions) {
-        glm::ivec3 adjacentPos = chunkPos + dir;
-        auto adjIt = m_chunks.find(adjacentPos);
         
-        if (adjIt != m_chunks.end() && adjIt->second->isExposed()) {
-            // Check if the adjacent chunk has the face toward this chunk exposed
-            if (adjIt->second->isFaceExposedToChunk(chunkPos)) {
-                return true;
-            }
-        }
+        // No adjacent exposed chunks found
+        return false;
+    }
+        
+    // This column has exposed chunks
+    // Check if this chunk's Y-coordinate is within the exposed range or adjacent to it
+    if (chunkPos.y >= columnIt->second.bottomExposedHeight - 1 && 
+        chunkPos.y <= columnIt->second.topExposedHeight + 1) {
+        return true;
     }
     
-    // No exposure criteria met, this chunk should not be loaded based on exposure
+    // Outside the exposed range
     return false;
 }
 
@@ -1726,15 +1991,14 @@ void World::updateColumnMetadata(const glm::ivec3& chunkPos) {
 
 // Add a method to update a limited number of dirty chunk meshes per frame
 void World::updateDirtyChunkMeshes(int maxUpdatesPerFrame) {
-    // Call the reset function periodically
-    resetChunkStates();
-    
     // Find dirty chunks that need mesh updates
     std::vector<glm::ivec3> dirtyChunks;
     
-    for (const auto& pair : m_chunks) {
-        if (pair.second->isDirty()) {
-            dirtyChunks.push_back(pair.first);
+    // Only consider chunks that are both dirty AND in the visible set
+    for (const auto& chunkPos : m_visibleChunks) {
+        auto it = m_chunks.find(chunkPos);
+        if (it != m_chunks.end() && it->second->isDirty()) {
+            dirtyChunks.push_back(chunkPos);
         }
     }
     
@@ -1745,17 +2009,6 @@ void World::updateDirtyChunkMeshes(int maxUpdatesPerFrame) {
     // Get player's chunk position
     glm::ivec3 playerChunkPos = worldToChunkPos(m_lastPlayerPosition);
     
-    // Track if the player has moved since last frame
-    static glm::ivec3 lastPlayerChunkPos = playerChunkPos;
-    bool playerMoved = (lastPlayerChunkPos != playerChunkPos);
-    lastPlayerChunkPos = playerChunkPos;
-    
-    // Define the 16x16 grid boundaries
-    int minX = playerChunkPos.x - 8;
-    int maxX = playerChunkPos.x + 7;
-    int minZ = playerChunkPos.z - 7;
-    int maxZ = playerChunkPos.z + 8;
-    
     // Log when we start and how many we have
     static bool firstTimeRunning = true;
     if (firstTimeRunning && !dirtyChunks.empty()) {
@@ -1764,88 +2017,55 @@ void World::updateDirtyChunkMeshes(int maxUpdatesPerFrame) {
         firstTimeRunning = false;
     }
     
-    // If we have too many dirty chunks, something may be wrong - impose a hard limit
-    const int MAX_DIRTY_CHUNKS = 1000; // Set a hard limit for safety
+    // If we have too many dirty chunks, reset to prevent excessive processing
+    const int MAX_DIRTY_CHUNKS = 500; // Lower limit for better performance
     if (dirtyChunks.size() > MAX_DIRTY_CHUNKS) {
         std::cout << "WARNING: Too many dirty chunks (" << dirtyChunks.size() 
-                  << ") - forcing reset to avoid excessive processing." << std::endl;
+                  << ") - resetting to avoid excessive processing." << std::endl;
                   
-        // Reset all dirty flags, keeping only chunks in player's immediate area
-        for (auto& pair : m_chunks) {
-            const glm::ivec3& chunkPos = pair.first;
-            Chunk* chunk = pair.second.get();
-            
-            // Keep as dirty only if in immediate area around player and exposed
-            bool inImmediateArea = (
-                std::abs(chunkPos.x - playerChunkPos.x) <= 2 && 
-                std::abs(chunkPos.y - playerChunkPos.y) <= 2 &&
-                std::abs(chunkPos.z - playerChunkPos.z) <= 2);
-                
-            if (!inImmediateArea || !chunk->isExposed()) {
-                chunk->setDirty(false);
-            }
-        }
+        // Reset all but the immediate area
+        resetChunkStates();
         
-        // Rebuild dirty chunk list with only the immediate chunks
+        // Rebuild dirty chunk list with only the remaining dirty chunks
         dirtyChunks.clear();
-        for (const auto& pair : m_chunks) {
-            if (pair.second->isDirty()) {
-                dirtyChunks.push_back(pair.first);
+        for (const auto& chunkPos : m_visibleChunks) {
+            auto it = m_chunks.find(chunkPos);
+            if (it != m_chunks.end() && it->second->isDirty()) {
+                dirtyChunks.push_back(chunkPos);
             }
         }
         
         std::cout << "Dirty chunks reduced to " << dirtyChunks.size() << " after reset." << std::endl;
+        
+        // If we still have too many, be even more aggressive
+        if (dirtyChunks.size() > MAX_DIRTY_CHUNKS / 2) {
+            // Only keep chunks in immediate vicinity
+            std::vector<glm::ivec3> immediateChunks;
+            for (const auto& chunkPos : dirtyChunks) {
+                if (std::abs(chunkPos.x - playerChunkPos.x) <= 2 && 
+                    std::abs(chunkPos.y - playerChunkPos.y) <= 2 &&
+                    std::abs(chunkPos.z - playerChunkPos.z) <= 2) {
+                    immediateChunks.push_back(chunkPos);
+                } else {
+                    // Clear the dirty flag for chunks we're skipping
+                    auto it = m_chunks.find(chunkPos);
+                    if (it != m_chunks.end()) {
+                        it->second->setDirty(false);
+                    }
+                }
+            }
+            dirtyChunks = std::move(immediateChunks);
+            std::cout << "Further reduced to " << dirtyChunks.size() << " immediate chunks." << std::endl;
+        }
     }
     
-    // If player hasn't moved and we're not in the initial loading phase,
-    // lower the number of updates per frame to reduce unnecessary mesh regeneration
-    if (!playerMoved && !firstTimeRunning && dirtyChunks.size() < 10) {
-        maxUpdatesPerFrame = std::min(maxUpdatesPerFrame, 1);
-    }
-    
-    // Sort dirty chunks by priority
-    // 1. Chunks within immediate player area (3x3x3 around player) first
-    // 2. Chunks in the 16x16 grid with exposed faces next
-    // 3. Rest of the chunks sorted by distance
+    // Sort dirty chunks by priority (distance to player)
     std::sort(dirtyChunks.begin(), dirtyChunks.end(), 
-        [playerChunkPos, this](const glm::ivec3& a, const glm::ivec3& b) {
-            // Define immediate area around player (higher priority)
-            bool aImmediate = std::abs(a.x - playerChunkPos.x) <= 1 && 
-                              std::abs(a.y - playerChunkPos.y) <= 1 && 
-                              std::abs(a.z - playerChunkPos.z) <= 1;
-            bool bImmediate = std::abs(b.x - playerChunkPos.x) <= 1 && 
-                              std::abs(b.y - playerChunkPos.y) <= 1 && 
-                              std::abs(b.z - playerChunkPos.z) <= 1;
-            
-            if (aImmediate && !bImmediate) return true;
-            if (!aImmediate && bImmediate) return false;
-            
-            // Define 16x16 grid
-            bool aIn16x16 = (a.x >= playerChunkPos.x - 8 && a.x <= playerChunkPos.x + 7 && 
-                             a.z >= playerChunkPos.z - 7 && a.z <= playerChunkPos.z + 8);
-            bool bIn16x16 = (b.x >= playerChunkPos.x - 8 && b.x <= playerChunkPos.x + 7 && 
-                             b.z >= playerChunkPos.z - 7 && b.z <= playerChunkPos.z + 8);
-            
-            // Prioritize exposed chunks in 16x16 grid
-            bool aExposed = this->isChunkExposed(a);
-            bool bExposed = this->isChunkExposed(b);
-            
-            if (aIn16x16 && aExposed && !(bIn16x16 && bExposed)) return true;
-            if (!(aIn16x16 && aExposed) && (bIn16x16 && bExposed)) return false;
-            
-            // Prioritize any chunks in 16x16 grid
-            if (aIn16x16 && !bIn16x16) return true;
-            if (!aIn16x16 && bIn16x16) return false;
-            
-            // For chunks with same priority level, sort by distance
-            int distA = std::abs(a.x - playerChunkPos.x) + 
-                        std::abs(a.y - playerChunkPos.y) + 
-                        std::abs(a.z - playerChunkPos.z);
-            int distB = std::abs(b.x - playerChunkPos.x) + 
-                        std::abs(b.y - playerChunkPos.y) + 
-                        std::abs(b.z - playerChunkPos.z);
-            
-            return distA < distB;
+        [playerChunkPos](const glm::ivec3& a, const glm::ivec3& b) {
+            // Use squared distance for efficiency
+            float distA = glm::distance(glm::vec3(a), glm::vec3(playerChunkPos));
+            float distB = glm::distance(glm::vec3(b), glm::vec3(playerChunkPos));
+            return distA < distB; // Closest first
         }
     );
     
@@ -1855,21 +2075,6 @@ void World::updateDirtyChunkMeshes(int maxUpdatesPerFrame) {
     if (firstFramesMeshCount < 20) {
         maxUpdatesPerFrame = 100; // Process many more chunks on first frames
         firstFramesMeshCount++;
-    }
-    else {
-        // Increase updates for immediate area chunks
-        int immediateAreaChunks = 0;
-        for (const auto& chunkPos : dirtyChunks) {
-            bool isImmediate = std::abs(chunkPos.x - playerChunkPos.x) <= 1 && 
-                               std::abs(chunkPos.y - playerChunkPos.y) <= 1 && 
-                               std::abs(chunkPos.z - playerChunkPos.z) <= 1;
-            if (isImmediate) immediateAreaChunks++;
-        }
-        
-        // If we have many chunks in immediate area, increase update count
-        if (immediateAreaChunks > maxUpdatesPerFrame / 2) {
-            maxUpdatesPerFrame = std::min(maxUpdatesPerFrame + 10, immediateAreaChunks + 5);
-        }
     }
     
     // Add timeout protection
@@ -1890,40 +2095,6 @@ void World::updateDirtyChunkMeshes(int maxUpdatesPerFrame) {
         
         Chunk* chunk = getChunkAt(chunkPos);
         if (chunk && chunk->isDirty()) {
-            // Skip chunks that are outside the player's current grid and not exposed
-            bool inGrid = (chunkPos.x >= minX && chunkPos.x <= maxX && 
-                          chunkPos.z >= minZ && chunkPos.z <= maxZ);
-                          
-            if (!inGrid && !chunk->isExposed() && !isAdjacentToExposedChunk(chunkPos)) {
-                // Just clear the dirty flag and skip mesh generation
-                chunk->setDirty(false);
-                continue;
-            }
-            
-            // Skip chunks that already have a mesh when player hasn't moved
-            // This prevents constant regeneration of meshes when standing still
-            if (!playerMoved && chunk->hasMesh() && !firstTimeRunning) {
-                chunk->setDirty(false);
-                continue;
-            }
-            
-            // Check if this chunk should be visible based on position and exposure
-            bool shouldBeVisible = false;
-            
-            // Is it in the 16x16 grid and exposed?
-            bool isExposed = chunk->isExposed();
-            bool isAdjacentToExposed = isAdjacentToExposedChunk(chunkPos);
-            
-            // Determine if chunk should be visible
-            if ((inGrid && isExposed) || isAdjacentToExposed) {
-                shouldBeVisible = true;
-            }
-            
-            // Only add to visible set if it should be visible
-            if (shouldBeVisible) {
-                m_visibleChunks.insert(chunkPos);
-            }
-            
             // Generate the mesh
             chunk->generateMesh(m_disableGreedyMeshing);
             chunk->setDirty(false);
@@ -1969,55 +2140,11 @@ bool World::isChunkExposed(const glm::ivec3& chunkPos) const {
     // Get the chunk
     auto it = m_chunks.find(chunkPos);
     if (it == m_chunks.end()) {
-        // If chunk doesn't exist, check if it's at a world boundary
-        if (chunkPos.y <= 0 || chunkPos.y >= 255) {
-            // Chunks at vertical world boundaries are always considered exposed
-            return true;
-        }
-        
-        // For non-existent chunks, we need to check if they would be exposed by:
-        // 1. Looking at adjacent chunks if they exist
-        // 2. Checking column metadata
-        
-        // Check column metadata first (more efficient)
-        ColumnXZ columnKey(chunkPos.x, chunkPos.z);
-        auto colIt = m_columnMetadata.find(columnKey);
-        if (colIt != m_columnMetadata.end()) {
-            // If this chunk's Y is within the exposed range, it's potentially exposed
-            if (chunkPos.y >= colIt->second.bottomExposedHeight - 1 && 
-                chunkPos.y <= colIt->second.topExposedHeight + 1) {
-                return true;
-            }
-        }
-        
-        // Check all adjacent chunks if they exist
-        const glm::ivec3 directions[6] = {
-            glm::ivec3(1, 0, 0),   // +X
-            glm::ivec3(-1, 0, 0),  // -X
-            glm::ivec3(0, 1, 0),   // +Y
-            glm::ivec3(0, -1, 0),  // -Y
-            glm::ivec3(0, 0, 1),   // +Z
-            glm::ivec3(0, 0, -1)   // -Z
-        };
-        
-        for (const auto& dir : directions) {
-            glm::ivec3 adjPos = chunkPos + dir;
-            auto adjIt = m_chunks.find(adjPos);
-            
-            if (adjIt != m_chunks.end() && adjIt->second->isExposed()) {
-                // If the adjacent chunk exists and is exposed on the face toward this chunk,
-                // this chunk would likely be exposed too
-                if (adjIt->second->isFaceExposedToChunk(chunkPos)) {
-                    return true;
-                }
-            }
-        }
-        
-        // We don't have enough information to determine exposure
+        // Chunk doesn't exist, so we can't determine its exposure
         return false;
     }
     
-    // For an existing chunk, check if it has any exposed faces
+    // Check if the chunk is exposed (has any face with exposed voxels)
     return it->second->isExposed();
 }
 
@@ -2058,333 +2185,6 @@ bool World::isAdjacentToExposedChunk(const glm::ivec3& chunkPos) const {
 
 void World::evaluateChunksNeeded(const glm::vec3& playerPos) {
     try {
-        // Only evaluate if the world is initialized
-        if (!m_initialized) {
-            return;
-        }
-
-        // Track when we last evaluated to prevent thrashing
+        // Track when we last evaluated
         static float lastEvaluationTime = 0.0f;
         float currentTime = glfwGetTime();
-        
-        // Only evaluate once per second to prevent oscillation/thrashing
-        if (currentTime - lastEvaluationTime < 1.0f) {
-            return;
-        }
-        lastEvaluationTime = currentTime;
-        
-        // Safety check for invalid positions
-        if (std::isnan(playerPos.x) || std::isnan(playerPos.y) || std::isnan(playerPos.z) ||
-            std::isinf(playerPos.x) || std::isinf(playerPos.y) || std::isinf(playerPos.z)) {
-            std::cerr << "ERROR: Invalid player position detected: " 
-                    << playerPos.x << ", " << playerPos.y << ", " << playerPos.z << std::endl;
-            return;
-        }
-        
-        // Update the stored position if valid
-        m_lastPlayerPosition = playerPos;
-        
-        // Convert player position to chunk coordinates
-        glm::ivec3 playerChunkPos = worldToChunkPos(playerPos);
-        
-        // Define the 16x16 grid boundaries around the player
-        int minX = playerChunkPos.x - 8;
-        int maxX = playerChunkPos.x + 7;
-        int minZ = playerChunkPos.z - 7;
-        int maxZ = playerChunkPos.z + 8;
-        
-        // Temporary collections for chunk operations
-        std::vector<glm::ivec3> newChunksToLoad;
-        std::vector<glm::ivec3> newChunksToUnload;
-        
-        // Cache currently loaded chunks
-        std::unordered_set<glm::ivec3, Vec3Hash> existingChunkPositions;
-        for (const auto& pair : m_chunks) {
-            existingChunkPositions.insert(pair.first);
-        }
-        
-        // Cache what's already in the load queue to avoid duplicates
-        std::unordered_set<glm::ivec3, Vec3Hash> chunksInLoadQueue;
-        for (const auto& chunkPos : m_chunksToLoadQueue) {
-            chunksInLoadQueue.insert(chunkPos);
-        }
-        
-        // STEP 1: First identify all columns that need evaluation
-        std::set<ColumnXZ> columnsToCheck;
-        
-        // Add all columns in the 16x16 grid
-        for (int x = minX; x <= maxX; x++) {
-            for (int z = minZ; z <= maxZ; z++) {
-                columnsToCheck.insert(ColumnXZ(x, z));
-            }
-        }
-        
-        // Also add columns with exposed chunks that are adjacent to the grid
-        int gridBoundaryPadding = 1; // Only check 1 chunk out from the grid
-        for (const auto& colMeta : m_columnMetadata) {
-            // Skip if already in the set
-            if (columnsToCheck.count(colMeta.first) > 0) {
-                continue;
-            }
-            
-            // Check if this column is adjacent to the player's grid
-            bool adjacentToGrid = 
-                (colMeta.first.first >= minX - gridBoundaryPadding && colMeta.first.first <= maxX + gridBoundaryPadding &&
-                 colMeta.first.second >= minZ - gridBoundaryPadding && colMeta.first.second <= maxZ + gridBoundaryPadding);
-                 
-            if (adjacentToGrid) {
-                columnsToCheck.insert(colMeta.first);
-            }
-        }
-        
-        // STEP 2: For each column, determine which chunks should be loaded
-        int exposedChunksInGrid = 0;
-        
-        for (const auto& columnKey : columnsToCheck) {
-            // Determine if this column is within the player's grid
-            bool inGrid = (columnKey.first >= minX && columnKey.first <= maxX && 
-                           columnKey.second >= minZ && columnKey.second <= maxZ);
-                           
-            // Get column metadata if it exists
-            auto colIt = m_columnMetadata.find(columnKey);
-            
-            // Determine Y range to check based on exposure info
-            int minY, maxY;
-            
-            if (colIt != m_columnMetadata.end()) {
-                // We have exposure data, use it to determine range
-                minY = colIt->second.bottomExposedHeight - 1; // Include one below
-                maxY = colIt->second.topExposedHeight + 1;    // Include one above
-                
-                // Ensure we also include player's height in grid
-                if (inGrid) {
-                    minY = std::min(minY, playerChunkPos.y - 2);
-                    maxY = std::max(maxY, playerChunkPos.y + 2);
-                }
-                
-                // Constrain to reasonable bounds
-                minY = std::max(0, minY);
-                maxY = std::min(255, maxY);
-            } else {
-                // No exposure data for this column
-                if (inGrid) {
-                    // For columns in grid with no exposure data, load around player
-                    minY = std::max(0, playerChunkPos.y - 2);
-                    maxY = std::min(255, playerChunkPos.y + 2);
-                } else {
-                    // Skip columns outside grid with no exposure data
-                    continue;
-                }
-            }
-            
-            // Check each chunk in the column's Y range
-            for (int y = minY; y <= maxY; y++) {
-                glm::ivec3 chunkPos(columnKey.first, y, columnKey.second);
-                
-                // Skip if chunk is already loaded or in queue
-                if (existingChunkPositions.count(chunkPos) > 0 || 
-                    chunksInLoadQueue.count(chunkPos) > 0) {
-                    continue;
-                }
-                
-                // Determine if we should load this chunk
-                bool shouldLoad = false;
-                
-                if (inGrid) {
-                    // For chunks in 16x16 grid, load if:
-                    // 1. Near player's height (+/- 2 chunks)
-                    // 2. Within exposed range (or adjacent to it)
-                    if (std::abs(y - playerChunkPos.y) <= 2) {
-                        shouldLoad = true;
-                    } else if (colIt != m_columnMetadata.end()) {
-                        // Check exposure-based criteria
-                        shouldLoad = (y >= colIt->second.bottomExposedHeight - 1 && 
-                                      y <= colIt->second.topExposedHeight + 1);
-                    }
-                } else {
-                    // For chunks outside the grid, only load if they're exposed or adjacent to exposed
-                    shouldLoad = shouldLoadBasedOnExposure(chunkPos);
-                }
-                
-                if (shouldLoad) {
-                    newChunksToLoad.push_back(chunkPos);
-                }
-            }
-        }
-        
-        // STEP 3: Find chunks to unload (more than 8 chunks away horizontally)
-        int chunksChecked = 0;
-        const int MAX_CHUNKS_TO_CHECK = 1000; // Limit to prevent performance issues
-        
-        for (const auto& pair : m_chunks) {
-            if (chunksChecked++ > MAX_CHUNKS_TO_CHECK) break;
-            
-            const glm::ivec3& chunkPos = pair.first;
-            
-            // Keep chunks in the 16x16 grid around player
-            bool inGrid = (chunkPos.x >= minX && chunkPos.x <= maxX &&
-                          chunkPos.z >= minZ && chunkPos.z <= maxZ);
-            if (inGrid) continue;
-            
-            // Don't unload chunks that are close to player's height
-            bool nearPlayerHeight = std::abs(chunkPos.y - playerChunkPos.y) <= 2;
-            if (nearPlayerHeight && (std::abs(chunkPos.x - playerChunkPos.x) <= 10 &&
-                                    std::abs(chunkPos.z - playerChunkPos.z) <= 10)) {
-                continue;
-            }
-            
-            // Don't unload ground-level chunks (important for world continuity)
-            bool isGroundLevel = chunkPos.y < 4;
-            if (isGroundLevel) continue;
-            
-            // Check exposure criteria - don't unload exposed chunks or those adjacent to exposed
-            bool isExposed = pair.second->isExposed();
-            bool isAdjacentToExposed = false;
-            
-            if (!isExposed) {
-                isAdjacentToExposed = isAdjacentToExposedChunk(chunkPos);
-            }
-            
-            // If not exposed and not adjacent to exposed, mark for unloading
-            if (!isExposed && !isAdjacentToExposed) {
-                newChunksToUnload.push_back(chunkPos);
-            }
-        }
-        
-        // Sort load candidates by distance (closest first)
-        std::sort(newChunksToLoad.begin(), newChunksToLoad.end(),
-            [playerChunkPos](const glm::ivec3& a, const glm::ivec3& b) {
-                // Manhattan distance is faster than Euclidean and works well for this
-                float distA = std::abs(a.x - playerChunkPos.x) + 
-                             std::abs(a.y - playerChunkPos.y) + 
-                             std::abs(a.z - playerChunkPos.z);
-                float distB = std::abs(b.x - playerChunkPos.x) + 
-                             std::abs(b.y - playerChunkPos.y) + 
-                             std::abs(b.z - playerChunkPos.z);
-                return distA < distB; // Closest FIRST
-            }
-        );
-        
-        // Sort unload candidates by distance (furthest first)
-        std::sort(newChunksToUnload.begin(), newChunksToUnload.end(),
-            [playerChunkPos](const glm::ivec3& a, const glm::ivec3& b) {
-                float distA = std::abs(a.x - playerChunkPos.x) + 
-                             std::abs(a.y - playerChunkPos.y) + 
-                             std::abs(a.z - playerChunkPos.z);
-                float distB = std::abs(b.x - playerChunkPos.x) + 
-                             std::abs(b.y - playerChunkPos.y) + 
-                             std::abs(b.z - playerChunkPos.z);
-                return distA > distB; // Furthest FIRST
-            }
-        );
-        
-        // Add to loading queue (keep a reasonable limit)
-        const int MAX_NEW_CHUNKS_TO_QUEUE = 50;
-        for (size_t i = 0; i < newChunksToLoad.size() && i < MAX_NEW_CHUNKS_TO_QUEUE; i++) {
-            m_chunksToLoadQueue.push_back(newChunksToLoad[i]);
-        }
-        
-        // Add to unloading queue (keep a reasonable limit)
-        const int MAX_NEW_CHUNKS_TO_UNLOAD = 20;
-        for (size_t i = 0; i < newChunksToUnload.size() && i < MAX_NEW_CHUNKS_TO_UNLOAD; i++) {
-            m_chunksToUnloadQueue.push_back(newChunksToUnload[i]);
-        }
-        
-        // Update the pending chunk operations count
-        m_pendingChunkOperations = m_chunksToLoadQueue.size();
-        
-        // Log what happened (occasionally)
-        static int logCounter = 0;
-        if (logCounter++ % 10 == 0) {
-            std::cout << "Chunk evaluation: Added " << newChunksToLoad.size() 
-                      << " chunks to load queue, " << newChunksToUnload.size() 
-                      << " to unload queue. Queue sizes: Load=" << m_chunksToLoadQueue.size() 
-                      << ", Unload=" << m_chunksToUnloadQueue.size() 
-                      << ", Active chunks=" << m_chunks.size() << std::endl;
-        }
-    } catch (const std::exception& e) {
-        std::cerr << "ERROR in evaluateChunksNeeded: " << e.what() << std::endl;
-    }
-}
-
-// Add a new method to periodically reset all dirty flags and visibility state
-void World::resetChunkStates() {
-    static float lastResetTime = 0.0f;
-    float currentTime = glfwGetTime();
-    
-    // Only perform this reset once every 30 seconds (increased from 10s to reduce frequency)
-    if (currentTime - lastResetTime < 30.0f) {
-        return;
-    }
-    
-    // Track if player has moved significantly since last reset
-    static glm::ivec3 lastResetPlayerChunkPos = worldToChunkPos(m_lastPlayerPosition);
-    glm::ivec3 currentPlayerChunkPos = worldToChunkPos(m_lastPlayerPosition);
-    bool playerMovedSignificantly = (lastResetPlayerChunkPos != currentPlayerChunkPos);
-    lastResetPlayerChunkPos = currentPlayerChunkPos;
-    
-    // If player hasn't moved significantly, don't do a full reset
-    if (!playerMovedSignificantly) {
-        // Skip the reset to avoid unnecessary mesh regeneration
-        lastResetTime = currentTime; // Update the time anyway
-        return;
-    }
-    
-    lastResetTime = currentTime;
-    std::cout << "*** PERFORMING FULL CHUNK STATE RESET ***" << std::endl;
-
-    // Define the strict 16x16 grid boundaries
-    int minX = currentPlayerChunkPos.x - 8;
-    int maxX = currentPlayerChunkPos.x + 7;
-    int minZ = currentPlayerChunkPos.z - 7;
-    int maxZ = currentPlayerChunkPos.z + 8;
-    
-    // Reset visibility set
-    size_t oldVisibleCount = m_visibleChunks.size();
-    m_visibleChunks.clear();
-    
-    // Reset dirty flags and rebuild visibility set properly
-    int dirtyChunks = 0;
-    int visibleChunks = 0;
-    
-    for (auto& pair : m_chunks) {
-        const glm::ivec3& chunkPos = pair.first;
-        Chunk* chunk = pair.second.get();
-        
-        // Clear dirty flag for chunks that already have meshes
-        bool wasDirty = chunk->isDirty();
-        if (wasDirty && chunk->hasMesh()) {
-            chunk->setDirty(false);
-            dirtyChunks++;
-        }
-        
-        // Apply proper visibility rules
-        bool inGrid = (chunkPos.x >= minX && chunkPos.x <= maxX && 
-                     chunkPos.z >= minZ && chunkPos.z <= maxZ);
-                     
-        // Add to visible set ONLY IF:
-        // 1. In grid and exposed
-        // 2. Adjacent to an exposed chunk and that exposed face points toward this chunk
-        if ((inGrid && chunk->isExposed()) || 
-            isAdjacentToExposedChunk(chunkPos)) {
-            m_visibleChunks.insert(chunkPos);
-            
-            // Only re-mark as dirty if it's exposed AND doesn't have a mesh yet
-            if (chunk->isExposed() && !chunk->hasMesh()) {
-                chunk->setDirty(true);
-            }
-            
-            visibleChunks++;
-        }
-    }
-    
-    std::cout << "Reset " << dirtyChunks << " dirty chunks and rebuilt visibility - now "
-              << visibleChunks << " visible chunks (was " << oldVisibleCount << ")" << std::endl;
-}
-
-// Add a method to reset visible chunks
-void World::resetVisibleChunks() {
-    size_t oldSize = m_visibleChunks.size();
-    m_visibleChunks.clear();
-    std::cout << "Reset visible chunks list. Removed " << oldSize << " entries." << std::endl;
-} 

@@ -1,0 +1,722 @@
+#include "world/Chunk.hpp"
+#include "world/World.hpp"
+#include <fstream>
+#include <iostream>
+#include <filesystem>
+
+Chunk::Chunk(int x, int y, int z)
+    : m_x(x)
+    , m_y(y)
+    , m_z(z)
+    , m_blocks(nullptr)
+    , m_isDirty(true)
+    , m_isModified(false)
+    , m_blocksInitialized(false)
+    , m_world(nullptr)
+    , m_visibilityChecked(false)
+    , m_hasExposedFaces(false)
+    , m_emptyCache(true)  // Default to empty until proven otherwise
+    , m_isEmptyCached(false)
+    , m_fullSolidCache(false)
+    , m_isFullSolidCached(false)
+{
+    // Initialize block data on first access
+}
+
+Chunk::~Chunk() {
+    // Free memory
+    if (m_blocks != nullptr) {
+        delete[] m_blocks;
+        m_blocks = nullptr;
+    }
+}
+
+void Chunk::setBlock(int x, int y, int z, int blockType) {
+    // Check if coordinates are valid
+    if (!isValidLocalPos(x, y, z)) {
+        // Check if this is a boundary block (mark in debug output)
+        bool isBoundary = (x == 0 || x == CHUNK_SIZE - 1 || 
+                          y == 0 || y == CHUNK_HEIGHT - 1 || 
+                          z == 0 || z == CHUNK_SIZE - 1);
+        
+        std::cout << "Chunk::setBlock - Setting (" << x << "," << y << "," << z 
+                  << ") in chunk (" << m_x << "," << m_y << "," << m_z
+                  << ") from " << getBlock(x, y, z) << " to " << blockType
+                  << (isBoundary ? " (BOUNDARY BLOCK)" : "") << std::endl;
+                  
+        return;
+    }
+    
+    // Make sure blocks array is created
+    ensureBlocksInitialized();
+    
+    // Calculate index
+    int index = getLocalIndex(x, y, z);
+    
+    // Skip if same block type
+    if (m_blocks[index] == blockType) {
+        return;
+    }
+    
+    // Set the block
+    bool wasAir = (m_blocks[index] == 0);
+    bool isAir = (blockType == 0);
+    m_blocks[index] = blockType;
+    
+    // Invalidate caches when block changes
+    if (wasAir != isAir) {
+        // Block changed between air/solid, invalidate caches
+        m_isEmptyCached = false;
+        m_isFullSolidCached = false;
+        m_visibilityChecked = false;
+        
+        // Mark chunk as modified and dirty (needs mesh update)
+        m_isModified = true;
+        m_isDirty = true;
+    }
+}
+
+int Chunk::getBlock(int x, int y, int z) const {
+    if (x < 0 || x >= CHUNK_SIZE || y < 0 || y >= CHUNK_HEIGHT || z < 0 || z >= CHUNK_SIZE) {
+        return 0; // Return air for out of bounds
+    }
+    return m_blocks[getLocalIndex(x, y, z)];
+}
+
+void Chunk::generateMesh(bool disableGreedyMeshing) {
+    // Clear previous mesh data
+    m_vertexData.clear();
+    m_indexData.clear();
+    
+    // Ensure blocks are initialized
+    if (!m_blocksInitialized || m_blocks == nullptr) {
+        return; // Nothing to generate for empty chunk
+    }
+    
+    // Define the six face directions
+    const glm::ivec3 directions[6] = {
+        glm::ivec3(0, 0, 1),   // Front  (+Z)
+        glm::ivec3(0, 0, -1),  // Back   (-Z)
+        glm::ivec3(-1, 0, 0),  // Left   (-X)
+        glm::ivec3(1, 0, 0),   // Right  (+X)
+        glm::ivec3(0, 1, 0),   // Top    (+Y)
+        glm::ivec3(0, -1, 0)   // Bottom (-Y)
+    };
+    
+    std::cout << "Generating mesh for chunk (" << m_x << ", " << m_y << ", " << m_z 
+              << ") with greedy meshing " << (disableGreedyMeshing ? "DISABLED" : "ENABLED") << std::endl;
+    
+    // STEP 1: FACE CULLING - Determine which faces need to be rendered
+    for (int x = 0; x < CHUNK_SIZE; x++) {
+        for (int y = 0; y < CHUNK_HEIGHT; y++) {
+            for (int z = 0; z < CHUNK_SIZE; z++) {
+                // Skip air blocks
+                int blockType = getBlock(x, y, z);
+                if (blockType == 0) continue;
+                
+                // Check each face of this block
+                for (int faceDir = 0; faceDir < 6; faceDir++) {
+                    const glm::ivec3& dir = directions[faceDir];
+                    
+                    // Calculate adjacent position
+                    int nx = x + dir.x;
+                    int ny = y + dir.y;
+                    int nz = z + dir.z;
+                    
+                    // Check if we need to render this face
+                    bool needsRender = false;
+                    
+                    // Check if adjacent position is within chunk
+                    if (nx < 0 || nx >= CHUNK_SIZE || 
+                        ny < 0 || ny >= CHUNK_HEIGHT || 
+                        nz < 0 || nz >= CHUNK_SIZE) {
+                        // Adjacent block is outside chunk, check in neighboring chunk
+                        if (m_world) {
+                            // Calculate world position of adjacent block
+                            int worldX = m_x * CHUNK_SIZE + nx;
+                            int worldY = m_y * CHUNK_HEIGHT + ny;
+                            int worldZ = m_z * CHUNK_SIZE + nz;
+                            
+                            // Get the block from the world
+                            int adjacentBlockType = m_world->getBlock(glm::ivec3(worldX, worldY, worldZ));
+                            
+                            // Only render if adjacent block is transparent or different type
+                            needsRender = (adjacentBlockType == 0);
+                        } else {
+                            // No world reference, assume air (render the face)
+                            needsRender = true;
+                        }
+                    } else {
+                        // Adjacent block is within this chunk
+                        int adjacentBlockType = getBlock(nx, ny, nz);
+                        
+                        // Only render if adjacent block is transparent or different type
+                        needsRender = (adjacentBlockType == 0);
+                    }
+                    
+                    // If this face needs to be rendered, add it to the mesh
+                    if (needsRender) {
+                        // Create face data
+                        Face face;
+                        face.direction = faceDir;
+                        face.x = x;
+                        face.y = y;
+                        face.z = z;
+                        face.blockType = blockType;
+                        
+                        // Add the face to our mesh
+                        addFace(face);
+                    }
+                }
+            }
+        }
+    }
+    
+    // Mark as no longer dirty
+    m_isDirty = false;
+}
+
+// Simple helper to add a face to the mesh
+void Chunk::addFace(const Face& face) {
+    // Define vertices for each face type (will be offset by block position)
+    const float vertices[][20] = {
+        // Front face (+Z)
+        {
+            0.0f, 0.0f, 1.0f,  0.0f, 0.0f,  0.0f, 0.0f, 1.0f,  // Bottom-left
+            1.0f, 0.0f, 1.0f,  1.0f, 0.0f,  0.0f, 0.0f, 1.0f,  // Bottom-right
+            1.0f, 1.0f, 1.0f,  1.0f, 1.0f,  0.0f, 0.0f, 1.0f,  // Top-right
+            0.0f, 1.0f, 1.0f,  0.0f, 1.0f,  0.0f, 0.0f, 1.0f   // Top-left
+        },
+        // Back face (-Z)
+        {
+            1.0f, 0.0f, 0.0f,  0.0f, 0.0f,  0.0f, 0.0f, -1.0f, // Bottom-right
+            0.0f, 0.0f, 0.0f,  1.0f, 0.0f,  0.0f, 0.0f, -1.0f, // Bottom-left
+            0.0f, 1.0f, 0.0f,  1.0f, 1.0f,  0.0f, 0.0f, -1.0f, // Top-left
+            1.0f, 1.0f, 0.0f,  0.0f, 1.0f,  0.0f, 0.0f, -1.0f  // Top-right
+        },
+        // Left face (-X)
+        {
+            0.0f, 0.0f, 0.0f,  0.0f, 0.0f,  -1.0f, 0.0f, 0.0f, // Bottom-back
+            0.0f, 0.0f, 1.0f,  1.0f, 0.0f,  -1.0f, 0.0f, 0.0f, // Bottom-front
+            0.0f, 1.0f, 1.0f,  1.0f, 1.0f,  -1.0f, 0.0f, 0.0f, // Top-front
+            0.0f, 1.0f, 0.0f,  0.0f, 1.0f,  -1.0f, 0.0f, 0.0f  // Top-back
+        },
+        // Right face (+X)
+        {
+            1.0f, 0.0f, 1.0f,  0.0f, 0.0f,  1.0f, 0.0f, 0.0f,  // Bottom-front
+            1.0f, 0.0f, 0.0f,  1.0f, 0.0f,  1.0f, 0.0f, 0.0f,  // Bottom-back
+            1.0f, 1.0f, 0.0f,  1.0f, 1.0f,  1.0f, 0.0f, 0.0f,  // Top-back
+            1.0f, 1.0f, 1.0f,  0.0f, 1.0f,  1.0f, 0.0f, 0.0f   // Top-front
+        },
+        // Top face (+Y)
+        {
+            0.0f, 1.0f, 1.0f,  0.0f, 0.0f,  0.0f, 1.0f, 0.0f,  // Front-left
+            1.0f, 1.0f, 1.0f,  1.0f, 0.0f,  0.0f, 1.0f, 0.0f,  // Front-right
+            1.0f, 1.0f, 0.0f,  1.0f, 1.0f,  0.0f, 1.0f, 0.0f,  // Back-right
+            0.0f, 1.0f, 0.0f,  0.0f, 1.0f,  0.0f, 1.0f, 0.0f   // Back-left
+        },
+        // Bottom face (-Y)
+        {
+            0.0f, 0.0f, 0.0f,  0.0f, 0.0f,  0.0f, -1.0f, 0.0f, // Bottom-left back
+            1.0f, 0.0f, 0.0f,  1.0f, 0.0f,  0.0f, -1.0f, 0.0f, // Bottom-right back
+            1.0f, 0.0f, 1.0f,  1.0f, 1.0f,  0.0f, -1.0f, 0.0f, // Top-right front
+            0.0f, 0.0f, 1.0f,  0.0f, 1.0f,  0.0f, -1.0f, 0.0f  // Top-left front
+        }
+    };
+    
+    // Get base index for this face
+    unsigned int baseIndex = m_vertexData.size() / 9; // 9 floats per vertex
+    
+    // Get face direction and position
+    int faceDir = face.direction;
+    float x = static_cast<float>(face.x);
+    float y = static_cast<float>(face.y);
+    float z = static_cast<float>(face.z);
+    
+    // Add the four vertices for this face
+    for (int i = 0; i < 4; i++) {
+        // Position coordinates (x, y, z)
+        m_vertexData.push_back(vertices[faceDir][i*8+0] + x);
+        m_vertexData.push_back(vertices[faceDir][i*8+1] + y);
+        m_vertexData.push_back(vertices[faceDir][i*8+2] + z);
+        
+        // Texture coordinates (u, v)
+        m_vertexData.push_back(vertices[faceDir][i*8+3]);
+        m_vertexData.push_back(vertices[faceDir][i*8+4]);
+        
+        // Normal coordinates (nx, ny, nz)
+        m_vertexData.push_back(vertices[faceDir][i*8+5]);
+        m_vertexData.push_back(vertices[faceDir][i*8+6]);
+        m_vertexData.push_back(vertices[faceDir][i*8+7]);
+        
+        // Add block type as color data
+        m_vertexData.push_back(static_cast<float>(face.blockType));
+    }
+    
+    // Add the six indices to form two triangles
+    m_indexData.push_back(baseIndex + 0);
+    m_indexData.push_back(baseIndex + 1);
+    m_indexData.push_back(baseIndex + 2);
+    
+    m_indexData.push_back(baseIndex + 2);
+    m_indexData.push_back(baseIndex + 3);
+    m_indexData.push_back(baseIndex + 0);
+}
+
+// Helper method to add a block using individual faces
+void Chunk::addCube(int x, int y, int z, int blockType) {
+    // Add each face of the cube
+    for (int faceDir = 0; faceDir < 6; faceDir++) {
+        Face face;
+        face.direction = faceDir;
+        face.x = x;
+        face.y = y;
+        face.z = z;
+        face.blockType = blockType;
+        addFace(face);
+    }
+}
+
+// Add a simple implementation of the greedy mesh function (placeholder)
+void Chunk::generateGreedyMesh() {
+    // This is a placeholder - the actual greedy meshing is complex and requires careful implementation
+    // For now, we'll do simple face-by-face rendering
+    for (int x = 0; x < CHUNK_SIZE; x++) {
+        for (int y = 0; y < CHUNK_HEIGHT; y++) {
+            for (int z = 0; z < CHUNK_SIZE; z++) {
+                int blockType = getBlock(x, y, z);
+                if (blockType != 0) {
+                    addCube(x, y, z, blockType);
+                }
+            }
+        }
+    }
+}
+
+// Simple helper for greedy face addition (placeholder)
+void Chunk::addGreedyFace(int direction, int startX, int startY, int startZ, int width, int height, int blockType) {
+    // This is a placeholder - actual implementation requires careful quad construction
+    // For now, use the basic addFace method
+    Face face;
+    face.direction = direction;
+    face.x = startX;
+    face.y = startY;
+    face.z = startZ;
+    face.blockType = blockType;
+    addFace(face);
+}
+
+int Chunk::getAdjacentBlock(int x, int y, int z, const glm::vec3& normal) const {
+    // Calculate adjacent block position
+    int checkX = x + static_cast<int>(normal.x);
+    int checkY = y + static_cast<int>(normal.y);
+    int checkZ = z + static_cast<int>(normal.z);
+
+    // If the adjacent block is within this chunk, check directly
+    if (checkX >= 0 && checkX < CHUNK_SIZE && 
+        checkY >= 0 && checkY < CHUNK_HEIGHT && 
+        checkZ >= 0 && checkZ < CHUNK_SIZE) {
+        return m_blocks[getLocalIndex(checkX, checkY, checkZ)];
+    }
+    
+    // If we have a world reference and the block is outside this chunk,
+    // convert to world coordinates and query the world
+    if (m_world) {
+        // Convert to world coordinates
+        int worldX = m_x * CHUNK_SIZE + checkX;
+        int worldY = m_y * CHUNK_HEIGHT + checkY;
+        int worldZ = m_z * CHUNK_SIZE + checkZ;
+        
+        // Query the world for the block at this position
+        return m_world->getBlock(glm::ivec3(worldX, worldY, worldZ));
+    }
+    
+    // If we don't have a world reference or can't find the block,
+    // assume it's air (0) which means the face should be rendered
+    return 0;
+}
+
+bool Chunk::serialize(const std::string& filename) const {
+    std::ofstream file(filename, std::ios::binary);
+    if (!file.is_open()) {
+        std::cerr << "Failed to open file for writing: " << filename << std::endl;
+        return false;
+    }
+    
+    // Write chunk position
+    file.write(reinterpret_cast<const char*>(&m_x), sizeof(m_x));
+    file.write(reinterpret_cast<const char*>(&m_y), sizeof(m_y));
+    file.write(reinterpret_cast<const char*>(&m_z), sizeof(m_z));
+    
+    // Write whether the chunk has been modified by the player
+    file.write(reinterpret_cast<const char*>(&m_isModified), sizeof(m_isModified));
+    
+    // Check if blocks are initialized
+    bool initialized = m_blocksInitialized && m_blocks != nullptr;
+    file.write(reinterpret_cast<const char*>(&initialized), sizeof(initialized));
+    
+    if (initialized) {
+        // Write all block data
+        const int totalSize = CHUNK_SIZE * CHUNK_HEIGHT * CHUNK_SIZE;
+        file.write(reinterpret_cast<const char*>(m_blocks), totalSize);
+    } else {
+        // Just write zeroes for all blocks (empty chunk)
+        std::vector<uint8_t> emptyData(CHUNK_SIZE * CHUNK_HEIGHT * CHUNK_SIZE, 0);
+        file.write(reinterpret_cast<const char*>(emptyData.data()), emptyData.size());
+    }
+    
+    return true;
+}
+
+bool Chunk::deserialize(const std::string& filename) {
+    std::ifstream file(filename, std::ios::binary);
+    if (!file.is_open()) {
+        std::cerr << "Failed to open file for reading: " << filename << std::endl;
+        return false;
+    }
+    
+    // Read chunk position
+    file.read(reinterpret_cast<char*>(&m_x), sizeof(m_x));
+    file.read(reinterpret_cast<char*>(&m_y), sizeof(m_y));
+    file.read(reinterpret_cast<char*>(&m_z), sizeof(m_z));
+    
+    // Read whether the chunk has been modified by the player
+    file.read(reinterpret_cast<char*>(&m_isModified), sizeof(m_isModified));
+    
+    // Read whether blocks were initialized
+    bool initialized;
+    file.read(reinterpret_cast<char*>(&initialized), sizeof(initialized));
+    
+    // Make sure our block array is ready
+    ensureBlocksInitialized();
+    
+    // Read all block data
+    const int totalSize = CHUNK_SIZE * CHUNK_HEIGHT * CHUNK_SIZE;
+    file.read(reinterpret_cast<char*>(m_blocks), totalSize);
+    
+    // Mark mesh as needing update
+    m_isDirty = true;
+    
+    // Reset cached values
+    m_visibilityChecked = false;
+    m_isEmptyCached = false;
+    m_isFullSolidCached = false;
+    
+    return true;
+}
+
+std::vector<AABB> Chunk::buildColliderMesh() const {
+    // Return cached collision mesh if not dirty
+    if (!m_collisionMeshDirty && !m_collisionMesh.empty()) {
+        return m_collisionMesh;
+    }
+    
+    std::vector<AABB> colliderVolumes;
+    
+    // 3D array to track which blocks have been processed already
+    bool processed[CHUNK_SIZE][CHUNK_HEIGHT][CHUNK_SIZE] = {{{false}}};
+    
+    // First pass: Combine blocks along X axis
+    for (int y = 0; y < CHUNK_HEIGHT; ++y) {
+        for (int z = 0; z < CHUNK_SIZE; ++z) {
+            for (int x = 0; x < CHUNK_SIZE; ++x) {
+                // Skip if already processed or not solid
+                int blockID = getBlock(x, y, z);
+                if (processed[x][y][z] || !isBlockSolid(blockID)) {
+                    continue;
+                }
+                
+                // Find max extent in X direction
+                int maxX = x;
+                while (maxX + 1 < CHUNK_SIZE && 
+                       !processed[maxX + 1][y][z] && 
+                       isBlockSolid(getBlock(maxX + 1, y, z)) &&
+                       getBlock(maxX + 1, y, z) == blockID) {
+                    maxX++;
+                }
+                
+                // Find max extent in Z direction
+                int maxZ = z;
+                bool canExpandZ = true;
+                
+                while (canExpandZ && maxZ + 1 < CHUNK_SIZE) {
+                    // Check if the entire range from x to maxX can be expanded in Z
+                    for (int testX = x; testX <= maxX; testX++) {
+                        if (processed[testX][y][maxZ + 1] || 
+                            !isBlockSolid(getBlock(testX, y, maxZ + 1)) ||
+                            getBlock(testX, y, maxZ + 1) != blockID) {
+                            canExpandZ = false;
+                            break;
+                        }
+                    }
+                    
+                    if (canExpandZ) {
+                        maxZ++;
+                    }
+                }
+                
+                // Find max extent in Y direction
+                int maxY = y;
+                bool canExpandY = true;
+                
+                while (canExpandY && maxY + 1 < CHUNK_HEIGHT) {
+                    // Check if the entire XZ plane can be expanded in Y
+                    for (int testZ = z; testZ <= maxZ; testZ++) {
+                        for (int testX = x; testX <= maxX; testX++) {
+                            if (processed[testX][maxY + 1][testZ] || 
+                                !isBlockSolid(getBlock(testX, maxY + 1, testZ)) ||
+                                getBlock(testX, maxY + 1, testZ) != blockID) {
+                                canExpandY = false;
+                                break;
+                            }
+                        }
+                        if (!canExpandY) break;
+                    }
+                    
+                    if (canExpandY) {
+                        maxY++;
+                    }
+                }
+                
+                // Mark all blocks in this volume as processed
+                for (int testY = y; testY <= maxY; testY++) {
+                    for (int testZ = z; testZ <= maxZ; testZ++) {
+                        for (int testX = x; testX <= maxX; testX++) {
+                            processed[testX][testY][testZ] = true;
+                        }
+                    }
+                }
+                
+                // Create a single AABB for this merged volume
+                glm::vec3 worldMin(x + m_x * CHUNK_SIZE, y + m_y * CHUNK_HEIGHT, z + m_z * CHUNK_SIZE);
+                glm::vec3 worldMax(maxX + 1 + m_x * CHUNK_SIZE, maxY + 1 + m_y * CHUNK_HEIGHT, maxZ + 1 + m_z * CHUNK_SIZE);
+                
+                colliderVolumes.emplace_back(worldMin, worldMax);
+            }
+        }
+    }
+    
+    // Cache the result
+    m_collisionMesh = colliderVolumes;
+    m_collisionMeshDirty = false;
+    
+    return colliderVolumes;
+}
+
+bool Chunk::isBlockTransparent(int blockType) const {
+    // Block ID 0 is air, which is transparent
+    if (blockType == 0) return true;
+    
+    // Define other transparent block types here
+    // For example, if block ID 2 is glass, 3 is water, etc.
+    switch (blockType) {
+        case 0:  // Air
+            return true;
+        case 2:  // Assuming ID 2 is glass
+            return true;
+        case 3:  // Assuming ID 3 is water
+            return true;
+        case 4:  // Assuming ID 4 is leaves
+            return true;
+        default:
+            return false;
+    }
+}
+
+bool Chunk::isEmpty() const {
+    // If we've cached the result, return it
+    if (m_isEmptyCached) {
+        return m_emptyCache;
+    }
+    
+    // If blocks aren't initialized, it's empty
+    if (!m_blocksInitialized || m_blocks == nullptr) {
+        // Cache result
+        const_cast<Chunk*>(this)->m_emptyCache = true;
+        const_cast<Chunk*>(this)->m_isEmptyCached = true;
+        return true;
+    }
+    
+    // Check if any block is not air
+    const int totalSize = CHUNK_SIZE * CHUNK_HEIGHT * CHUNK_SIZE;
+    for (int i = 0; i < totalSize; i++) {
+        if (m_blocks[i] != 0) {
+            // Found a non-air block, not empty
+            const_cast<Chunk*>(this)->m_emptyCache = false;
+            const_cast<Chunk*>(this)->m_isEmptyCached = true;
+            return false;
+        }
+    }
+    
+    // No non-air blocks found, chunk is empty
+    const_cast<Chunk*>(this)->m_emptyCache = true;
+    const_cast<Chunk*>(this)->m_isEmptyCached = true;
+    return true;
+}
+
+bool Chunk::isFullSolid() const {
+    // If we've cached the result, return it
+    if (m_isFullSolidCached) {
+        return m_fullSolidCache;
+    }
+    
+    // If blocks aren't initialized, it's not full
+    if (!m_blocksInitialized || m_blocks == nullptr) {
+        const_cast<Chunk*>(this)->m_fullSolidCache = false;
+        const_cast<Chunk*>(this)->m_isFullSolidCached = true;
+        return false;
+    }
+    
+    // Check if any block is air
+    const int totalSize = CHUNK_SIZE * CHUNK_HEIGHT * CHUNK_SIZE;
+    for (int i = 0; i < totalSize; i++) {
+        if (m_blocks[i] == 0) {
+            // Found an air block, not full solid
+            const_cast<Chunk*>(this)->m_fullSolidCache = false;
+            const_cast<Chunk*>(this)->m_isFullSolidCached = true;
+            return false;
+        }
+    }
+    
+    // No air blocks found, chunk is full solid
+    const_cast<Chunk*>(this)->m_fullSolidCache = true;
+    const_cast<Chunk*>(this)->m_isFullSolidCached = true;
+    return true;
+}
+
+bool Chunk::hasFacingBlocks(const glm::ivec3& direction) const {
+    // If blocks aren't initialized, no blocks
+    if (!m_blocksInitialized || m_blocks == nullptr) {
+        return false;
+    }
+    
+    // Determine which face to check
+    int faceX = 0;
+    int faceY = 0;
+    int faceZ = 0;
+    
+    if (direction.x > 0) faceX = CHUNK_SIZE - 1;
+    else if (direction.x < 0) faceX = 0;
+    else if (direction.y > 0) faceY = CHUNK_HEIGHT - 1;
+    else if (direction.y < 0) faceY = 0;
+    else if (direction.z > 0) faceZ = CHUNK_SIZE - 1;
+    else if (direction.z < 0) faceZ = 0;
+    
+    // Check blocks on this face
+    if (direction.x != 0) {
+        // Check YZ face
+        for (int y = 0; y < CHUNK_HEIGHT; y++) {
+            for (int z = 0; z < CHUNK_SIZE; z++) {
+                if (getBlock(faceX, y, z) != 0) {
+                    return true; // Found a non-air block
+                }
+            }
+        }
+    } else if (direction.y != 0) {
+        // Check XZ face
+        for (int x = 0; x < CHUNK_SIZE; x++) {
+            for (int z = 0; z < CHUNK_SIZE; z++) {
+                if (getBlock(x, faceY, z) != 0) {
+                    return true; // Found a non-air block
+                }
+            }
+        }
+    } else if (direction.z != 0) {
+        // Check XY face
+        for (int x = 0; x < CHUNK_SIZE; x++) {
+            for (int y = 0; y < CHUNK_HEIGHT; y++) {
+                if (getBlock(x, y, faceZ) != 0) {
+                    return true; // Found a non-air block
+                }
+            }
+        }
+    }
+    
+    // No blocks on this face
+    return false;
+}
+
+bool Chunk::hasGapsOnFace(const glm::ivec3& direction) const {
+    // If blocks aren't initialized, assume there are gaps
+    if (!m_blocksInitialized || m_blocks == nullptr) {
+        return true;
+    }
+    
+    // Determine which face to check
+    int faceX = 0;
+    int faceY = 0;
+    int faceZ = 0;
+    
+    if (direction.x > 0) faceX = CHUNK_SIZE - 1;
+    else if (direction.x < 0) faceX = 0;
+    else if (direction.y > 0) faceY = CHUNK_HEIGHT - 1;
+    else if (direction.y < 0) faceY = 0;
+    else if (direction.z > 0) faceZ = CHUNK_SIZE - 1;
+    else if (direction.z < 0) faceZ = 0;
+    
+    // Check for air gaps on this face
+    if (direction.x != 0) {
+        // Check YZ face
+        for (int y = 0; y < CHUNK_HEIGHT; y++) {
+            for (int z = 0; z < CHUNK_SIZE; z++) {
+                if (getBlock(faceX, y, z) == 0) {
+                    return true; // Found an air block (gap)
+                }
+            }
+        }
+    } else if (direction.y != 0) {
+        // Check XZ face
+        for (int x = 0; x < CHUNK_SIZE; x++) {
+            for (int z = 0; z < CHUNK_SIZE; z++) {
+                if (getBlock(x, faceY, z) == 0) {
+                    return true; // Found an air block (gap)
+                }
+            }
+        }
+    } else if (direction.z != 0) {
+        // Check XY face
+        for (int x = 0; x < CHUNK_SIZE; x++) {
+            for (int y = 0; y < CHUNK_HEIGHT; y++) {
+                if (getBlock(x, y, faceZ) == 0) {
+                    return true; // Found an air block (gap)
+                }
+            }
+        }
+    }
+    
+    // No air gaps on this face
+    return false;
+}
+
+// Add methods for block array initialization
+void Chunk::ensureBlocksInitialized() {
+    // Only initialize if not already done
+    if (m_blocksInitialized && m_blocks != nullptr) {
+        return;
+    }
+    
+    // Allocate block array (1D array for better cache locality)
+    const int totalSize = CHUNK_SIZE * CHUNK_HEIGHT * CHUNK_SIZE;
+    m_blocks = new uint8_t[totalSize]();  // Initialize all to 0 (air)
+    
+    // Mark as initialized
+    m_blocksInitialized = true;
+    
+    // Set initial cache values
+    m_emptyCache = true;  // Start as empty (all air)
+    m_isEmptyCached = true;
+    m_fullSolidCache = false;  // Not full solid
+    m_isFullSolidCached = true;
+}
+
+// Add helper for index calculation
+int Chunk::getLocalIndex(int x, int y, int z) const {
+    return (x * CHUNK_HEIGHT * CHUNK_SIZE) + (y * CHUNK_SIZE) + z;
+}
+
+// Add helper for position validation
+bool Chunk::isValidLocalPos(int x, int y, int z) const {
+    return (x >= 0 && x < CHUNK_SIZE &&
+            y >= 0 && y < CHUNK_HEIGHT &&
+            z >= 0 && z < CHUNK_SIZE);
+} 

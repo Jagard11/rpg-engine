@@ -31,6 +31,7 @@ set(SOURCES
     src/world/Chunk.cpp
     src/world/WorldGenerator.cpp
     src/world/VoxelManipulator.cpp
+    src/world/ChunkVisibilityManager.cpp
     src/player/Player.cpp
     src/physics/CollisionSystem.cpp
     src/renderer/Renderer.cpp
@@ -55,6 +56,7 @@ set(HEADERS
     include/world/Chunk.hpp
     include/world/WorldGenerator.hpp
     include/world/VoxelManipulator.hpp
+    include/world/ChunkVisibilityManager.hpp
     include/player/Player.hpp
     include/physics/CollisionSystem.hpp
     include/renderer/Renderer.hpp
